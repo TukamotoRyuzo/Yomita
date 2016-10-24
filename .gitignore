@@ -218,7 +218,6 @@ ModelManifest.xml
 *.bin
 *.opendb
 io_log*
-book.txt
 *.bat
 engine-config*
 teacher
