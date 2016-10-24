@@ -1,5 +1,5 @@
-/*
-“Ç‚İ‘¾iyomitaj, a USI shogi (Japanese chess) playing engine derived from
+ï»¿/*
+èª­ã¿å¤ªï¼ˆyomitaï¼‰, a USI shogi (Japanese chess) playing engine derived from
 Stockfish 7 & YaneuraOu mid 2016 V3.57
 Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "eval_krb.h"
 #include "eval_kppl.h"
 
-// memory mapped file‚É•K—vB
+// memory mapped fileã«å¿…è¦ã€‚
 namespace Eval
 {
 	extern void loadSub();
