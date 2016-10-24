@@ -212,7 +212,6 @@ _Pvt_Extensions/
 ModelManifest.xml
 /yomita/yomita.VC.db
 /yomita/yomita.VC.VC.opendb
-*exe
 *.iobj
 *.ipdb
 *.bin
