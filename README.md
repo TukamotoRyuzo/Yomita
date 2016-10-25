@@ -9,7 +9,7 @@
 https://github.com/TukamotoRyuzo/Yomita/releases/tag/0
 
 こちらからでもダウンロードできます。
-https://drive.google.com/open?id=0B7n02sPVvqFWSFFfS1Vvc0NtTEE
+https://drive.google.com/open?id=0B7n02sPVvqFWVmxRODVsejFickU
 
 やねうら王、Aperyの評価関数バイナリは、読み太でも使うことができます。
 付属している評価関数バイナリは、電王トーナメント時点ではやねうら王、Aperyでは使用できなかったのですが、
