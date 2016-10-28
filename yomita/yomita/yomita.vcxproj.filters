@@ -228,4 +228,9 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\更新履歴.txt">
+      <Filter>リソース ファイル</Filter>
+    </Text>
+  </ItemGroup>
 </Project>

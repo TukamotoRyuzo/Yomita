@@ -187,7 +187,7 @@ namespace Eval
 		// 盤上のsqの升にpiece_noのpcの駒を配置したときの駒番号に対するBonaPieceを設定する。
 		void putPiece(PieceNo piece_no, Square sq, Piece pc) 
 		{
-			setPiece(piece_no, BonaPiece(BP_BOARD_ID[pc].fb + toEvalSq(sq)), BonaPiece(BP_BOARD_ID[pc].fw + toEvalSq(inverse(sq))));
+			setPiece(piece_no, BonaPiece(BP_BOARD_ID[pc].fb + sq), BonaPiece(BP_BOARD_ID[pc].fw + inverse(sq)));
 		}
 
 		// c側の手駒ptのi+1枚目の駒のPieceNoを設定する。(1枚目の駒のPieceNoを設定したいならi==0にして呼び出すの意味)

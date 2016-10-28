@@ -347,7 +347,7 @@ public:
 	PieceNo pieceNoOf(Turn c, PieceType pt) const { return eval_list_.pieceNoOf(bonaPieceOf(c, pt)); }
 
 	// 盤上のpcの駒のPieceNoを返す
-	PieceNo pieceNoOf(Piece pc, Square sq) const { return eval_list_.pieceNoOf((Eval::BonaPiece)(Eval::BP_BOARD_ID[pc].fb + toEvalSq(sq))); }
+	PieceNo pieceNoOf(Piece pc, Square sq) const { return eval_list_.pieceNoOf((Eval::BonaPiece)(Eval::BP_BOARD_ID[pc].fb + sq)); }
 #endif
 
 	Key key() const { return st_->key(); }

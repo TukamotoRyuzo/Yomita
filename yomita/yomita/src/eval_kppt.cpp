@@ -65,10 +65,55 @@ namespace Eval
 		if (!ifsKK || !ifsKKP || !ifsKPP)
 			goto Error;
 
+#ifdef USE_FILE_SQUARE_EVAL
+		// 縦型Square用の評価関数バイナリを使うときは横型に変換して読み込む。
+		EvalTable et2;
+		auto tempeval = new SharedEval();
+		et2.set(tempeval);
+
+		ifsKK.read(reinterpret_cast<char*>(*et2.kk_), sizeof(*et2.kk_));
+		ifsKKP.read(reinterpret_cast<char*>(*et2.kkp_), sizeof(*et2.kkp_));
+		ifsKPP.read(reinterpret_cast<char*>(*et2.kpp_), sizeof(*et2.kpp_));
+	
+		int y2b[fe_end];
+
+		for (BonaPiece p = BONA_PIECE_ZERO; p < fe_end; p++)
+		{
+			if (p < fe_hand_end)
+			{
+				y2b[p] = p;
+			}
+			else
+			{
+				auto wp = p - fe_hand_end;
+				Square sq = Square(wp % 81);
+				EvalSquare rsq = toEvalSq(sq);
+				auto np = p - sq + rsq;
+				y2b[p] = np;
+			}
+		}
+
+		// 元の重みをコピー
+		for (auto k1 : Squares)
+			for (auto k2 : Squares)
+				kk[k1][k2] = (*et2.kk_)[toEvalSq(k1)][toEvalSq(k2)];
+
+		for (auto k : Squares)
+			for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
+				for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
+					kpp[k][p1][p2] = (*et2.kpp_)[toEvalSq(k)][y2b[p1]][y2b[p2]];
+
+		for (auto k1 : Squares)
+			for (auto k2 : Squares)
+				for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
+					kkp[k1][k2][p] = (*et2.kkp_)[toEvalSq(k1)][toEvalSq(k2)][y2b[p]];
+
+		delete tempeval;
+#else
 		ifsKK.read(reinterpret_cast<char*>(kk), sizeof(kk));
 		ifsKKP.read(reinterpret_cast<char*>(kkp), sizeof(kkp));
 		ifsKPP.read(reinterpret_cast<char*>(kpp), sizeof(kpp));
-
+#endif
 #ifdef LEARN
 		evalLearnInit();
 #endif
@@ -87,8 +132,8 @@ namespace Eval
 	{
 		assert(kpp != nullptr);
 
-		auto sq_bk0 = toEvalSq(b.kingSquare(BLACK));
-		auto sq_wk0 = toEvalSq(b.kingSquare(WHITE));
+		auto sq_bk0 = b.kingSquare(BLACK);
+		auto sq_wk0 = b.kingSquare(WHITE);
 		auto sq_wk1 = inverse(sq_wk0);
 		auto list_fb = b.evalList()->pieceListFb();
 		auto list_fw = b.evalList()->pieceListFw();
@@ -197,8 +242,8 @@ namespace Eval
 
 		// この差分を求める
 		{
-			auto sq_bk0 = toEvalSq(b.kingSquare(BLACK));
-			auto sq_wk0 = toEvalSq(b.kingSquare(WHITE));
+			auto sq_bk0 = b.kingSquare(BLACK);
+			auto sq_wk0 = b.kingSquare(WHITE);
 			auto sq_wk1 = inverse(sq_wk0);
 
 			auto list_fb = b.evalList()->pieceListFb();
