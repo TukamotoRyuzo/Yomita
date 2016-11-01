@@ -59,6 +59,7 @@ namespace Search
 		Move excluded_move;
 		Move killers[2];
 		Score static_eval; // 現局面で評価関数を呼び出した時のスコア
+		Score history;
 		bool skip_early_pruning;
 		int move_count;
 		CounterMoveStats* counter_moves;

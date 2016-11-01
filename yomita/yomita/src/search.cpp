@@ -533,6 +533,7 @@ namespace
 		Score best_score = -SCORE_INFINITE;
 		ss->ply = (ss - 1)->ply + 1;
 		move_count = quiet_count = ss->move_count = 0;
+		ss->history = SCORE_ZERO;
 
 		// checkTime()を呼ぶためのカウンタをリセットする
 		if (this_thread->reset_calls.load(std::memory_order_relaxed))
@@ -914,9 +915,9 @@ namespace
 			// Step 12. 王手延長
 			// 王手でしかも駒得なら延長して探索する価値あり
 			if (gives_check
-			&& !move_count_pruning
-			&& b.seeSign(move) >= SCORE_ZERO)
-				extension = ONE_PLY;
+				&& !move_count_pruning
+				&& b.seeSign(move) >= SCORE_ZERO)
+					extension = ONE_PLY;
 
 			// singular extension search
 			// ここでのsearchは純粋に延長する/しないだけを求めたいのであり、historyのupdateはしたくない。
@@ -1010,19 +1011,23 @@ namespace
 				
 				if (!capture_or_pawn_promotion)
 				{
-					const Score history_score = this_thread->history.value(move)
-						+ (cmh ? cmh->value(move) : SCORE_ZERO)
-						+ (fmh ? fmh->value(move) : SCORE_ZERO)
-						+ (fm2 ? fm2->value(move) : SCORE_ZERO)
-						+ this_thread->from_to_history.get(~b.turn(), move);
-
 					if (!PvNode && cut_node)
 						r += ONE_PLY;
 
-					// historyの価値が高かったら探索深さを増やす
-					int r_hist = (history_score - 8000) / 20000;
+					ss->history = this_thread->history.value(move)
+						+ (cmh ? cmh->value(move) : SCORE_ZERO)
+						+ (fmh ? fmh->value(move) : SCORE_ZERO)
+						+ (fm2 ? fm2->value(move) : SCORE_ZERO)
+						+ this_thread->from_to_history.get(~b.turn(), move)
+						- 8000;
 
-					r = std::max(DEPTH_ZERO, r - r_hist * ONE_PLY);
+					if (ss->history > SCORE_ZERO && (ss - 1)->history < SCORE_ZERO)
+						r -= ONE_PLY;
+
+					else if (ss->history < SCORE_ZERO && (ss - 1)->history > SCORE_ZERO)
+						r += ONE_PLY;
+
+					r = std::max(DEPTH_ZERO, (r - ss->history / 20000) * ONE_PLY);
 				}
 				else if (r) // 価値が高い可能性が高いので深くする。
 					r -= ONE_PLY;
