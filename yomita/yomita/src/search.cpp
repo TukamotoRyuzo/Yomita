@@ -858,7 +858,6 @@ namespace
 
 		const CounterMoveStats* cmh = (ss - 1)->counter_moves;
 		const CounterMoveStats* fmh = (ss - 2)->counter_moves;
-		//const CounterMoveStats* cm2 = (ss - 3)->counter_moves;
 		const CounterMoveStats* fm2 = (ss - 4)->counter_moves;
 
 #ifdef EVAL_DIFF
@@ -1479,7 +1478,6 @@ namespace
 	{
 		CounterMoveStats* cmh = (ss - 1)->counter_moves;
 		CounterMoveStats* fmh = (ss - 2)->counter_moves;
-		CounterMoveStats* cm2 = (ss - 3)->counter_moves;
 		CounterMoveStats* fm2 = (ss - 4)->counter_moves;
 
 		if (cmh)
@@ -1487,9 +1485,6 @@ namespace
 
 		if (fmh)
 			fmh->update(m, bonus);
-
-		if (cm2)
-			cm2->update(m, bonus);
 
 		if (fm2)
 			fm2->update(m, bonus);
