@@ -321,7 +321,7 @@ public:
 	
 	// 静止探索
 	Score see(const Move) const;
-	Score seeSign(const Move) const;
+	bool seeGe(const Move, const Score) const;
 
 	// ピンされている駒(return)、している駒(pinners)を返す。tはsniperのturn, sqはking_sq
 	// BlockersOnlyはBlockersだけを求めたいときにtrueにする。

@@ -89,6 +89,13 @@ void randomPlayer(Board& b, uint64_t loop_max)
 				m = ml.begin()[rng.rand<int>() % ml.size()].move;
 			} while (cc++ < 3 && isDrop(m));
 
+			if (b.seeGe(m, Score(1)) != (b.see(m) >= 1))
+			{
+				std::cout << b << pretty(m) << "see = " << b.see(m) << std::endl;
+
+				b.seeGe(m, Score(1));
+			}
+
 			b.doMove(m, state[ply], b.givesCheck(m));
 			moves[ply] = m;
 

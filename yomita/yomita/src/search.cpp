@@ -915,7 +915,7 @@ namespace
 			// 王手でしかも駒得なら延長して探索する価値あり
 			if (gives_check
 				&& !move_count_pruning
-				&& b.seeSign(move) >= SCORE_ZERO)
+				&& b.seeGe(move, SCORE_ZERO))
 					extension = ONE_PLY;
 
 			// singular extension search
@@ -972,13 +972,13 @@ namespace
 					if (predicted_depth < 7 * ONE_PLY && ss->static_eval + futilityMargin(predicted_depth, b) + 256 <= alpha)
 						continue;
 
-					if (predicted_depth < 4 * ONE_PLY && b.seeSign(move) < SCORE_ZERO)
+					if (predicted_depth < 4 * ONE_PLY && !b.seeGe(move, SCORE_ZERO))
 						continue;
 				}
 				
 				// とても浅い残り探索深さにおける王手や駒をとる手のSEE値が負なら枝刈してしまう。
 				else if (depth < 3 * ONE_PLY && 
-					(mp.seeSign() < 0 || (!mp.seeSign() && b.seeSign(move) < SCORE_ZERO)))
+					(mp.seeSign() < 0 || (!mp.seeSign() && !b.seeGe(move, SCORE_ZERO))))
 					continue;
 			}
 
@@ -1349,7 +1349,7 @@ namespace
 					continue;
 				}
 
-				if (futility_base <= alpha && b.seeSign(move) <= SCORE_ZERO)
+				if (futility_base <= alpha && !b.seeGe(move, Score(1)))
 				{
 					best_score = std::max(best_score, futility_base);
 					continue;
@@ -1363,7 +1363,7 @@ namespace
 			// 王手されていない時や詰まされる時は、QUIETな手やSEEが-の手は探索しない
 			if ((!InCheck || evasionPrunable)
 				&& !isPawnPromote(move)
-				&& b.seeSign(move) < SCORE_ZERO)
+				&& !b.seeGe(move, SCORE_ZERO))
 				continue;
 
 #ifdef ENABLE_TT

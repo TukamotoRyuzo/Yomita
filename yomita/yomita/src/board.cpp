@@ -823,16 +823,105 @@ namespace
 	}
 }
 
-Score Board::seeSign(const Move move) const
+// mのSEE >= s を返す。s以上であることがわかった時点でこの関数を抜けるので、通常のSEEよりも高速。
+// 成りは考慮しない。
+bool Board::seeGe(const Move m, const Score s) const
 {
-	// 安い駒で高い駒を取れるのであれば、取り合いは必ずこちらが得をする……という意図なのだが、
-	// 将棋ではチェスよりは頻繁に成りがあるので、単純にはそうとも言い切れない。例えば香車で桂馬を取る手はこの関数を通すとsee値は正なのだが、
-	// もしその香車を歩成で取り返されたら駒割上は損をすることになってしまう。
-	if (isCapture(move)
-		&& captureScore(movedPieceType(move)) < captureScore(capturePieceType(move)))
-		return Score(1);
+	// seeSign的なものを入れるほうが0.3~0.4%ほどnpsが高かった。
+	if (isCapture(m)
+		&& captureScore(capturePieceType(m)) - captureScore(movedPieceType(m)) >= s)
+		return true;
 
-	return see(move);
+	assert(isOK(m));
+	const Square to = toSq(m);
+	PieceType next_victims;
+	Bitboard occ = bbOccupied(), all_attackers, enemy_attackers;
+	Turn enemy = ~turn();
+	Score balance;
+
+	if (isDrop(m)) // 駒打ち
+	{
+		// toに利いている相手の駒
+		enemy_attackers = attackers(enemy, to, occ);
+
+		// pinされている駒を使うことを許さない。
+		enemy_attackers &= ~state()->blockers_for_king[enemy];
+
+		// そこに敵の利きがないなら取り合いが起こらない。
+		if (!enemy_attackers)
+			return SCORE_ZERO >= s;
+
+		all_attackers = enemy_attackers | attackers(~enemy, to, occ);
+		balance = SCORE_ZERO;
+		next_victims = movedPieceType(m);
+	}
+	else // 駒打ちではない
+	{
+		// fromが空いたことによって敵の利きが通るかもしれない
+		const Square from = fromSq(m);
+		occ ^= from;
+
+		// toに利いている敵の駒のbitboard
+		enemy_attackers = attackers(enemy, to, occ);
+
+		// toにあった駒がpinnerの可能性があるのでtoに駒があれば取り除いておく。
+		occ ^= to;
+
+		// pinされている駒を使うことを許さない。
+		if (!(state()->pinners_for_king[enemy] & ~occ))
+			enemy_attackers &= ~state()->blockers_for_king[enemy];
+
+		balance = captureScore(capturePieceType(m));
+
+		// 敵の利きがないなら、そこで取り合いは終わり。
+		if (!enemy_attackers)
+			return balance >= s;
+
+		all_attackers = enemy_attackers | attackers(~enemy, to, occ);
+
+		// この指し手で移動した駒が、次に相手によって取られる駒である。
+		next_victims = movedPieceType(m);
+	}
+
+	if (balance < s)
+		return false;
+
+	if (next_victims == KING)
+		return true;
+
+	balance -= captureScore(next_victims);
+
+	if (balance >= s)
+		return true;
+
+	bool relative_turn = true;
+
+	do {
+		// 次に相手がどの駒で取るのか。
+		next_victims = nextAttacker(*this, to, enemy_attackers, &occ, &all_attackers, enemy);
+
+		all_attackers &= occ;
+
+		if (next_victims == KING)
+			return relative_turn == bool(all_attackers & bbTurn(~enemy));
+
+		balance += relative_turn ? captureScore(next_victims) : -captureScore(next_victims);
+		
+		relative_turn = !relative_turn;
+
+		if (relative_turn == (balance >= s))
+			return relative_turn;
+
+		enemy = ~enemy;
+		
+		enemy_attackers = all_attackers & bbTurn(enemy);
+
+		if (!(state()->pinners_for_king[enemy] & ~occ))
+			enemy_attackers &= ~state()->blockers_for_king[enemy];
+		
+	} while (enemy_attackers);
+
+	return relative_turn;
 }
 
 // ピンされている駒(return)、している駒(pinners)を返す。tはsniperのturn, sqはking_sq
@@ -911,14 +1000,7 @@ Score Board::see(const Move move) const
 
 		// 敵の利きがないなら、そこで取り合いは終わり。
 		if (!enemy_attackers)
-		{
-			// 成りなら、取った駒のスコア + 成りのスコア
-			if (isPromote(move))
-				return captureScore(capturePieceType(move)) + promoteScore(movedPieceType(move));
-
-			// 成りではないなら、取った駒のスコアだけ。
 			return captureScore(capturePieceType(move));
-		}
 
 		all_attackers = enemy_attackers | attackers(~enemy, to, occ);
 

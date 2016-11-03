@@ -108,7 +108,7 @@ MovePicker::MovePicker(const Board& b, Move ttm, Score th)
 	tt_move = (ttm
 		&& b.pseudoLegal(ttm)
 		&& isCapture(ttm)
-		&& b.see(ttm) > threshold) ? ttm : MOVE_NONE;
+		&& b.seeGe(ttm, threshold + 1)) ? ttm : MOVE_NONE;
 
 	end_moves += !isNone(tt_move);
 }
@@ -282,7 +282,7 @@ Move MovePicker::nextMove()
 
 			if (move != tt_move)
 			{
-				if (board.seeSign(move) >= SCORE_ZERO)
+				if (board.seeGe(move, SCORE_ZERO))
 					return move;
 
 				// 駒を損するcapturePieceは指し手バッファの一番後ろにやる。
@@ -331,7 +331,7 @@ Move MovePicker::nextMove()
 		case PROBCUT_CAPTURES:
 			move = pickBest(current++, end_moves);
 
-			if (move != tt_move && board.see(move) > threshold)
+			if (move != tt_move && board.seeGe(move, threshold + 1))
 				return move;
 
 			break;
