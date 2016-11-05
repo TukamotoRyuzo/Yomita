@@ -745,9 +745,7 @@ namespace
 			&& depth < 7 * ONE_PLY
 			&& eval - futilityMargin(depth, b) >= beta
 			&& eval < SCORE_KNOWN_WIN)
-		{
-			return eval - futilityMargin(depth, b);
-		}
+			return eval;
 
 		// Step 8. Null move search with verification search (is omitted in PV nodes)
 		// 現局面でbetaを超えているなら探索深さを減らしてパスをしてみて、

@@ -827,11 +827,6 @@ namespace
 // 成りは考慮しない。
 bool Board::seeGe(const Move m, const Score s) const
 {
-	// seeSign的なものを入れるほうが0.3~0.4%ほどnpsが高かった。
-	if (isCapture(m)
-		&& captureScore(capturePieceType(m)) - captureScore(movedPieceType(m)) >= s)
-		return true;
-
 	assert(isOK(m));
 	const Square to = toSq(m);
 	PieceType next_victims;
@@ -875,7 +870,14 @@ bool Board::seeGe(const Move m, const Score s) const
 
 		// 敵の利きがないなら、そこで取り合いは終わり。
 		if (!enemy_attackers)
+		{
+			// 成りなら、取った駒のスコア + 成りのスコア
+			if (isPromote(m))
+				return balance + promoteScore(movedPieceType(m)) >= s;
+
+			// 成りではないなら、取った駒のスコアだけ。
 			return balance >= s;
+		}
 
 		all_attackers = enemy_attackers | attackers(~enemy, to, occ);
 
@@ -1000,7 +1002,14 @@ Score Board::see(const Move move) const
 
 		// 敵の利きがないなら、そこで取り合いは終わり。
 		if (!enemy_attackers)
+		{
+			// 成りなら、取った駒のスコア + 成りのスコア
+			if (isPromote(move))
+				return captureScore(capturePieceType(move)) + promoteScore(movedPieceType(move));
+			
+			// 成りではないなら、取った駒のスコアだけ。
 			return captureScore(capturePieceType(move));
+		}
 
 		all_attackers = enemy_attackers | attackers(~enemy, to, occ);
 
