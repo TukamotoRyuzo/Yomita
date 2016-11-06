@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 // 棋譜からの学習時に定義。
-//#define LEARN
+#define LEARN
 
 // 教師棋譜の生成時に定義。LEARNと同時に定義してもよい。
 //#define GENSFEN
@@ -40,10 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //#define EVAL_KPPL
 
 // KPP + 手番型の評価関数
-#define EVAL_KPPT
+//#define EVAL_KPPT
 
 // PP + 手番型の評価関数
-//#define EVAL_PPT
+#define EVAL_PPT
 
 // KRB型
 //#define EVAL_KRB
@@ -57,6 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // 縦型Squareで作られたハフマン化sfenを読み込みたいときに定義する。
 // 読み込み方が対応するだけで、生成には対応しない。
 //#define GENERATED_SFEN_BY_FILESQ
+
+// 進行度を使うときに定義する。
+#define USE_PROGRESS
 
 // 評価関数バイナリが入っているディレクトリと、学習時に生成したバイナリを保存するディレクトリ
 #ifdef EVAL_KPP

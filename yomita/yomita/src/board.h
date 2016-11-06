@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "bitboard.h"
 #include "common.h"
 #include "evaluate.h"
+#include "progress.h"
 
 #if defined USE_EVAL
 #include "evalsum.h"
@@ -102,7 +103,9 @@ struct StateInfo
 	// 評価値の差分計算の管理用
 	DirtyPiece dirty_piece;
 #endif
-
+#ifdef USE_PROGRESS
+	Prog::ProgressSum progress;
+#endif
 	// この局面における手番側の持ち駒。優等局面の判定のために必要
 	Hand hand;
 

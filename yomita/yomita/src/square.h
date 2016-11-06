@@ -158,6 +158,11 @@ std::string toUSI(const Rank r);
 std::string toUSI(const File f);
 std::string toUSI(const Square sq);
 
+// CSA形式で出力
+std::string toCSA(const Rank r);
+std::string toCSA(const File f);
+std::string toCSA(const Square sq);
+
 // Squareが手番側から見て成れるかどうかを返す。
 inline bool canPromote(const Turn t, const Square sq) { return t == BLACK ? sq <= SQ_13 : sq >= SQ_97; }
 inline bool canPromote(const Turn t, const Rank r)    { return t == BLACK ? r <= RANK_3 : r >= RANK_7; }

@@ -50,6 +50,25 @@ std::string toUSI(const Move m)
 	return usi;
 }
 
+
+std::string toCSA(const Move m)
+{
+	static const std::string piece_to_csa[] = { "", "KA", "HI", "FU", "KY", "KE", "GI", "KI", "OU", "UM", "RY", "TO", "NY", "NK", "NG" };
+
+	if (isNone(m))
+		return "resign";
+
+	if (isNull(m))
+		return "0000";
+
+	if (isDrop(m))
+		return "00" + ::toCSA(toSq(m)) + piece_to_csa[movedPieceType(m)];
+
+	std::string csa = ::toCSA(fromSq(m)) + ::toCSA(toSq(m)) + piece_to_csa[movedPieceTypeTo(m)];
+
+	return csa;
+}
+
 std::string pretty(const Move m)
 { 
 	if (isNone(m))

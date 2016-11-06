@@ -49,9 +49,9 @@ void OptionsMap::init()
 #else
 #define MAX_MEMORY 2048
 #endif
-	(*this)["Hash"]					 = Option(1024, 1, MAX_MEMORY, onHashSize);
+	(*this)["Hash"]					 = Option(64, 1, MAX_MEMORY, onHashSize);
 	(*this)["Ponder"]				 = Option(true);
-	(*this)["Threads"]				 = Option(1, 1, 128, onThreads);
+	(*this)["Threads"]				 = Option(12, 1, 128, onThreads);
 	(*this)["Minimum_Thinking_Time"] = Option(15, 0, 5000);
 	(*this)["Move_Overhead"]		 = Option(60, 0, 5000);
 	(*this)["Slow_Mover"]		     = Option(70, 10, 1000);
@@ -70,7 +70,7 @@ void OptionsMap::init()
 	eval += "/7_2_177";
 #endif
 #elif defined EVAL_PPT
-	eval += "/40";
+	eval += "/44_260";
 #elif defined EVAL_KRB
 	eval += "/1_202";
 #elif defined EVAL_KPPL

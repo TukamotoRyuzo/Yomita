@@ -43,6 +43,7 @@
     <ClInclude Include="src\piece.h" />
     <ClInclude Include="src\piecescore.h" />
     <ClInclude Include="src\platform.h" />
+    <ClInclude Include="src\progress.h" />
     <ClInclude Include="src\range.h" />
     <ClInclude Include="src\score.h" />
     <ClInclude Include="src\search.h" />
@@ -81,6 +82,7 @@
     <ClCompile Include="src\movepick.cpp" />
     <ClCompile Include="src\multi_think.cpp" />
     <ClCompile Include="src\piece.cpp" />
+    <ClCompile Include="src\progress.cpp" />
     <ClCompile Include="src\search.cpp" />
     <ClCompile Include="src\sfen_rw.cpp" />
     <ClCompile Include="src\shared_memory.cpp" />
@@ -162,7 +164,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>../../yomita_engine/</OutDir>
-    <TargetName>$(ProjectName)_kppt1.5</TargetName>
+    <TargetName>$(ProjectName)_kppt1.6</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

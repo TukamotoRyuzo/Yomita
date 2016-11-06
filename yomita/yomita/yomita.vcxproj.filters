@@ -120,6 +120,9 @@
     <ClInclude Include="src\eval_kppl.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="src\progress.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\board.cpp">
@@ -225,6 +228,9 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="src\learn_kppl.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="src\progress.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timeman.h" // for ponderhit 
 
 const std::string engine_name = "Yomita_";
-const std::string version = "1.5";
+const std::string version = "1.51";
 
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI
@@ -76,8 +76,11 @@ namespace Learn
 #endif
 #ifdef LEARN
 	void learn(Board& b, std::istringstream& is);
+	void learnProgress(Board& b, std::istringstream& is);
 #endif
+	
 } // namespace Learn
+
 
 void USI::isReady()
 {
@@ -283,7 +286,7 @@ Move USI::toMove(const Board& b, std::string str)
 void USI::loop(int argc, char** argv)
 {
 	// デフォルトでログを取る。
-	startLogger(true);
+	//startLogger(true);
 
 	// 評価関数の読み込みが行われてからでないと局面のセットはできない。
 	Board board(Threads.main());
@@ -470,6 +473,9 @@ void USI::loop(int argc, char** argv)
 		else if (token == "learn") { Learn::learn(board, ss_cmd); }
 
 		else if (token == "save_eval") { Eval::saveEval("eval_zero"); }
+
+		// 棋譜からの進行度学習
+		else if (token == "learn_progress") { Learn::learnProgress(board, ss_cmd); }
 #endif
 		// 有効なコマンドではない。
 		else { SYNC_COUT << "unknown command: " << cmd << SYNC_ENDL; }

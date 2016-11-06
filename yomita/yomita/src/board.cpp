@@ -156,7 +156,9 @@ void Board::init(std::string sfen, Thread* th)
 #ifdef USE_EVAL
 	Eval::computeEval(*this);
 #endif
-
+#ifdef USE_PROGRESS
+	Prog::computeProgress(*this);
+#endif
 	ss >> ply_;
 
 	// この処理、何かおかしい。けどこの状態で定跡ファイルを作ってしまったので直すに直せない。
@@ -1246,6 +1248,9 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
 	// 評価値の計算をまだ済ませていないフラグをセット。
 	st_->sum.setNotEvaluated();
 	auto& dp = st_->dirty_piece;
+#endif
+#ifdef USE_PROGRESS
+	st_->progress.setNoProgress();
 #endif
 
 	if (isDrop(move)) // 持ち駒を打つ手

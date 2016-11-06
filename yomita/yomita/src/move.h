@@ -164,6 +164,7 @@ inline bool isOK(const Move m) { return !isNone(m) && !isNull(m); }
 
 // USI変換用
 std::string toUSI(const Move m);
+std::string toCSA(const Move m);
 std::string pretty(const Move m);
 
 // Move型を人間にとってわかりやすい形式で出力する。デバッグ用。

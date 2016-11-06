@@ -160,6 +160,9 @@ std::string pretty(const Square sq) { return pretty(fileOf(sq)) + pretty(rankOf(
 std::string toUSI(const File f) { const char c[] = { '9' - f, '\0' }; return std::string(c); }
 std::string toUSI(const Rank r) { const char c[] = { 'a' + r, '\0' }; return std::string(c); }
 std::string toUSI(const Square sq) { return toUSI(fileOf(sq)) + toUSI(rankOf(sq)); }
+std::string toCSA(const File f) { const char c[] = { '9' - f, '\0' }; return std::string(c); }
+std::string toCSA(const Rank r) { const char c[] = { '1' + r, '\0' }; return std::string(c); }
+std::string toCSA(const Square sq) { return toCSA(fileOf(sq)) + toCSA(rankOf(sq)); }
 std::string fromPretty(const Square sq) { return toUSI(fileOf(sq)) + toUSI(inverse(File(rankOf(sq)))); }
 std::ostream& operator << (std::ostream& os, const File f) { os << toUSI(f); return os; }
 std::ostream& operator << (std::ostream& os, const Rank r) { os << toUSI(r); return os; }
