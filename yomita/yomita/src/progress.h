@@ -36,46 +36,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace Learn
 {
-	extern double sigmoid(double x);
+    extern double sigmoid(double x);
 }
 
 namespace Prog
 {
-	// 進行度
-	// KP値により、局面の進行度を取得する。
-	// 進行度は32bitで表され、教師棋譜から開始局面を進行度0(0%)、終了局面を進行度1(=100%)として学習を行う。
-	typedef int32_t ValueProg;
+    // 進行度
+    // KP値により、局面の進行度を取得する。
+    // 進行度は32bitで表され、教師棋譜から開始局面を進行度0(0%)、終了局面を進行度1(=100%)として学習を行う。
+    typedef int32_t ValueProg;
 
-	extern ValueProg PROGRESS[SQ_MAX][Eval::fe_end];
+    extern ValueProg PROGRESS[SQ_MAX][Eval::fe_end];
 
-	// 進行度ファイルの読み込み
-	void load();
+    // 進行度ファイルの読み込み
+    void load();
 
-	// 進行度を全計算
-	double computeProgress(const Board& b);
+    // 進行度を全計算
+    double computeProgress(const Board& b);
 
-	// 進行度を差分計算
-	double calcProgressDiff(const Board& b);
+    // 進行度を差分計算
+    double calcProgressDiff(const Board& b);
 
-	struct ProgressSum
-	{
-		ProgressSum() {};
+    struct ProgressSum
+    {
+        ProgressSum() {};
 
-		void set(int b, int w) { bkp = b; wkp = w; }
+        void set(int b, int w) { bkp = b; wkp = w; }
 
-		// 進行度を計算する。
+        // 進行度を計算する。
         // 2^20は適当に決めた。
-		double sum() const { return double(bkp + wkp) / double(1 << 20); }
+        double sum() const { return double(bkp + wkp) / double(1 << 20); }
 
-		// まだ進行度の計算を済ませていないかどうかを返す。
-		inline bool isNoProgress() const { return bkp == INT64_MAX; }
+        // まだ進行度の計算を済ませていないかどうかを返す。
+        inline bool isNoProgress() const { return bkp == INT64_MAX; }
 
-		// まだ進行度の計算を済ませていないことを示す値を入れておく。
-		inline void setNoProgress() { bkp = INT64_MAX; }
-		
-		int64_t bkp, wkp;
-	};
-	
+        // まだ進行度の計算を済ませていないことを示す値を入れておく。
+        inline void setNoProgress() { bkp = INT64_MAX; }
+        
+        int64_t bkp, wkp;
+    };
+    
 } // namespace Prog
 
 #endif

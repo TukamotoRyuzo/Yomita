@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timeman.h" // for ponderhit 
 
 const std::string engine_name = "Yomita_";
-const std::string version = "1.51";
+const std::string version = "1.52";
 
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI
@@ -286,7 +286,7 @@ Move USI::toMove(const Board& b, std::string str)
 void USI::loop(int argc, char** argv)
 {
 	// デフォルトでログを取る。
-	//startLogger(true);
+	startLogger(true);
 
 	// 評価関数の読み込みが行われてからでないと局面のセットはできない。
 	Board board(Threads.main());
