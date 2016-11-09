@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // KKP + KPP型
 //#define EVAL_KPP
 
-// kpp light型。kppから評価項目をいくつか減らしたもの。
+// kpp light型。kppだけ。
 //#define EVAL_KPPL
 
 // KPP + 手番型の評価関数

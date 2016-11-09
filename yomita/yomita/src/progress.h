@@ -57,11 +57,14 @@ namespace Prog
     // 進行度を差分計算
     double calcProgressDiff(const Board& b);
 
+    // ↑二つのラッパー
+    double evaluateProgress(const Board& b);
+
     struct ProgressSum
     {
         ProgressSum() {};
 
-        void set(int b, int w) { bkp = b; wkp = w; }
+        void set(int64_t b, int64_t w) { bkp = b; wkp = w; }
 
         // 進行度を計算する。
         // 2^20は適当に決めた。

@@ -53,7 +53,6 @@ namespace Prog
 #if 0 // 実験的な初期化コード
         {
             PRNG rng(11);
-
             for (auto sq : Squares)
                 for (int i = 0; i < Eval::fe_end; i++)
                     PROGRESS[sq][i] = rng.rand<ValueProg>();
@@ -87,7 +86,7 @@ namespace Prog
         auto sq_wk1 = inverse(b.kingSquare(WHITE));
         auto list_fb = b.evalList()->pieceListFb();
         auto list_fw = b.evalList()->pieceListFw();
-        int bkp = 0, wkp = 0;
+        int64_t bkp = 0, wkp = 0;
 
         for (int i = 0; i < PIECE_NO_KING; i++)
         {
@@ -189,6 +188,7 @@ namespace Prog
 
 } // namespace Prog
 
+#ifdef LEARN
 namespace Learn
 {
 
@@ -254,20 +254,26 @@ namespace Learn
 
     struct Weight
     { 
-        double w, g;
+        double w, g, g2;
+        static const int eta = 1024;
 
-        void addGrad(double delta)
-        {
-            g += delta;
-        }
+        void addGrad(double delta) { g += delta; }
 
         // 勾配値を重みに反映させる
         bool update()
         {
-            bool b = (g != 0);
-            w = w - g * 0.01;
+            if (g == 0)
+                return false;
+
+            g2 += g * g;
+            double e = std::sqrt(g2);
+
+            if (e != 0)
+                w = w - g * eta / e;
+
             g = 0;
-            return b;
+
+            return true;
         }
     };
 
@@ -309,9 +315,7 @@ namespace Learn
                 auto& w = prog_w[sq][i];
 
                 if (w.update())
-                {
                     Prog::PROGRESS[sq][i] = w.w;
-                }
             }
     }
 
@@ -320,7 +324,7 @@ namespace Learn
     // 勾配を計算する関数
     double calcGrad(double teacher, double now)
     {
-        // return now - teacher;
+        //return now - teacher;
         return (now - teacher) * dsigmoid(now);
     }
 
@@ -338,7 +342,8 @@ namespace Learn
         virtual void work(size_t thread_id);
         
         std::vector<GameVector> games;
-       
+        GameVector errors;
+
         // updateWeightsしている途中であることを表すフラグ
         std::atomic_bool updating;
 
@@ -352,18 +357,16 @@ namespace Learn
         StateInfo st[MAX_PLY + 64];
         auto th = Threads[thread_id];
         auto& b = th->root_board;
-        double sum_error = 0;
-        int j = 0, sample_num = 0;
         const bool is_main = th == Threads.main();
         th->add_grading = true;
 
 #ifdef _DEBUG
         const int interval = 5000;
 #else
-        const int interval = 100000;
+        const int interval = 10000;
 #endif
 
-        for (int loop = 0; loop < max_loop; loop++)
+        for (int loop = 0; loop < max_loop;)
         {
             for (auto game : games[thread_id])
             {
@@ -377,16 +380,22 @@ namespace Learn
                     b.doMove(m, st[i]);
 
                     // 教師の進行度
-                    auto t = (double)i / (double)game.ply;
+                    auto t = (double)(i + 1) / (double)game.ply;
 
                     // NNの出力
                     auto p = Prog::evaluateProgress(b);
 
+                    // 勾配ベクトル
+                    auto delta = calcGrad(t, p);
+
+                    addGrad(b, delta);
+
                     if (is_main)
                     {
-                        // 誤差の計算
-                        sum_error += calcError(p, t);
-                        j++;
+#if 0
+                        SYNC_COUT << b << "progress = " << p * 100.0 << "%\n"
+                                       << "teacher = "  << t * 100.0 << "%" << SYNC_ENDL;
+#endif
 #if 0
                         if (j % interval == 0)
                         {
@@ -395,27 +404,39 @@ namespace Learn
                         }
 #endif
                     }
-
-                    // 勾配ベクトル
-                    auto delta = calcGrad(t, p);
-
-                    addGrad(b, delta);
                 }
             }
 
             // メインスレッドだけがWeightを変更する。
             if (is_main)
             {
+                int j = 0;
+                double sum_error = 0;
+
+                for (auto game : errors)
+                { 
+                    // 平手初期局面セット
+                    b.init(USI::START_POS, th);
+
+                    // 誤差の計算
+                    for (int i = 0; i < game.ply - 1; i++)
+                    {
+                        Move m = game.move[i];
+                        b.doMove(m, st[i]);
+                        auto t = (double)(i + 1) / (double)game.ply;
+                        auto p = Prog::evaluateProgress(b);
+                        sum_error += calcError(p, t);
+                        j++;
+                    }
+                }
+
                 auto rmse = std::sqrt(sum_error / j);
                 SYNC_COUT << std::endl << std::setprecision(8) << "rmse = " << rmse << SYNC_ENDL;
-                j = sum_error = 0;
 
                 updating = true;
 
                 for (auto t : Threads.slaves)
                     t->cond.notify_one();
-
-                int tt = 0;
 
                 // 他のスレッドがすべてaddGradし終えるのを待つ。
                 for (auto t : Threads.slaves)
@@ -430,10 +451,10 @@ namespace Learn
                 for (auto t : Threads.slaves)
                     t->cond.notify_one();
 
-                if (is_main && (loop % 100 == 0))
+                if (++loop % 100 == 0)
                 {
-                    Prog::save(std::to_string(loop / 1000));
-                    SYNC_COUT << localTime() << SYNC_ENDL;
+                   Prog::save(std::to_string(loop / 1000));
+                   SYNC_COUT << localTime() << SYNC_ENDL;
                 }
             }
             
@@ -455,6 +476,8 @@ namespace Learn
                 th->cond.wait(lk, [&] { return !updating; });
 
                 th->add_grading = true;
+
+                ++loop;
             }
         }
 
@@ -471,7 +494,7 @@ namespace Learn
 #ifdef _DEBUG
             file_name = "records23.txt",
 #else
-            file_name = "records_2500.txt",
+            file_name = "records_2000.txt",
 #endif
             dir = "";
 
@@ -549,7 +572,10 @@ namespace Learn
                 b.doMove(m, st[i]);
             }
 
-            pl.games[kifu_num++ / kifu_per_thread].push_back(g);
+            if (kifu_num++ <= kifu_size - 100)
+                pl.games[kifu_num / kifu_per_thread].push_back(g);
+            else
+                pl.errors.push_back(g);
         }
 
         pl.setLoopMax(loop_max);
@@ -558,4 +584,5 @@ namespace Learn
 
 } // namespace Learn
 
-#endif
+#endif // LEARN
+#endif // USE_PROGRESS

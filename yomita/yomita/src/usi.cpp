@@ -93,6 +93,9 @@ void USI::isReady()
 		// 評価関数の読み込み
 		Eval::load();
 #endif
+#ifdef USE_PROGRESS
+        Prog::load();
+#endif
 		first = false;
 	}
 
@@ -140,7 +143,13 @@ void USI::position(Board &b, std::istringstream &is)
 		Search::setup_status->push(StateInfo());
 		b.doMove(m, Search::setup_status->top());
 		assert(b.verify());
+#ifdef USE_EVAL
 		Eval::evaluate(b);
+#endif
+#ifdef USE_PROGRESS
+        Prog::evaluateProgress(b);
+        std::cout << b << "progress = " << Prog::evaluateProgress(b) * 100.0 << "%" << std::endl;
+#endif
 		++current_ply;
 	}
 
