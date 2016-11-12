@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 // 棋譜からの学習時に定義。
-#define LEARN
+//#define LEARN
 
 // 教師棋譜の生成時に定義。LEARNと同時に定義してもよい。
 //#define GENSFEN
@@ -40,10 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //#define EVAL_KPPL
 
 // KPP + 手番型の評価関数
-//#define EVAL_KPPT
+#define EVAL_KPPT
 
 // PP + 手番型の評価関数
-#define EVAL_PPT
+//#define EVAL_PPT
 
 // KRB型
 //#define EVAL_KRB

@@ -214,7 +214,8 @@ ModelManifest.xml
 /yomita/yomita.VC.VC.opendb
 *.iobj
 *.ipdb
-*.bin
+eval
+evalsave
 *.opendb
 io_log*
 *.bat

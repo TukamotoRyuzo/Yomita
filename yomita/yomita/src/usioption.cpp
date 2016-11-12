@@ -59,7 +59,7 @@ void OptionsMap::init()
 	(*this)["byoyomi_margin"]		 = Option(0, 0, 60000);
 	(*this)["Write_Debug_Log"]		 = Option(false, onWriteDebugLog);
 	(*this)["Draw_Score"]			 = Option(-50, -300, 300);
-
+    (*this)["ProgressDir"]           = Option("progress");
 #ifdef USE_EVAL
 	std::string eval = "eval/"     + std::string(EVAL_TYPE);
 	std::string save = "evalsave/" + std::string(EVAL_TYPE);

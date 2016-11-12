@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timeman.h" // for ponderhit 
 
 const std::string engine_name = "Yomita_";
-const std::string version = "1.52";
+const std::string version = "1.6";
 
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI
@@ -148,7 +148,7 @@ void USI::position(Board &b, std::istringstream &is)
 #endif
 #ifdef USE_PROGRESS
         Prog::evaluateProgress(b);
-        std::cout << b << "progress = " << Prog::evaluateProgress(b) * 100.0 << "%" << std::endl;
+        //std::cout << b << "progress = " << Prog::evaluateProgress(b) * 100.0 << "%" << std::endl;
 #endif
 		++current_ply;
 	}

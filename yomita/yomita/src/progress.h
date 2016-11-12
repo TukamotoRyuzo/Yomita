@@ -30,9 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "platform.h"
 #include "evaluate.h"
 
-#define PROGRESS_DIR "progress"
 #define PROGRESS_BIN "progress.bin"
-#define SAVE_PROGRESS_DIR "progress/save"
+#define SAVE_PROGRESS_DIR "save"
 
 namespace Learn
 {
@@ -68,7 +67,7 @@ namespace Prog
 
         // 進行度を計算する。
         // 2^20は適当に決めた。
-        double sum() const { return double(bkp + wkp) / double(1 << 20); }
+        double rate() const { return double(bkp + wkp) / double(1 << 20); }
 
         // まだ進行度の計算を済ませていないかどうかを返す。
         inline bool isNoProgress() const { return bkp == INT64_MAX; }

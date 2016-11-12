@@ -62,9 +62,7 @@ namespace
 	Score futilityMargin(Depth d, Board& b)
 	{
 #ifdef EVAL_KPPT
-		// 0.1秒などの短い時間だと70くらいが強いのだが、10秒将棋では微妙。
-		// 一応、手数に応じてfutility marginが大きくなるようにしておく。
-		return Score((70 + b.ply() * 2) * d);
+		return Score((int)(70 + 100 * b.state()->progress.rate()) * (int)d);
 #else
 		return Score(80 * d);
 #endif
@@ -686,6 +684,9 @@ namespace
 			}
 		}	
 #endif
+		// 進行度を差分計算
+		Prog::evaluateProgress(b);
+
 		// Step 5. 王手ならすぐ指し手ループへ行く
 		if (in_check)
 		{
@@ -1254,6 +1255,9 @@ namespace
 			return tt_score;
 		}
 
+		// 進行度を差分計算
+		Prog::evaluateProgress(b);
+
 		Score score, best_score, futility_base;
 
 		// 評価関数を呼び出して現局面の評価値を得ておく
@@ -1356,7 +1360,7 @@ namespace
 
 			const bool evasionPrunable = InCheck
 									  && best_score > SCORE_MATED_IN_MAX_PLY
-								      && !isCapture(move);
+									  && !isCapture(move);
 
 			// 王手されていない時や詰まされる時は、QUIETな手やSEEが-の手は探索しない
 			if ((!InCheck || evasionPrunable)
@@ -1459,7 +1463,7 @@ namespace
 	Score scoreFromTT(Score s, int ply)
 	{
 		return  s == SCORE_NONE ? SCORE_NONE
-		      : s >= SCORE_MATE_IN_MAX_PLY  ? s - ply
+			  : s >= SCORE_MATE_IN_MAX_PLY  ? s - ply
 			  : s <= SCORE_MATED_IN_MAX_PLY ? s + ply : s;
 	}
 

@@ -42,7 +42,7 @@ namespace Prog
     // 進行度ファイルの読み込み
     void load()
     {
-        std::string p = path(PROGRESS_DIR, PROGRESS_BIN);
+        std::string p = path(USI::Options["ProgressDir"], PROGRESS_BIN);
         std::ifstream ifs(p, std::ios::binary);
 
         if (!ifs)
@@ -67,7 +67,7 @@ namespace Prog
     // 進行度ファイルの保存
     void save(std::string dir_name)
     {
-        std::string prog_dir = path(SAVE_PROGRESS_DIR, dir_name);
+        std::string prog_dir = path(USI::Options["ProgressDir"], path(SAVE_PROGRESS_DIR, dir_name));
         mkdir(prog_dir);
         std::ofstream ofs(path(prog_dir, PROGRESS_BIN), std::ios::binary);
 
@@ -96,7 +96,7 @@ namespace Prog
 
         b.state()->progress.set(bkp, wkp);
 
-        return b.state()->progress.sum();
+        return b.state()->progress.rate();
     }
 
     // 進行度を差分計算
@@ -105,7 +105,7 @@ namespace Prog
         auto now = b.state();
 
         if (!now->progress.isNoProgress())
-            return now->progress.sum();
+            return now->progress.rate();
 
         auto prev = now->previous;
 
@@ -171,7 +171,7 @@ namespace Prog
 
         now->progress = prog;
 
-        return now->progress.sum();
+        return now->progress.rate();
     }
     
     double evaluateProgress(const Board& b)
@@ -255,7 +255,7 @@ namespace Learn
     struct Weight
     { 
         double w, g, g2;
-        static const int eta = 1024;
+        static const int eta = 128;
 
         void addGrad(double delta) { g += delta; }
 
@@ -310,7 +310,7 @@ namespace Learn
     void updateWeights()
     {
         for (auto sq : Squares)
-            for (int i = 0; i < PIECE_NO_NB; ++i)
+            for (int i = 0; i < Eval::fe_end; ++i)
             {
                 auto& w = prog_w[sq][i];
 
