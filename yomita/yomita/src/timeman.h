@@ -29,22 +29,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 class TimeManagement
 {
 public:
-	void init(LimitsType& limits, Turn t, int ply);
+    void init(LimitsType& limits, Turn t, int ply);
 
-	int optimum() const { return optimum_time; }
-	int maximum() const { return maximum_time; }
-	int elapsed() const { return int(now() - start_time); }
-	void reset() { start_time = now(); }
-	int64_t availableNodes; // When in 'nodes as time' mode
+    int optimum() const { return optimum_time; }
+    int maximum() const { return maximum_time; }
+    int elapsed() const { return int(now() - start_time); }
+    void reset() { start_time = now(); }
+    int64_t availableNodes; // When in 'nodes as time' mode
 
 private:
-	TimePoint start_time;
+    TimePoint start_time;
 
-	// 最適な探索時間
-	int optimum_time;
+    // 最適な探索時間
+    int optimum_time;
 
-	// 利用可能な最大の探索時間
-	int maximum_time;
+    // 利用可能な最大の探索時間
+    int maximum_time;
 };
 
 extern TimeManagement Time;

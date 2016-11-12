@@ -33,25 +33,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace Eval
 {
-	typedef int32_t Value;
+    typedef int32_t Value;
 
-	// memory mapped file用
-	struct SharedEval
-	{
-		Value kpp_[SQ_MAX][fe_end][fe_end];
-	};
+    // memory mapped file用
+    struct SharedEval
+    {
+        Value kpp_[SQ_MAX][fe_end][fe_end];
+    };
 
-	struct EvalTable
-	{
-		Value(*kpp_)[SQ_MAX][fe_end][fe_end];
+    struct EvalTable
+    {
+        Value(*kpp_)[SQ_MAX][fe_end][fe_end];
 
-		void set(SharedEval* se)
-		{
-			kpp_ = &se->kpp_;
-		}
-	};
+        void set(SharedEval* se)
+        {
+            kpp_ = &se->kpp_;
+        }
+    };
 
-	extern EvalTable et;
-	
+    extern EvalTable et;
+    
 } // namespace Eval
 #endif

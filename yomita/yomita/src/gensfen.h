@@ -32,28 +32,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace Learn
 {
-	// 複数スレッドでsfenを生成するためのクラス
-	struct MultiThinkGenSfen : public MultiThink
-	{
-		MultiThinkGenSfen(int search_depth_, SfenWriter& sw_) : search_depth(search_depth_), sw(sw_)
-		{
-			// 乱数を時刻で初期化しないとまずい。
-			// (同じ乱数列だと同じ棋譜が生成されかねないため)
-			setPrng(PRNG());
-		}
+    // 複数スレッドでsfenを生成するためのクラス
+    struct MultiThinkGenSfen : public MultiThink
+    {
+        MultiThinkGenSfen(int search_depth_, SfenWriter& sw_) : search_depth(search_depth_), sw(sw_)
+        {
+            // 乱数を時刻で初期化しないとまずい。
+            // (同じ乱数列だと同じ棋譜が生成されかねないため)
+            setPrng(PRNG());
+        }
 
-		virtual void work(size_t thread_id);
-		void startFileWriteWorker() { sw.startFileWriteWorker(); }
+        virtual void work(size_t thread_id);
+        void startFileWriteWorker() { sw.startFileWriteWorker(); }
 
-		// 通常探索の探索深さ
-		int search_depth;
+        // 通常探索の探索深さ
+        int search_depth;
 
-		// 生成する局面の評価値の上限
-		int eval_limit;
+        // 生成する局面の評価値の上限
+        int eval_limit;
 
-		// sfenの書き出し器
-		SfenWriter& sw;
-	};
+        // sfenの書き出し器
+        SfenWriter& sw;
+    };
 
 
 } // namespace Learn

@@ -82,14 +82,14 @@ typedef std::chrono::milliseconds::rep TimePoint;
 // ms単位で現在時刻を返す
 inline TimePoint now() 
 {
-	return std::chrono::duration_cast<std::chrono::milliseconds>
-		(std::chrono::steady_clock::now().time_since_epoch()).count();
+    return std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 // 指定されたミリ秒だけsleepする。
 inline void sleep(int ms)
 {
-	std::this_thread::sleep_for(std::chrono::microseconds(ms));
+    std::this_thread::sleep_for(std::chrono::microseconds(ms));
 }
 
 typedef uint64_t Key;
@@ -106,15 +106,15 @@ inline void prefetch(void*) {}
 #else
 inline void prefetch(void* addr) {
 #if defined(__INTEL_COMPILER)
-	// This hack prevents prefetches from being optimized away by
-	// Intel compiler. Both MSVC and gcc seem not be affected by this.
-	__asm__("");
+    // This hack prevents prefetches from being optimized away by
+    // Intel compiler. Both MSVC and gcc seem not be affected by this.
+    __asm__("");
 #endif
 
 #if defined(__INTEL_COMPILER) || defined(_MSC_VER)
-	_mm_prefetch((char*)addr, _MM_HINT_T0);
+    _mm_prefetch((char*)addr, _MM_HINT_T0);
 #else
-	__builtin_prefetch(addr);
+    __builtin_prefetch(addr);
 #endif
 }
 #endif
@@ -134,24 +134,24 @@ std::string localTime();
 // 擬似乱数生成器
 struct PRNG 
 {
-	PRNG(uint64_t seed) : s(seed) { assert(seed); }
+    PRNG(uint64_t seed) : s(seed) { assert(seed); }
 
-	// thisアドレスを加味することでプロセスごとに異なった乱数を用いることができる。
-	PRNG() : s(now() ^ uint64_t(this)) {}
+    // thisアドレスを加味することでプロセスごとに異なった乱数を用いることができる。
+    PRNG() : s(now() ^ uint64_t(this)) {}
 
-	// T型の乱数を一つ生成
-	template<typename T> T rand() { return T(rand64()); }
+    // T型の乱数を一つ生成
+    template<typename T> T rand() { return T(rand64()); }
 
-	uint64_t rand(size_t n) { return rand<uint64_t>() % n; }
+    uint64_t rand(size_t n) { return rand<uint64_t>() % n; }
 
 private:
-	uint64_t s;
+    uint64_t s;
 
-	uint64_t rand64() 
-	{
-		s ^= s >> 12, s ^= s << 25, s ^= s >> 27;
-		return s * 2685821657736338717LL;
-	}
+    uint64_t rand64() 
+    {
+        s ^= s >> 12, s ^= s << 25, s ^= s >> 27;
+        return s * 2685821657736338717LL;
+    }
 };
 
 void mkdir(std::string dir);

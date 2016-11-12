@@ -33,26 +33,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace Eval
 {
-	// ValuePp[0] = 手番を握っている側の点数。[1]は手番とは関係ない点数。
-	typedef std::array<int32_t, 2> ValuePp;
+    // ValuePp[0] = 手番を握っている側の点数。[1]は手番とは関係ない点数。
+    typedef std::array<int32_t, 2> ValuePp;
 
-	// memory mapped file用
-	struct SharedEval
-	{
-		ValuePp ppt_[fe_end2][fe_end2];
-	};
+    // memory mapped file用
+    struct SharedEval
+    {
+        ValuePp ppt_[fe_end2][fe_end2];
+    };
 
-	struct EvalTable
-	{
-		ValuePp(*ppt_)[fe_end2][fe_end2];
+    struct EvalTable
+    {
+        ValuePp(*ppt_)[fe_end2][fe_end2];
 
-		void set(SharedEval* se)
-		{
-			ppt_ = &se->ppt_;
-		}
-	};
+        void set(SharedEval* se)
+        {
+            ppt_ = &se->ppt_;
+        }
+    };
 
-	extern EvalTable et;
+    extern EvalTable et;
 
 } // namespace Eval
 #endif

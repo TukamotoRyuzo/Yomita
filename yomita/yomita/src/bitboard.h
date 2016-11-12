@@ -32,116 +32,116 @@ enum Index { HIGH, LOW, ID_MAX };
 class Bitboard
 {
 public:
-	Bitboard() {}
-	Bitboard(const uint64_t v0, const uint64_t v1) { b_[0] = v0; b_[1] = v1; }
-	uint64_t b(const int index) const { return b_[index]; }
-	void clear() { b_[0] = b_[1] = 0; }
+    Bitboard() {}
+    Bitboard(const uint64_t v0, const uint64_t v1) { b_[0] = v0; b_[1] = v1; }
+    uint64_t b(const int index) const { return b_[index]; }
+    void clear() { b_[0] = b_[1] = 0; }
 
 #if defined (HAVE_SSE2) || defined (HAVE_SSE4)
-	Bitboard& operator = (const Bitboard& b) { _mm_store_si128(&m_, b.m_); return *this; }
-	Bitboard(const Bitboard& bb) { _mm_store_si128(&m_, bb.m_); }
-	Bitboard operator ~ () const { Bitboard tmp; _mm_store_si128(&tmp.m_, _mm_andnot_si128(m_, _mm_set1_epi8(static_cast<char>(0xffu)))); return tmp; }
-	Bitboard operator &= (const Bitboard& rhs) { _mm_store_si128(&m_, _mm_and_si128(m_, rhs.m_)); return *this; };
-	Bitboard operator |= (const Bitboard& rhs) { _mm_store_si128(&m_, _mm_or_si128(m_, rhs.m_)); return *this; };
-	Bitboard operator ^= (const Bitboard& rhs) { _mm_store_si128(&m_, _mm_xor_si128(m_, rhs.m_)); return *this; };
-	Bitboard operator <<= (const int i) { _mm_store_si128(&m_, _mm_slli_epi64(m_, i)); return *this; };
-	Bitboard operator >>= (const int i) { _mm_store_si128(&m_, _mm_srli_epi64(m_, i)); return *this; };
-	Bitboard andEqualNot(const Bitboard& bb) { _mm_store_si128(&m_, _mm_andnot_si128(bb.m_, m_)); return *this; };
-	Bitboard notThisAnd(const Bitboard& bb) { Bitboard temp; _mm_store_si128(&temp.m_, _mm_andnot_si128(m_, bb.m_)); return temp; };
+    Bitboard& operator = (const Bitboard& b) { _mm_store_si128(&m_, b.m_); return *this; }
+    Bitboard(const Bitboard& bb) { _mm_store_si128(&m_, bb.m_); }
+    Bitboard operator ~ () const { Bitboard tmp; _mm_store_si128(&tmp.m_, _mm_andnot_si128(m_, _mm_set1_epi8(static_cast<char>(0xffu)))); return tmp; }
+    Bitboard operator &= (const Bitboard& rhs) { _mm_store_si128(&m_, _mm_and_si128(m_, rhs.m_)); return *this; };
+    Bitboard operator |= (const Bitboard& rhs) { _mm_store_si128(&m_, _mm_or_si128(m_, rhs.m_)); return *this; };
+    Bitboard operator ^= (const Bitboard& rhs) { _mm_store_si128(&m_, _mm_xor_si128(m_, rhs.m_)); return *this; };
+    Bitboard operator <<= (const int i) { _mm_store_si128(&m_, _mm_slli_epi64(m_, i)); return *this; };
+    Bitboard operator >>= (const int i) { _mm_store_si128(&m_, _mm_srli_epi64(m_, i)); return *this; };
+    Bitboard andEqualNot(const Bitboard& bb) { _mm_store_si128(&m_, _mm_andnot_si128(bb.m_, m_)); return *this; };
+    Bitboard notThisAnd(const Bitboard& bb) { Bitboard temp; _mm_store_si128(&temp.m_, _mm_andnot_si128(m_, bb.m_)); return temp; };
 #else
-	Bitboard operator ~ () const { return Bitboard(~b(0), ~b(1)); };
-	Bitboard operator &= (const Bitboard& rhs) { b_[0] &= rhs.b(0); b_[1] &= rhs.b(1); return *this; };
-	Bitboard operator |= (const Bitboard& rhs) { b_[0] |= rhs.b(0); b_[1] |= rhs.b(1); return *this; };
-	Bitboard operator ^= (const Bitboard& rhs) { b_[0] ^= rhs.b(0); b_[1] ^= rhs.b(1); return *this; };
-	Bitboard operator <<= (const int i) { b_[0] <<= i; b_[1] <<= i; return *this; };
-	Bitboard operator >>= (const int i) { b_[0] >>= i; b_[1] >>= i; return *this; };
-	Bitboard andEqualNot(const Bitboard& bb) { return (*this) &= ~bb; };
-	Bitboard notThisAnd(const Bitboard& bb) { return ~(*this) & bb; };
+    Bitboard operator ~ () const { return Bitboard(~b(0), ~b(1)); };
+    Bitboard operator &= (const Bitboard& rhs) { b_[0] &= rhs.b(0); b_[1] &= rhs.b(1); return *this; };
+    Bitboard operator |= (const Bitboard& rhs) { b_[0] |= rhs.b(0); b_[1] |= rhs.b(1); return *this; };
+    Bitboard operator ^= (const Bitboard& rhs) { b_[0] ^= rhs.b(0); b_[1] ^= rhs.b(1); return *this; };
+    Bitboard operator <<= (const int i) { b_[0] <<= i; b_[1] <<= i; return *this; };
+    Bitboard operator >>= (const int i) { b_[0] >>= i; b_[1] >>= i; return *this; };
+    Bitboard andEqualNot(const Bitboard& bb) { return (*this) &= ~bb; };
+    Bitboard notThisAnd(const Bitboard& bb) { return ~(*this) & bb; };
 #endif
-	Bitboard operator & (const Bitboard& rhs) const { return Bitboard(*this) &= rhs; }
-	Bitboard operator | (const Bitboard& rhs) const { return Bitboard(*this) |= rhs; }
-	Bitboard operator ^ (const Bitboard& rhs) const { return Bitboard(*this) ^= rhs; }
-	Bitboard operator << (const int i) const { return Bitboard(*this) <<= i; }
-	Bitboard operator >> (const int i) const { return Bitboard(*this) >>= i; }
+    Bitboard operator & (const Bitboard& rhs) const { return Bitboard(*this) &= rhs; }
+    Bitboard operator | (const Bitboard& rhs) const { return Bitboard(*this) |= rhs; }
+    Bitboard operator ^ (const Bitboard& rhs) const { return Bitboard(*this) ^= rhs; }
+    Bitboard operator << (const int i) const { return Bitboard(*this) <<= i; }
+    Bitboard operator >> (const int i) const { return Bitboard(*this) >>= i; }
 #ifdef HAVE_SSE4
-	bool operator == (const Bitboard& rhs) const { return (_mm_testc_si128(_mm_cmpeq_epi8(m_, rhs.m_), _mm_set1_epi8(static_cast<char>(0xffu))) ? true : false); };
-	operator bool() const { return !(_mm_testz_si128(m_, _mm_set1_epi8(static_cast<char>(0xffu)))); };
-	bool andIsFalse(const Bitboard& bb) const { return _mm_testz_si128(m_, bb.m_); };
+    bool operator == (const Bitboard& rhs) const { return (_mm_testc_si128(_mm_cmpeq_epi8(m_, rhs.m_), _mm_set1_epi8(static_cast<char>(0xffu))) ? true : false); };
+    operator bool() const { return !(_mm_testz_si128(m_, _mm_set1_epi8(static_cast<char>(0xffu)))); };
+    bool andIsFalse(const Bitboard& bb) const { return _mm_testz_si128(m_, bb.m_); };
 #else
-	bool operator == (const Bitboard& rhs) const { return (b(0) == rhs.b(0)) && (b(1) == rhs.b(1)); };
-	operator bool() const { return (b_[0] || b_[1]); };
-	bool andIsFalse(const Bitboard& bb) const { return !(*this & bb); };
+    bool operator == (const Bitboard& rhs) const { return (b(0) == rhs.b(0)) && (b(1) == rhs.b(1)); };
+    operator bool() const { return (b_[0] || b_[1]); };
+    bool andIsFalse(const Bitboard& bb) const { return !(*this & bb); };
 #endif
 
-	bool operator != (const Bitboard& rhs) const { return !(*this == rhs); }
+    bool operator != (const Bitboard& rhs) const { return !(*this == rhs); }
 
-	// Squareとのoperator
-	Bitboard operator & (const Square sq) const;
-	Bitboard operator | (const Square sq) const;
-	Bitboard operator ^ (const Square sq) const;
-	Bitboard& operator |= (const Square sq);
-	Bitboard& operator ^= (const Square sq);
+    // Squareとのoperator
+    Bitboard operator & (const Square sq) const;
+    Bitboard operator | (const Square sq) const;
+    Bitboard operator ^ (const Square sq) const;
+    Bitboard& operator |= (const Square sq);
+    Bitboard& operator ^= (const Square sq);
 
-	// どちらかが必ず1になっていることが前提条件。その条件を満たさない状況で呼び出すとassert。
-	// Clearをtrueにして呼び出すと見つけたビットを0にする。
-	template<bool Clear = true> Square firstOne();
+    // どちらかが必ず1になっていることが前提条件。その条件を満たさない状況で呼び出すとassert。
+    // Clearをtrueにして呼び出すと見つけたビットを0にする。
+    template<bool Clear = true> Square firstOne();
 
-	// 立っているビットの数を返す。
-	int count() const { return popCount(b(0)) + popCount(b(1) & 0x7fffe00000000000ULL); }
+    // 立っているビットの数を返す。
+    int count() const { return popCount(b(0)) + popCount(b(1) & 0x7fffe00000000000ULL); }
 
-	// merge()はRANK2～RANK8までの情報が入った64bit変数を作る
-	// b(0) >> 9をするとRANK_2が0～8ビット目にくる。RANK_1は桁あふれする。
-	// b(1) << 9をするとRANK_3が9～17ビット目に来る。RANK_9は桁あふれする。
-	// b_[1]のA1にあたる部分(54bit目)が63ビット目にくるが、pextの引数に使うだけなので影響がない。無視する。
-	// 縦型のbitboardに比べてシフト2回分損をしているが、この方法ならpextの引数にする前に調べなければならないマスが
-	// 1になったbitboardとの&を取らなくていいというメリットもある。
-	uint64_t merge() const { return (b(0) >> 9) | (b(1) << 9); }
+    // merge()はRANK2～RANK8までの情報が入った64bit変数を作る
+    // b(0) >> 9をするとRANK_2が0～8ビット目にくる。RANK_1は桁あふれする。
+    // b(1) << 9をするとRANK_3が9～17ビット目に来る。RANK_9は桁あふれする。
+    // b_[1]のA1にあたる部分(54bit目)が63ビット目にくるが、pextの引数に使うだけなので影響がない。無視する。
+    // 縦型のbitboardに比べてシフト2回分損をしているが、この方法ならpextの引数にする前に調べなければならないマスが
+    // 1になったbitboardとの&を取らなくていいというメリットもある。
+    uint64_t merge() const { return (b(0) >> 9) | (b(1) << 9); }
 
-	// 歩のいる9bitのパターンを与えると、その歩のいない筋が1のbitboardを返す。
-	// 先手ならRANK_9, 後手ならRANK_1が0になっているので、1段目への歩打もはじける。
-	Bitboard pawnDropable(const Turn t) const;
+    // 歩のいる9bitのパターンを与えると、その歩のいない筋が1のbitboardを返す。
+    // 先手ならRANK_9, 後手ならRANK_1が0になっているので、1段目への歩打もはじける。
+    Bitboard pawnDropable(const Turn t) const;
 
-	// range based forのためのoperator
-	Square operator * () { return firstOne(); }
-	void operator ++ () {};
+    // range based forのためのoperator
+    Square operator * () { return firstOne(); }
+    void operator ++ () {};
 
-	// デバッグ用。ビットボードのレイアウトを見たいときに使う
-	friend std::ostream& operator << (std::ostream& ofs, const Bitboard& b);
+    // デバッグ用。ビットボードのレイアウトを見たいときに使う
+    friend std::ostream& operator << (std::ostream& ofs, const Bitboard& b);
 
 private:
 #if defined (HAVE_SSE2) || defined (HAVE_SSE4)
-	union
-	{
-		uint64_t b_[2];
-		__m128i m_;
-	};
+    union
+    {
+        uint64_t b_[2];
+        __m128i m_;
+    };
 #else
-	uint64_t b_[2];
+    uint64_t b_[2];
 #endif
 
-	// b_[0]
-	//  0  1  2  3  4  5  6  7  8
-	//  9 10 11 12 13 14 15 16 17
-	// 18 19 20 21 22 23 24 25 26 
-	// 27 28 29 30 31 32 33 34 35
-	// 36 37 38 39 40 41 42 43 44
-	// 45 46 47 48 49 50 51 52 53
-	// 54 55 56 57 58 59 60 61 62 
-	//  -  -  -  -  -  -  -  -  -
-	//  -  -  -  -  -  -  -  -  -
+    // b_[0]
+    //  0  1  2  3  4  5  6  7  8
+    //  9 10 11 12 13 14 15 16 17
+    // 18 19 20 21 22 23 24 25 26 
+    // 27 28 29 30 31 32 33 34 35
+    // 36 37 38 39 40 41 42 43 44
+    // 45 46 47 48 49 50 51 52 53
+    // 54 55 56 57 58 59 60 61 62 
+    //  -  -  -  -  -  -  -  -  -
+    //  -  -  -  -  -  -  -  -  -
 
-	// b_[1]
-	//  -  -  -  -  -  -  -  -  -
-	//  -  -  -  -  -  -  -  -  -
-	//  0  1  2  3  4  5  6  7  8
-	//  9 10 11 12 13 14 15 16 17
-	// 18 19 20 21 22 23 24 25 26
-	// 27 28 29 30 31 32 33 34 35
-	// 36 37 38 39 40 41 42 43 44
-	// 45 46 47 48 49 50 51 52 53
-	// 54 55 56 57 58 59 60 61 62
+    // b_[1]
+    //  -  -  -  -  -  -  -  -  -
+    //  -  -  -  -  -  -  -  -  -
+    //  0  1  2  3  4  5  6  7  8
+    //  9 10 11 12 13 14 15 16 17
+    // 18 19 20 21 22 23 24 25 26
+    // 27 28 29 30 31 32 33 34 35
+    // 36 37 38 39 40 41 42 43 44
+    // 45 46 47 48 49 50 51 52 53
+    // 54 55 56 57 58 59 60 61 62
 
-	// Redundant Bitboard (RBB)
+    // Redundant Bitboard (RBB)
 };
 
 #ifdef HAVE_BMI2
@@ -255,9 +255,9 @@ inline Bitboard enemyMaskPlus1(const Turn t) { return BB_PROMOTE_MASK[t]; }
 
 inline Bitboard Bitboard::pawnDropable(const Turn t) const
 {
-	uint64_t tmp = b(0) | b(1);
-	tmp |= tmp >> 36;
-	return BB_EXCEPT_PAWN_FILE_MASK[t][(tmp >> 18 | tmp >> 9 | tmp) & 511];
+    uint64_t tmp = b(0) | b(1);
+    tmp |= tmp >> 36;
+    return BB_EXCEPT_PAWN_FILE_MASK[t][(tmp >> 18 | tmp >> 9 | tmp) & 511];
 }
 
 // 実際に使用する部分がすべて1になっているビットボード
@@ -293,19 +293,19 @@ inline Bitboard   goldCheck(const Turn t, const Square sq) { return BB_GOLD_CHEC
 // 縦横斜めの利きを求める。
 template <RelationType RT> inline Bitboard attacks(const Square from, const Bitboard& occupied)
 {
-	STATIC_ASSERT(RT == DIRECT_RANK || RT == DIRECT_FILE);
+    STATIC_ASSERT(RT == DIRECT_RANK || RT == DIRECT_FILE);
 
-	// Rankの場合だけ、pextを使わずにマスクと右シフトで求める。
-	if (RT == DIRECT_RANK)
-	{
-		// Squareがb_[0]とb_[1]のどちらに属しているか。どちらにも属しているなら0を優先する。
-		const int index = static_cast<int>(from >= SQ_98);
-		const int shift = index ? (from / 9 - 2) * 9 + 1 : from / 9 * 9 + 1;
-		const int pat = ((occupied.b(index) & rankMask(from).b(index)) >> shift) & 127;
-		return BB_RANK_ATTACKS[from][pat];
-	}
-	else
-		return BB_FILE_ATTACKS[from][pext(occupied.merge(), PEXT_MASK_FILE[from])];
+    // Rankの場合だけ、pextを使わずにマスクと右シフトで求める。
+    if (RT == DIRECT_RANK)
+    {
+        // Squareがb_[0]とb_[1]のどちらに属しているか。どちらにも属しているなら0を優先する。
+        const int index = static_cast<int>(from >= SQ_98);
+        const int shift = index ? (from / 9 - 2) * 9 + 1 : from / 9 * 9 + 1;
+        const int pat = ((occupied.b(index) & rankMask(from).b(index)) >> shift) & 127;
+        return BB_RANK_ATTACKS[from][pat];
+    }
+    else
+        return BB_FILE_ATTACKS[from][pext(occupied.merge(), PEXT_MASK_FILE[from])];
 }
 
 inline Bitboard  lanceAttack(const Turn t, const Square sq, const Bitboard& occupied) { return attacks<DIRECT_FILE>(sq, occupied) & frontMask(t, sq); }
@@ -323,40 +323,40 @@ inline const Bitboard end(const Bitboard& b) { return allZeroMask(); }
 
 inline int popLSB(uint64_t &b) 
 { 
-	int index = bsf64(b); 
-	b &= b - 1; 
-	//b = _blsr_u64(b);
-	return index; 
+    int index = bsf64(b); 
+    b &= b - 1; 
+    //b = _blsr_u64(b);
+    return index; 
 }
 
 template <bool Clear> inline Square Bitboard::firstOne()
 {
-	if (b_[0])
-	{
-		const int index = bsf64(b_[0]);
+    if (b_[0])
+    {
+        const int index = bsf64(b_[0]);
 
-		// bitを消すときb_[0]とb_[1]が重なっている場合は二つ消すことに注意
-		if (Clear)
-			andEqualNot(mask(Square(index)));
+        // bitを消すときb_[0]とb_[1]が重なっている場合は二つ消すことに注意
+        if (Clear)
+            andEqualNot(mask(Square(index)));
 
-		return Square(index);
-	}
-	else
-	{
-		// 45～62ビット目だけを取り出すマスクは必要なく、そのままbsfにかければよい。
-		const int index = (Clear ? popLSB(b_[1]) : bsf64(b_[1])) + 18;
-		
-		// Bitboardがすべて0ではないことを前提としているので、ここでindexが63になるはずはない。
-		assert(index > 44 + 18 && index < 63 + 18);
-		
-		return Square(index);
-	}
+        return Square(index);
+    }
+    else
+    {
+        // 45～62ビット目だけを取り出すマスクは必要なく、そのままbsfにかければよい。
+        const int index = (Clear ? popLSB(b_[1]) : bsf64(b_[1])) + 18;
+        
+        // Bitboardがすべて0ではないことを前提としているので、ここでindexが63になるはずはない。
+        assert(index > 44 + 18 && index < 63 + 18);
+        
+        return Square(index);
+    }
 }
 
 // どちらか片方だけを探す場合。この場合、Clearがtrueなら見つけたビットをclearする
 // firstOne系ではこれが一番高速なのでできればこれを使うようにコーディングしたい。
 template <Index Id, bool Clear = true> inline Square firstOne(uint64_t& mask)
 {
-	const int index = Clear ? popLSB(mask) : bsf64(mask);
-	return Square(Id == HIGH ? index : index + 18);
+    const int index = Clear ? popLSB(mask) : bsf64(mask);
+    return Square(Id == HIGH ? index : index + 18);
 }

@@ -33,150 +33,150 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace Eval
 {
-	// PP
-	EvalTable et;
+    // PP
+    EvalTable et;
 
-	// 評価関数ファイルを読み込む
-	void loadSub()
-	{
-		std::ifstream ifsPP(path((std::string)USI::Options["EvalDir"], PP_BIN), std::ios::binary);
-		
-		if (ifsPP)
-			ifsPP.read(reinterpret_cast<char*>(ppt), sizeof(ppt));
-		else
-			goto Error;
+    // 評価関数ファイルを読み込む
+    void loadSub()
+    {
+        std::ifstream ifsPP(path((std::string)USI::Options["EvalDir"], PP_BIN), std::ios::binary);
+        
+        if (ifsPP)
+            ifsPP.read(reinterpret_cast<char*>(ppt), sizeof(ppt));
+        else
+            goto Error;
 
 #ifdef LEARN
-		evalLearnInit();
+        evalLearnInit();
 #endif
-		return;
+        return;
 
-	Error:;
-		std::cout << "\ninfo string open evaluation file failed.\n";
-	}
+    Error:;
+        std::cout << "\ninfo string open evaluation file failed.\n";
+    }
 
-	// PPのスケール
-	const int FV_SCALE = 32;
+    // PPのスケール
+    const int FV_SCALE = 32;
 
-	// 駒割り以外の全計算
-	Score computeEval(const Board& b)
-	{
-		//assert(pp_ != nullptr);
+    // 駒割り以外の全計算
+    Score computeEval(const Board& b)
+    {
+        //assert(pp_ != nullptr);
 
-		// 先手から見た駒の位置だけわかればよい。
-		auto list = b.evalList()->pieceListFb();
+        // 先手から見た駒の位置だけわかればよい。
+        auto list = b.evalList()->pieceListFb();
 
-		EvalSum sum;
-		sum.u = 0;
+        EvalSum sum;
+        sum.u = 0;
 
-		for (int i = 0; i < PIECE_NO_NB; ++i)
-			for (int j = 0; j < i; ++j)
-				sum.p += ppt[list[i]][list[j]];
+        for (int i = 0; i < PIECE_NO_NB; ++i)
+            for (int j = 0; j < i; ++j)
+                sum.p += ppt[list[i]][list[j]];
 
-		b.state()->sum = sum;
+        b.state()->sum = sum;
 
-		return Score(sum.calcScore(b.turn()) / FV_SCALE);
-	}
+        return Score(sum.calcScore(b.turn()) / FV_SCALE);
+    }
 
-	Score calcEvalDiff(const Board& b)
-	{
-		EvalSum sum;
-		auto now = b.state();
+    Score calcEvalDiff(const Board& b)
+    {
+        EvalSum sum;
+        auto now = b.state();
 
-		if (!now->sum.isNotEvaluated())
-		{
-			sum = now->sum;
-			goto CALC_DIFF_END;
-		}
+        if (!now->sum.isNotEvaluated())
+        {
+            sum = now->sum;
+            goto CALC_DIFF_END;
+        }
 
-		auto prev = now->previous;
+        auto prev = now->previous;
 
-		if (prev->sum.isNotEvaluated())
-			return computeEval(b);
+        if (prev->sum.isNotEvaluated())
+            return computeEval(b);
 
-		// この差分を求める
-		{
-			int i;
-			sum = prev->sum;
-			auto list = b.evalList()->pieceListFb();
-			auto& dp = now->dirty_piece;
-			int k = dp.dirty_num;			// 移動させた駒は最大2つある。その数
-			auto dirty = dp.piece_no[0];
+        // この差分を求める
+        {
+            int i;
+            sum = prev->sum;
+            auto list = b.evalList()->pieceListFb();
+            auto& dp = now->dirty_piece;
+            int k = dp.dirty_num;			// 移動させた駒は最大2つある。その数
+            auto dirty = dp.piece_no[0];
 
 #define ADD_PP(W0,W1) { \
           sum.p -= ppt[W0][list[i]]; \
           sum.p += ppt[W1][list[i]]; \
 }
-			if (k == 1) // 移動した駒が一つ。
-			{
-				auto k0 = dp.pre_piece[0].fb;
-				auto k1 = dp.now_piece[0].fb;
+            if (k == 1) // 移動した駒が一つ。
+            {
+                auto k0 = dp.pre_piece[0].fb;
+                auto k1 = dp.now_piece[0].fb;
 
-				for (i = 0; i < dirty; ++i)
-					ADD_PP(k0, k1);
-				for (++i; i < PIECE_NO_NB; ++i)
-					ADD_PP(k0, k1);
-			}
-			else if (k == 2) // 移動した駒が二つ。
-			{
-				PieceNo dirty2 = dp.piece_no[1];
+                for (i = 0; i < dirty; ++i)
+                    ADD_PP(k0, k1);
+                for (++i; i < PIECE_NO_NB; ++i)
+                    ADD_PP(k0, k1);
+            }
+            else if (k == 2) // 移動した駒が二つ。
+            {
+                PieceNo dirty2 = dp.piece_no[1];
 
-				if (dirty > dirty2) 
-					std::swap(dirty, dirty2);
+                if (dirty > dirty2) 
+                    std::swap(dirty, dirty2);
 
-				auto k0 = dp.pre_piece[0].fb;
-				auto k1 = dp.now_piece[0].fb;
-				auto m0 = dp.pre_piece[1].fb;
-				auto m1 = dp.now_piece[1].fb;
+                auto k0 = dp.pre_piece[0].fb;
+                auto k1 = dp.now_piece[0].fb;
+                auto m0 = dp.pre_piece[1].fb;
+                auto m1 = dp.now_piece[1].fb;
 
-				// PP差分
-				for (i = 0; i < dirty; ++i)
-				{
-					ADD_PP(k0, k1);
-					ADD_PP(m0, m1);
-				}
-				for (++i; i < dirty2; ++i)
-				{
-					ADD_PP(k0, k1);
-					ADD_PP(m0, m1);
-				}
-				for (++i; i < PIECE_NO_NB; ++i)
-				{
-					ADD_PP(k0, k1);
-					ADD_PP(m0, m1);
-				}
+                // PP差分
+                for (i = 0; i < dirty; ++i)
+                {
+                    ADD_PP(k0, k1);
+                    ADD_PP(m0, m1);
+                }
+                for (++i; i < dirty2; ++i)
+                {
+                    ADD_PP(k0, k1);
+                    ADD_PP(m0, m1);
+                }
+                for (++i; i < PIECE_NO_NB; ++i)
+                {
+                    ADD_PP(k0, k1);
+                    ADD_PP(m0, m1);
+                }
 
-				sum.p -= ppt[k0][m0];
-				sum.p += ppt[k1][m1];
-			}
-		}
+                sum.p -= ppt[k0][m0];
+                sum.p += ppt[k1][m1];
+            }
+        }
 
-		now->sum = sum;
+        now->sum = sum;
 
-		// 差分計算終わり
-	CALC_DIFF_END:
-		return (Score)(sum.calcScore(b.turn()) / FV_SCALE);
-	}
+        // 差分計算終わり
+    CALC_DIFF_END:
+        return (Score)(sum.calcScore(b.turn()) / FV_SCALE);
+    }
 
-	// 評価関数
-	Score evaluate(const Board& b)
-	{
-		// 差分計算
-		auto material = b.turn() == BLACK ? b.state()->material : -b.state()->material;
-		auto score = calcEvalDiff(b) + material;
+    // 評価関数
+    Score evaluate(const Board& b)
+    {
+        // 差分計算
+        auto material = b.turn() == BLACK ? b.state()->material : -b.state()->material;
+        auto score = calcEvalDiff(b) + material;
 
 #if 0
-		// 非差分計算
-		auto sscore = computeEval(b) + material;
+        // 非差分計算
+        auto sscore = computeEval(b) + material;
 
-		if (score != sscore)
-		{
-			std::cout << score << " " << sscore;
-		}
+        if (score != sscore)
+        {
+            std::cout << score << " " << sscore;
+        }
 #endif
-		assert(score == computeEval(b) + material);
+        assert(score == computeEval(b) + material);
 
-		return score;
-	}
+        return score;
+    }
 }
 #endif // EVAL_PPT

@@ -29,67 +29,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 void MultiThink::think()
 {
-	// 評価関数の読み込み。
-	USI::isReady();
+    // 評価関数の読み込み。
+    USI::isReady();
 
-	// ループの上限は自分でセット。
-	this->loop_count = 0;
-	std::vector<std::thread> threads;
-	auto thread_num = (size_t)USI::Options["Threads"];
+    // ループの上限は自分でセット。
+    this->loop_count = 0;
+    std::vector<std::thread> threads;
+    auto thread_num = (size_t)USI::Options["Threads"];
 
-	thread_finished.reset(new volatile bool[thread_num]);
+    thread_finished.reset(new volatile bool[thread_num]);
 
-	// 関数をラムダで渡せば起動したことになるらしい。
-	for (size_t i = 0; i < thread_num; i++)
-	{
-		thread_finished.get()[i] = false;
-		threads.push_back(std::thread([i, this]
-		{
-			this->work(i);
-			this->thread_finished.get()[i] = true;
-		}));
-	}
+    // 関数をラムダで渡せば起動したことになるらしい。
+    for (size_t i = 0; i < thread_num; i++)
+    {
+        thread_finished.get()[i] = false;
+        threads.push_back(std::thread([i, this]
+        {
+            this->work(i);
+            this->thread_finished.get()[i] = true;
+        }));
+    }
 
-	// 何秒か置きにcallback_func()を呼び出す。
-	// すべてのスレッドが終了しているかどうかもチェック。
-	while (true)
-	{
-		const int check_interval = 5;
+    // 何秒か置きにcallback_func()を呼び出す。
+    // すべてのスレッドが終了しているかどうかもチェック。
+    while (true)
+    {
+        const int check_interval = 5;
 
-		for (int i = 0; i < callback_seconds / check_interval; i++)
-		{
-			// ここはメインスレッドなので眠ってもよし。
-			// backgroundで動いているスレッドが動いてくれる。
-			std::this_thread::sleep_for(std::chrono::seconds(check_interval));
+        for (int i = 0; i < callback_seconds / check_interval; i++)
+        {
+            // ここはメインスレッドなので眠ってもよし。
+            // backgroundで動いているスレッドが動いてくれる。
+            std::this_thread::sleep_for(std::chrono::seconds(check_interval));
 
-			for (size_t s = 0; s < thread_num; s++)
-			{
-				// すべて終了していればFinishする。
-				if (!thread_finished.get()[s])
-					goto Next;
-			}
+            for (size_t s = 0; s < thread_num; s++)
+            {
+                // すべて終了していればFinishする。
+                if (!thread_finished.get()[s])
+                    goto Next;
+            }
 
-			goto Finish;
+            goto Finish;
 
-		Next:;
-		}
+        Next:;
+        }
 
-		// callback関数があれば呼び出す。
-		if (callback_func)
-			callback_func();
-	}
+        // callback関数があれば呼び出す。
+        if (callback_func)
+            callback_func();
+    }
 
 Finish:
 
-	if (callback_func)
-	{
-		std::cout << "\nfinalize..";
-		callback_func();
-	}
+    if (callback_func)
+    {
+        std::cout << "\nfinalize..";
+        callback_func();
+    }
 
-	for (size_t i = 0; i < thread_num; i++)
-		threads[i].join();
+    for (size_t i = 0; i < thread_num; i++)
+        threads[i].join();
 
-	std::cout << "..all works done!" << std::endl;
+    std::cout << "..all works done!" << std::endl;
 }
 #endif

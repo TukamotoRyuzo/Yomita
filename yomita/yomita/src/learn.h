@@ -102,96 +102,96 @@ typedef double LearnFloatType;
 namespace Eval
 {
 #if defined USE_EVAL_TURN
-	typedef std::array<LearnFloatType, 2> WeightValue;
+    typedef std::array<LearnFloatType, 2> WeightValue;
 #elif defined USE_EVAL_NO_TURN
-	typedef LearnFloatType WeightValue;
+    typedef LearnFloatType WeightValue;
 #endif
 
-	struct Weight
-	{
-		// w : 元のパラメータ値。
-		// g : mini-batch一回分の勾配
-		WeightValue w, g;
+    struct Weight
+    {
+        // w : 元のパラメータ値。
+        // g : mini-batch一回分の勾配
+        WeightValue w, g;
 
 #if defined (USE_SGD_UPDATE)
 
-		// SGDの更新式 : w = w - ηg
-		// SGDの場合、勾配自動調整ではないので、損失関数に合わせて適宜調整する必要がある。
-		static LearnFloatType eta;
+        // SGDの更新式 : w = w - ηg
+        // SGDの場合、勾配自動調整ではないので、損失関数に合わせて適宜調整する必要がある。
+        static LearnFloatType eta;
 
-		// この特徴の出現回数
-		uint32_t count;
+        // この特徴の出現回数
+        uint32_t count;
 
 #elif defined (USE_ADA_GRAD_UPDATE)
 
-		// AdaGradの更新式
-		//   v = v + g^2
-		// ※　vベクトルの各要素に対して、gの各要素の2乗を加算するの意味
-		//   w = w - ηg/sqrt(v)
-		// 学習率η = 0.01として勾配が一定な場合、1万回でη×199ぐらい。
-		// cf. [AdaGradのすすめ](http://qiita.com/ak11/items/7f63a1198c345a138150)
-		// 初回更新量はeta。そこから小さくなっていく。
+        // AdaGradの更新式
+        //   v = v + g^2
+        // ※　vベクトルの各要素に対して、gの各要素の2乗を加算するの意味
+        //   w = w - ηg/sqrt(v)
+        // 学習率η = 0.01として勾配が一定な場合、1万回でη×199ぐらい。
+        // cf. [AdaGradのすすめ](http://qiita.com/ak11/items/7f63a1198c345a138150)
+        // 初回更新量はeta。そこから小さくなっていく。
 
-		static LearnFloatType eta;
+        static LearnFloatType eta;
 
-		// AdaGradのg2
-		WeightValue g2;
+        // AdaGradのg2
+        WeightValue g2;
 
 #elif defined USE_YANE_GRAD_UPDATE
 
-		// YaneGradの更新式
+        // YaneGradの更新式
 
-		// gを勾配、wを評価関数パラメーター、ηを学習率、εを微小値とする。
-		// ※　α = 0.99とかに設定しておき、v[i]が大きくなりすぎて他のパラメーターがあとから動いたときに、このv[i]が追随できないのを防ぐ。
-		//  ※　また比較的大きなεを加算しておき、vが小さいときに変な方向に行くことを抑制する。
-		// v = αv + g^2
-		// w = w - ηg/sqrt(v+ε)
+        // gを勾配、wを評価関数パラメーター、ηを学習率、εを微小値とする。
+        // ※　α = 0.99とかに設定しておき、v[i]が大きくなりすぎて他のパラメーターがあとから動いたときに、このv[i]が追随できないのを防ぐ。
+        //  ※　また比較的大きなεを加算しておき、vが小さいときに変な方向に行くことを抑制する。
+        // v = αv + g^2
+        // w = w - ηg/sqrt(v+ε)
 
-		// YaneGradのα値
-		LearnFloatType Weight::alpha = 0.99f;
+        // YaneGradのα値
+        LearnFloatType Weight::alpha = 0.99f;
 
-		// 学習率η
-		static LearnFloatType eta;
+        // 学習率η
+        static LearnFloatType eta;
 
-		// 最初のほうの更新量を抑制する項を独自に追加しておく。
-		static constexpr LearnFloatType epsilon = LearnFloatType(1.0f);
+        // 最初のほうの更新量を抑制する項を独自に追加しておく。
+        static constexpr LearnFloatType epsilon = LearnFloatType(1.0f);
 
-		// AdaGradのg2
-		WeightValue g2;
+        // AdaGradのg2
+        WeightValue g2;
 
 #elif defined (USE_ADAM_UPDATE)
 
-		// 普通のAdam
-		// cf. http://qiita.com/skitaoka/items/e6afbe238cd69c899b2a
+        // 普通のAdam
+        // cf. http://qiita.com/skitaoka/items/e6afbe238cd69c899b2a
 
-		//		const LearnFloatType alpha = 0.001f;
+        //		const LearnFloatType alpha = 0.001f;
 
-		// const double eta = 32.0/64.0;
-		// と書くとなぜかeta == 0。コンパイラ最適化のバグか？defineで書く。
-		// etaは学習率。FV_SCALE / 64
+        // const double eta = 32.0/64.0;
+        // と書くとなぜかeta == 0。コンパイラ最適化のバグか？defineで書く。
+        // etaは学習率。FV_SCALE / 64
 
-		static constexpr LearnFloatType beta = LearnFloatType(0.9);
-		static constexpr LearnFloatType gamma = LearnFloatType(0.999);
-		static constexpr LearnFloatType epsilon = LearnFloatType(10e-8);
-		static LearnFloatType eta;
-		//static constexpr LearnFloatType  eta = LearnFloatType(1.0);
+        static constexpr LearnFloatType beta = LearnFloatType(0.9);
+        static constexpr LearnFloatType gamma = LearnFloatType(0.999);
+        static constexpr LearnFloatType epsilon = LearnFloatType(10e-8);
+        static LearnFloatType eta;
+        //static constexpr LearnFloatType  eta = LearnFloatType(1.0);
 
-		WeightValue v;
-		WeightValue r;
+        WeightValue v;
+        WeightValue r;
 
-		// これはupdate()呼び出し前に計算して代入されるものとする。
-		// bt = pow(β,epoch) , rt = pow(γ,epoch)
-		static double bt;
-		static double rt;
+        // これはupdate()呼び出し前に計算して代入されるものとする。
+        // bt = pow(β,epoch) , rt = pow(γ,epoch)
+        static double bt;
+        static double rt;
 #endif
 
 #if defined EVAL_KPPT || defined EVAL_PPT
-		// 手番の学習率
-		static LearnFloatType eta2;
+        // 手番の学習率
+        static LearnFloatType eta2;
 #endif
-		void addGrad(WeightValue delta);
+        void addGrad(WeightValue delta);
 
-		bool update(bool skip_update);
-	};
+        bool update(bool skip_update);
+    };
 } // namespace Eval
 #endif

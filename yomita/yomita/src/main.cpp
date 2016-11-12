@@ -30,13 +30,13 @@ extern void initTables();
 
 int main(int argc, char** argv)
 {
-	initTables();
-	Zobrist::init();
-	USI::Options.init();
-	Threads.init();
-	TT.resize(USI::Options["Hash"]);
-	Search::init();
-	USI::loop(argc, argv);
-	Threads.exit();
-	return 0;
+    initTables();
+    Zobrist::init();
+    USI::Options.init();
+    Threads.init();
+    TT.resize(USI::Options["Hash"]);
+    Search::init();
+    USI::loop(argc, argv);
+    Threads.exit();
+    return 0;
 }

@@ -30,84 +30,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct TTEntry
 {
-	Key		key()		 const { return (Key  )  key32; }
-	Move    move()       const { return (Move ) move32; }
-	Score   score()      const { return (Score)score16; }
-	Score   eval()		 const { return (Score) eval16; }
-	Depth   depth()		 const { return (Depth) depth8; }
-	Bound   bound()		 const { return (Bound) bound8; }
-	uint8_t generation() const { return    generation8; }
+    Key		key()		 const { return (Key  )  key32; }
+    Move    move()       const { return (Move ) move32; }
+    Score   score()      const { return (Score)score16; }
+    Score   eval()		 const { return (Score) eval16; }
+    Depth   depth()		 const { return (Depth) depth8; }
+    Bound   bound()		 const { return (Bound) bound8; }
+    uint8_t generation() const { return    generation8; }
 
-	// 書き込みはアトミックに行いたい。
-	void save(Key k, Score s, Bound b, Depth d, Move m, Score ev, uint8_t g)
-	{
-		// 何も考えずに指し手を上書き(新しいデータのほうが価値があるので)
-		if (m || (k >> 32) != key32)
-			move32 = m;
+    // 書き込みはアトミックに行いたい。
+    void save(Key k, Score s, Bound b, Depth d, Move m, Score ev, uint8_t g)
+    {
+        // 何も考えずに指し手を上書き(新しいデータのほうが価値があるので)
+        if (m || (k >> 32) != key32)
+            move32 = m;
 
-		// このエントリーの現在の内容のほうが価値があるなら上書きしない。
-		if ((k >> 32) != key32
-			|| d > depth8 - 4 
-			|| b == BOUND_EXACT)
-		{
-			key32	    = (uint32_t)(k >> 32);
-			score16     = (int16_t)s;
-			eval16      = (int16_t)ev;
-			generation8 = (uint8_t)g;
-			bound8      = (uint8_t)b;
-			depth8      = (int8_t)d;
-		}
-	}
+        // このエントリーの現在の内容のほうが価値があるなら上書きしない。
+        if ((k >> 32) != key32
+            || d > depth8 - 4 
+            || b == BOUND_EXACT)
+        {
+            key32	    = (uint32_t)(k >> 32);
+            score16     = (int16_t)s;
+            eval16      = (int16_t)ev;
+            generation8 = (uint8_t)g;
+            bound8      = (uint8_t)b;
+            depth8      = (int8_t)d;
+        }
+    }
 
 private:
-	friend class TranspositionTable;
+    friend class TranspositionTable;
 
-	// hash keyの上位32bit
-	uint32_t key32;
+    // hash keyの上位32bit
+    uint32_t key32;
 
-	// 指し手
-	uint32_t move32;
+    // 指し手
+    uint32_t move32;
 
-	// このnodeでの探索の結果スコア
-	int16_t score16;
+    // このnodeでの探索の結果スコア
+    int16_t score16;
 
-	// 評価関数の評価値
-	int16_t eval16;
+    // 評価関数の評価値
+    int16_t eval16;
 
-	uint8_t generation8;
+    uint8_t generation8;
 
-	uint8_t bound8;
+    uint8_t bound8;
 
-	// そのときの残り深さ(これが大きいものほど価値がある)
-	int8_t depth8;
+    // そのときの残り深さ(これが大きいものほど価値がある)
+    int8_t depth8;
 };
 
 // 32 + 32 + 16 + 16 + 8 + 8 + 8 = 120bit = 15byte → 16byteになる模様
 
 class TranspositionTable 
 {
-	static const int CACHE_LINE_SIZE = 64;
-	static const int CLUSTER_SIZE = 4;
+    static const int CACHE_LINE_SIZE = 64;
+    static const int CLUSTER_SIZE = 4;
 
-	struct Cluster { TTEntry entry[CLUSTER_SIZE]; };
+    struct Cluster { TTEntry entry[CLUSTER_SIZE]; };
 
-	static_assert(CACHE_LINE_SIZE % sizeof(Cluster) == 0, "Cluster size incorrect");
+    static_assert(CACHE_LINE_SIZE % sizeof(Cluster) == 0, "Cluster size incorrect");
 
 public:
-	~TranspositionTable() { free(mem_); }
-	void newSearch() { generation8_++; }
-	uint8_t generation() const { return generation8_; }
-	bool probe(const Key key, TTEntry* &ptt) const;
-	int hashfull() const;
-	void resize(size_t mb_size);
-	void clear() { memset(table_, 0, cluster_count_ * sizeof(Cluster)); generation8_ = 0; }
-	TTEntry* firstEntry(const Key key) const { return &table_[(size_t)key & (cluster_count_ - 1)].entry[0]; }
+    ~TranspositionTable() { free(mem_); }
+    void newSearch() { generation8_++; }
+    uint8_t generation() const { return generation8_; }
+    bool probe(const Key key, TTEntry* &ptt) const;
+    int hashfull() const;
+    void resize(size_t mb_size);
+    void clear() { memset(table_, 0, cluster_count_ * sizeof(Cluster)); generation8_ = 0; }
+    TTEntry* firstEntry(const Key key) const { return &table_[(size_t)key & (cluster_count_ - 1)].entry[0]; }
 
 private:
-	void* mem_;
-	Cluster* table_;
-	uint8_t generation8_;
-	size_t cluster_count_;	
+    void* mem_;
+    Cluster* table_;
+    uint8_t generation8_;
+    size_t cluster_count_;	
 };
 
 extern TranspositionTable TT;

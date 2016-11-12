@@ -36,34 +36,34 @@ enum File { FILE_9, FILE_8, FILE_7, FILE_6, FILE_5, FILE_4, FILE_3, FILE_2, FILE
 enum Rank { RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8, RANK_9, RANK_ZERO = 0, RANK_MAX = 9 };
 enum Square
 {
-	SQ_91, SQ_81, SQ_71, SQ_61, SQ_51, SQ_41, SQ_31, SQ_21, SQ_11,
-	SQ_92, SQ_82, SQ_72, SQ_62, SQ_52, SQ_42, SQ_32, SQ_22, SQ_12,
-	SQ_93, SQ_83, SQ_73, SQ_63, SQ_53, SQ_43, SQ_33, SQ_23, SQ_13,
-	SQ_94, SQ_84, SQ_74, SQ_64, SQ_54, SQ_44, SQ_34, SQ_24, SQ_14,
-	SQ_95, SQ_85, SQ_75, SQ_65, SQ_55, SQ_45, SQ_35, SQ_25, SQ_15,
-	SQ_96, SQ_86, SQ_76, SQ_66, SQ_56, SQ_46, SQ_36, SQ_26, SQ_16,
-	SQ_97, SQ_87, SQ_77, SQ_67, SQ_57, SQ_47, SQ_37, SQ_27, SQ_17,
-	SQ_98, SQ_88, SQ_78, SQ_68, SQ_58, SQ_48, SQ_38, SQ_28, SQ_18,
-	SQ_99, SQ_89, SQ_79, SQ_69, SQ_59, SQ_49, SQ_39, SQ_29, SQ_19,
-	SQ_ZERO = 0, SQ_MAX = 81,
-	SQ_MAX_PLUS1 = SQ_MAX + 1,
-	DELTA_N = -9, DELTA_S = 9, DELTA_E = 1, DELTA_W = -1,
-	DELTA_NE = -8, DELTA_SE = 10, DELTA_SW = 8, DELTA_NW = -10,
+    SQ_91, SQ_81, SQ_71, SQ_61, SQ_51, SQ_41, SQ_31, SQ_21, SQ_11,
+    SQ_92, SQ_82, SQ_72, SQ_62, SQ_52, SQ_42, SQ_32, SQ_22, SQ_12,
+    SQ_93, SQ_83, SQ_73, SQ_63, SQ_53, SQ_43, SQ_33, SQ_23, SQ_13,
+    SQ_94, SQ_84, SQ_74, SQ_64, SQ_54, SQ_44, SQ_34, SQ_24, SQ_14,
+    SQ_95, SQ_85, SQ_75, SQ_65, SQ_55, SQ_45, SQ_35, SQ_25, SQ_15,
+    SQ_96, SQ_86, SQ_76, SQ_66, SQ_56, SQ_46, SQ_36, SQ_26, SQ_16,
+    SQ_97, SQ_87, SQ_77, SQ_67, SQ_57, SQ_47, SQ_37, SQ_27, SQ_17,
+    SQ_98, SQ_88, SQ_78, SQ_68, SQ_58, SQ_48, SQ_38, SQ_28, SQ_18,
+    SQ_99, SQ_89, SQ_79, SQ_69, SQ_59, SQ_49, SQ_39, SQ_29, SQ_19,
+    SQ_ZERO = 0, SQ_MAX = 81,
+    SQ_MAX_PLUS1 = SQ_MAX + 1,
+    DELTA_N = -9, DELTA_S = 9, DELTA_E = 1, DELTA_W = -1,
+    DELTA_NE = -8, DELTA_SE = 10, DELTA_SW = 8, DELTA_NW = -10,
 
 #ifdef EVAL_KRB
-	// 成り、持ち駒判定も含めた駒位置の最大値
-	SQ_MAX_PRO_HAND = SQ_MAX * 2 + 1,
+    // 成り、持ち駒判定も含めた駒位置の最大値
+    SQ_MAX_PRO_HAND = SQ_MAX * 2 + 1,
 #endif
 };
 
 // 方向を意味するbit
 enum RelationType : uint8_t
 {
-	DIRECT_MISC,  // 方向が縦横斜めの関係に無い場合
-	DIRECT_FILE,  // 方向が縦方向の関係である
-	DIRECT_RANK,  // 方向が横方向の関係である
-	DIRECT_DIAG1, // 方向が右上から左下方向の斜め関係である
-	DIRECT_DIAG2, // 方向が左上から右下方向の斜め関係である
+    DIRECT_MISC,  // 方向が縦横斜めの関係に無い場合
+    DIRECT_FILE,  // 方向が縦方向の関係である
+    DIRECT_RANK,  // 方向が横方向の関係である
+    DIRECT_DIAG1, // 方向が右上から左下方向の斜め関係である
+    DIRECT_DIAG2, // 方向が左上から右下方向の斜め関係である
 };
 
 ENABLE_OPERATORS_ON(File);
@@ -92,12 +92,12 @@ inline Square mirror(const Square sq) { return sqOf(inverse(fileOf(sq)), rankOf(
 // 成りと持ち駒を含めたSquareをmirrorしたいときに使う。
 inline Square mirrorProHand(const Square sq)
 {
-	if (sq == SQ_MAX_PRO_HAND - 1)
-		return sq;
-	else if (sq >= SQ_MAX)
-		return mirror(sq - SQ_MAX) + SQ_MAX;
-	
-	return mirror(sq);
+    if (sq == SQ_MAX_PRO_HAND - 1)
+        return sq;
+    else if (sq >= SQ_MAX)
+        return mirror(sq - SQ_MAX) + SQ_MAX;
+    
+    return mirror(sq);
 }
 #endif
 
@@ -109,15 +109,15 @@ inline Rank relativeRank(const Rank r, const Turn t) { return t == BLACK ? r : i
 #if defined USE_FILE_SQUARE_EVAL || defined CONVERT_EVAL
 enum EvalSquare
 {
-	BSQ_11, BSQ_12, BSQ_13, BSQ_14, BSQ_15, BSQ_16, BSQ_17, BSQ_18, BSQ_19,
-	BSQ_21, BSQ_22, BSQ_23, BSQ_24, BSQ_25, BSQ_26, BSQ_27, BSQ_28, BSQ_29,
-	BSQ_31, BSQ_32, BSQ_33, BSQ_34, BSQ_35, BSQ_36, BSQ_37, BSQ_38, BSQ_39,
-	BSQ_41, BSQ_42, BSQ_43, BSQ_44, BSQ_45, BSQ_46, BSQ_47, BSQ_48, BSQ_49,
-	BSQ_51, BSQ_52, BSQ_53, BSQ_54, BSQ_55, BSQ_56, BSQ_57, BSQ_58, BSQ_59,
-	BSQ_61, BSQ_62, BSQ_63, BSQ_64, BSQ_65, BSQ_66, BSQ_67, BSQ_68, BSQ_69,
-	BSQ_71, BSQ_72, BSQ_73, BSQ_74, BSQ_75, BSQ_76, BSQ_77, BSQ_78, BSQ_79,
-	BSQ_81, BSQ_82, BSQ_83, BSQ_84, BSQ_85, BSQ_86, BSQ_87, BSQ_88, BSQ_89,
-	BSQ_91, BSQ_92, BSQ_93, BSQ_94, BSQ_95, BSQ_96, BSQ_97, BSQ_98, BSQ_99,
+    BSQ_11, BSQ_12, BSQ_13, BSQ_14, BSQ_15, BSQ_16, BSQ_17, BSQ_18, BSQ_19,
+    BSQ_21, BSQ_22, BSQ_23, BSQ_24, BSQ_25, BSQ_26, BSQ_27, BSQ_28, BSQ_29,
+    BSQ_31, BSQ_32, BSQ_33, BSQ_34, BSQ_35, BSQ_36, BSQ_37, BSQ_38, BSQ_39,
+    BSQ_41, BSQ_42, BSQ_43, BSQ_44, BSQ_45, BSQ_46, BSQ_47, BSQ_48, BSQ_49,
+    BSQ_51, BSQ_52, BSQ_53, BSQ_54, BSQ_55, BSQ_56, BSQ_57, BSQ_58, BSQ_59,
+    BSQ_61, BSQ_62, BSQ_63, BSQ_64, BSQ_65, BSQ_66, BSQ_67, BSQ_68, BSQ_69,
+    BSQ_71, BSQ_72, BSQ_73, BSQ_74, BSQ_75, BSQ_76, BSQ_77, BSQ_78, BSQ_79,
+    BSQ_81, BSQ_82, BSQ_83, BSQ_84, BSQ_85, BSQ_86, BSQ_87, BSQ_88, BSQ_89,
+    BSQ_91, BSQ_92, BSQ_93, BSQ_94, BSQ_95, BSQ_96, BSQ_97, BSQ_98, BSQ_99,
 };
 
 ENABLE_OPERATORS_ON(EvalSquare);
@@ -179,8 +179,8 @@ inline RelationType relation(const Square sq1, const Square sq2) { return SQUARE
 // from, to, ksqが同じ位置関係のときtrueを返す。
 inline bool isAligned(const Square from, const Square to, const Square ksq)
 {
-	const RelationType rt = relation(from, ksq);
-	return rt != DIRECT_MISC && rt == relation(from, to);
+    const RelationType rt = relation(from, ksq);
+    return rt != DIRECT_MISC && rt == relation(from, to);
 }
 
 // range名は新たな型名という扱いにする。こいつらは最後にsをつける。

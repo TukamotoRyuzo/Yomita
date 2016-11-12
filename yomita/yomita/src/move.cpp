@@ -26,63 +26,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 std::string toUSI(const Move m)
 {
-	// 持ち駒を打つとき、USIにこの文字列を送信する。
-	static const std::string hand_to_usi_str[] = { "", "B*", "R*", "P*", "L*", "N*", "S*", "G*", };
+    // 持ち駒を打つとき、USIにこの文字列を送信する。
+    static const std::string hand_to_usi_str[] = { "", "B*", "R*", "P*", "L*", "N*", "S*", "G*", };
 
-	if (isNone(m))
-		return "resign";
+    if (isNone(m))
+        return "resign";
 
-	if (isNull(m))
-		return "0000";
+    if (isNull(m))
+        return "0000";
 
-	// 駒打ちなら
-	// 打った駒の種類を大文字 + * + 打つ場所をUSI用に変換して返す。
-	if (isDrop(m))
-		return hand_to_usi_str[movedPieceType(m)] + ::toUSI(toSq(m));
+    // 駒打ちなら
+    // 打った駒の種類を大文字 + * + 打つ場所をUSI用に変換して返す。
+    if (isDrop(m))
+        return hand_to_usi_str[movedPieceType(m)] + ::toUSI(toSq(m));
 
-	// 盤上の手なら、移動前 + 移動後 という形で表す。
-	std::string usi = ::toUSI(fromSq(m)) + ::toUSI(toSq(m));
+    // 盤上の手なら、移動前 + 移動後 という形で表す。
+    std::string usi = ::toUSI(fromSq(m)) + ::toUSI(toSq(m));
 
-	if (isPromote(m)) 
-		usi += "+";
+    if (isPromote(m)) 
+        usi += "+";
 
-	// これで変換完了！
-	return usi;
+    // これで変換完了！
+    return usi;
 }
 
 
 std::string toCSA(const Move m)
 {
-	static const std::string piece_to_csa[] = { "", "KA", "HI", "FU", "KY", "KE", "GI", "KI", "OU", "UM", "RY", "TO", "NY", "NK", "NG" };
+    static const std::string piece_to_csa[] = { "", "KA", "HI", "FU", "KY", "KE", "GI", "KI", "OU", "UM", "RY", "TO", "NY", "NK", "NG" };
 
-	if (isNone(m))
-		return "resign";
+    if (isNone(m))
+        return "resign";
 
-	if (isNull(m))
-		return "0000";
+    if (isNull(m))
+        return "0000";
 
-	if (isDrop(m))
-		return "00" + ::toCSA(toSq(m)) + piece_to_csa[movedPieceType(m)];
+    if (isDrop(m))
+        return "00" + ::toCSA(toSq(m)) + piece_to_csa[movedPieceType(m)];
 
-	std::string csa = ::toCSA(fromSq(m)) + ::toCSA(toSq(m)) + piece_to_csa[movedPieceTypeTo(m)];
+    std::string csa = ::toCSA(fromSq(m)) + ::toCSA(toSq(m)) + piece_to_csa[movedPieceTypeTo(m)];
 
-	return csa;
+    return csa;
 }
 
 std::string pretty(const Move m)
 { 
-	if (isNone(m))
-		return "none";
+    if (isNone(m))
+        return "none";
 
-	if (isNull(m))
-		return "null";
+    if (isNull(m))
+        return "null";
 
-	std::string ret = ::pretty(toSq(m)) + ::pretty(movedPieceType(m)) + (isDrop(m) ? "打" : isPromote(m) ? "成" : "");
+    std::string ret = ::pretty(toSq(m)) + ::pretty(movedPieceType(m)) + (isDrop(m) ? "打" : isPromote(m) ? "成" : "");
 
-	if (!isDrop(m))
-		ret += "(" + fromPretty(fromSq(m)) + ")";
+    if (!isDrop(m))
+        ret += "(" + fromPretty(fromSq(m)) + ")";
 
-	return ret; 
+    return ret; 
 }
 
 

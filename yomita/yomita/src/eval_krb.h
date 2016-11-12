@@ -35,36 +35,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace Eval
 {
-	// 全部16bitでいいや。
-	typedef int16_t Value;
+    // 全部16bitでいいや。
+    typedef int16_t Value;
 
-	// memory mapped file用
-	struct SharedEval
-	{
-		Value kpp_[SQ_MAX][fe_end][fe_end];
+    // memory mapped file用
+    struct SharedEval
+    {
+        Value kpp_[SQ_MAX][fe_end][fe_end];
 
-		// 生飛車、角の場合はSQ_MAXまで。
-		// 竜、馬の場合はSQ_MAX から 2 * SQ_MAXまで。
-		// 持ち駒になっている場合は、SQ_MAX * 2。
-		Value rpp_[SQ_MAX_PRO_HAND][fe_gold_end][fe_gold_end];
-		Value bpp_[SQ_MAX_PRO_HAND][fe_gold_end][fe_gold_end];
-	};
+        // 生飛車、角の場合はSQ_MAXまで。
+        // 竜、馬の場合はSQ_MAX から 2 * SQ_MAXまで。
+        // 持ち駒になっている場合は、SQ_MAX * 2。
+        Value rpp_[SQ_MAX_PRO_HAND][fe_gold_end][fe_gold_end];
+        Value bpp_[SQ_MAX_PRO_HAND][fe_gold_end][fe_gold_end];
+    };
 
-	struct EvalTable
-	{
-		Value(*kpp_)[SQ_MAX][fe_end][fe_end];
-		Value(*rpp_)[SQ_MAX_PRO_HAND][fe_gold_end][fe_gold_end];
-		Value(*bpp_)[SQ_MAX_PRO_HAND][fe_gold_end][fe_gold_end];
+    struct EvalTable
+    {
+        Value(*kpp_)[SQ_MAX][fe_end][fe_end];
+        Value(*rpp_)[SQ_MAX_PRO_HAND][fe_gold_end][fe_gold_end];
+        Value(*bpp_)[SQ_MAX_PRO_HAND][fe_gold_end][fe_gold_end];
 
-		void set(SharedEval* se)
-		{
-			kpp_ = &se->kpp_;
-			rpp_ = &se->rpp_;
-			bpp_ = &se->bpp_;
-		}
-	};
+        void set(SharedEval* se)
+        {
+            kpp_ = &se->kpp_;
+            rpp_ = &se->rpp_;
+            bpp_ = &se->bpp_;
+        }
+    };
 
-	extern EvalTable et;
+    extern EvalTable et;
 
 } // namespace Eval
 #endif

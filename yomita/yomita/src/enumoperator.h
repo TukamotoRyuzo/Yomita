@@ -24,29 +24,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #define ENABLE_SAFE_OPERATORS_ON(T)\
-	inline constexpr T  operator + (const T d1, const T d2) { return T(int(d1) + int(d2)); }\
-	inline constexpr T  operator + (const T d1, const int d2) { return T(int(d1) + int(d2)); }\
-	inline constexpr T  operator | (const T d1, const T d2) { return T(int(d1) | int(d2)); }\
-	inline constexpr T  operator ^ (const T d1, const T d2) { return T(int(d1) ^ int(d2)); }\
-	inline constexpr T  operator - (const T d1, const T d2) { return T(int(d1) - int(d2)); }\
-	inline constexpr T  operator - (const T d1, const int d2) { return T(int(d1) - int(d2)); }\
-	inline constexpr T  operator * (int i, const T d) { return T(i * int(d)); }\
-	inline constexpr T  operator * (const T d, const T d2) { return T(int(d) * int(d2)); }\
-	inline constexpr T  operator & (int i, const T d) { return T(i & int(d)); }\
-	inline constexpr T  operator & (const T d1, const T d2) { return T(int(d1) & int(d2)); }\
-	inline constexpr T  operator * (const T d, int i) { return T(int(d) * i); }\
-	inline constexpr T  operator - (const T d) { return T(-int(d)); }\
-	inline T& operator += (T& d1, const T d2) { return d1 = d1 + d2; }\
-	inline T& operator -= (T& d1, const T d2) { return d1 = d1 - d2; }\
-	inline T& operator += (T& d1, const int d2) { return d1 = d1 + d2; }\
-	inline T& operator -= (T& d1, const int d2) { return d1 = d1 - d2; }\
-	inline T& operator *= (T& d, int i) { return d = T(int(d) * i); }\
-	inline T& operator ^= (T& d, int i) { return d = T(int(d) ^ i); }
+    inline constexpr T  operator + (const T d1, const T d2) { return T(int(d1) + int(d2)); }\
+    inline constexpr T  operator + (const T d1, const int d2) { return T(int(d1) + int(d2)); }\
+    inline constexpr T  operator | (const T d1, const T d2) { return T(int(d1) | int(d2)); }\
+    inline constexpr T  operator ^ (const T d1, const T d2) { return T(int(d1) ^ int(d2)); }\
+    inline constexpr T  operator - (const T d1, const T d2) { return T(int(d1) - int(d2)); }\
+    inline constexpr T  operator - (const T d1, const int d2) { return T(int(d1) - int(d2)); }\
+    inline constexpr T  operator * (int i, const T d) { return T(i * int(d)); }\
+    inline constexpr T  operator * (const T d, const T d2) { return T(int(d) * int(d2)); }\
+    inline constexpr T  operator & (int i, const T d) { return T(i & int(d)); }\
+    inline constexpr T  operator & (const T d1, const T d2) { return T(int(d1) & int(d2)); }\
+    inline constexpr T  operator * (const T d, int i) { return T(int(d) * i); }\
+    inline constexpr T  operator - (const T d) { return T(-int(d)); }\
+    inline T& operator += (T& d1, const T d2) { return d1 = d1 + d2; }\
+    inline T& operator -= (T& d1, const T d2) { return d1 = d1 - d2; }\
+    inline T& operator += (T& d1, const int d2) { return d1 = d1 + d2; }\
+    inline T& operator -= (T& d1, const int d2) { return d1 = d1 - d2; }\
+    inline T& operator *= (T& d, int i) { return d = T(int(d) * i); }\
+    inline T& operator ^= (T& d, int i) { return d = T(int(d) ^ i); }
 
 #define ENABLE_OPERATORS_ON(T) ENABLE_SAFE_OPERATORS_ON(T)\
-	inline T& operator ++ (T& d) { return d = T(int(d) + 1); }\
-	inline T& operator -- (T& d) { return d = T(int(d) - 1); }\
-	inline T  operator ++ (T& d,int) { T prev = d; d = T(int(d) + 1); return prev; } \
-	inline T  operator -- (T& d,int) { T prev = d; d = T(int(d) - 1); return prev; } \
-	inline constexpr T  operator / (const T d, int i) { return T(int(d) / i); }\
-	inline T& operator /= (T& d, int i) { return d = T(int(d) / i); }
+    inline T& operator ++ (T& d) { return d = T(int(d) + 1); }\
+    inline T& operator -- (T& d) { return d = T(int(d) - 1); }\
+    inline T  operator ++ (T& d,int) { T prev = d; d = T(int(d) + 1); return prev; } \
+    inline T  operator -- (T& d,int) { T prev = d; d = T(int(d) - 1); return prev; } \
+    inline constexpr T  operator / (const T d, int i) { return T(int(d) / i); }\
+    inline T& operator /= (T& d, int i) { return d = T(int(d) / i); }

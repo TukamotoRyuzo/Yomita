@@ -29,82 +29,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // C++11では、std::stack<StateInfo>がalignasを無視するために、代わりにstack相当のものを自作。
 template <typename T> struct aligned_stack 
 {
-	void push(const T& t) { auto ptr = (T*)_mm_malloc(sizeof(T), alignof(T)); *ptr = t; container.push_back(ptr); }
-	T& top() const { return **container.rbegin(); }
-	void clear() { for (auto ptr : container) _mm_free(ptr); container.clear(); }
-	~aligned_stack() { clear(); }
+    void push(const T& t) { auto ptr = (T*)_mm_malloc(sizeof(T), alignof(T)); *ptr = t; container.push_back(ptr); }
+    T& top() const { return **container.rbegin(); }
+    void clear() { for (auto ptr : container) _mm_free(ptr); container.clear(); }
+    ~aligned_stack() { clear(); }
 private:
-	std::vector<T*> container;
+    std::vector<T*> container;
 };
 
 // 64bitのうち、LSBの位置を返す。
 inline int bsf64(const uint64_t mask)
 {
-	assert(mask != 0);
+    assert(mask != 0);
 #if defined USE_BSF
-	unsigned long index;
-	_BitScanForward64(&index, mask);
-	return index;
+    unsigned long index;
+    _BitScanForward64(&index, mask);
+    return index;
 #else
-	static const int BitTable[64] =
-	{
-		63, 30, 3, 32, 25, 41, 22, 33, 15, 50, 42, 13, 11, 53, 19, 34, 61, 29, 2,
-		51, 21, 43, 45, 10, 18, 47, 1, 54, 9, 57, 0, 35, 62, 31, 40, 4, 49, 5, 52,
-		26, 60, 6, 23, 44, 46, 27, 56, 16, 7, 39, 48, 24, 59, 14, 12, 55, 38, 28,
-		58, 20, 37, 17, 36, 8
-	};
-	const uint64_t tmp = mask ^ (mask - 1);
-	const uint32_t old = static_cast<uint32_t>((tmp & 0xffffffff) ^ (tmp >> 32));
-	return BitTable[(old * 0x783a9b23) >> 26];
+    static const int BitTable[64] =
+    {
+        63, 30, 3, 32, 25, 41, 22, 33, 15, 50, 42, 13, 11, 53, 19, 34, 61, 29, 2,
+        51, 21, 43, 45, 10, 18, 47, 1, 54, 9, 57, 0, 35, 62, 31, 40, 4, 49, 5, 52,
+        26, 60, 6, 23, 44, 46, 27, 56, 16, 7, 39, 48, 24, 59, 14, 12, 55, 38, 28,
+        58, 20, 37, 17, 36, 8
+    };
+    const uint64_t tmp = mask ^ (mask - 1);
+    const uint32_t old = static_cast<uint32_t>((tmp & 0xffffffff) ^ (tmp >> 32));
+    return BitTable[(old * 0x783a9b23) >> 26];
 #endif
 }
 
 inline int bsr64(const uint64_t mask)
 {
-	assert(mask != 0);
+    assert(mask != 0);
 #if defined USE_BSF
-	unsigned long index;
-	_BitScanReverse64(&index, mask);
-	return index;
+    unsigned long index;
+    _BitScanReverse64(&index, mask);
+    return index;
 #else
-	for (int i = 63; 0 <= i; --i)
-	{
-		if (mask >> i)
-			return 63 - i;
-	}
-	return 0;
+    for (int i = 63; 0 <= i; --i)
+    {
+        if (mask >> i)
+            return 63 - i;
+    }
+    return 0;
 #endif
 }
 
 #if defined USE_POPCNT
 #define popCount(v) (int)_mm_popcnt_u64(v)
 #else
-	//64bitのうち、たっているビットの数を返す。(popcntの代わり)
-	inline int popCount(uint64_t v) 
-	{
-		uint64_t count = (v & 0x5555555555555555ULL) + ((v >> 1) & 0x5555555555555555ULL);
-		count = (count & 0x3333333333333333ULL) + ((count >> 2) & 0x3333333333333333ULL);
-		count = (count & 0x0f0f0f0f0f0f0f0fULL) + ((count >> 4) & 0x0f0f0f0f0f0f0f0fULL);
-		count = (count & 0x00ff00ff00ff00ffULL) + ((count >> 8) & 0x00ff00ff00ff00ffULL);
-		count = (count & 0x0000ffff0000ffffULL) + ((count >> 16) & 0x0000ffff0000ffffULL);
-		return (int)((count & 0x00000000ffffffffULL) + ((count >> 32) & 0x00000000ffffffffULL));
-	}
+    //64bitのうち、たっているビットの数を返す。(popcntの代わり)
+    inline int popCount(uint64_t v) 
+    {
+        uint64_t count = (v & 0x5555555555555555ULL) + ((v >> 1) & 0x5555555555555555ULL);
+        count = (count & 0x3333333333333333ULL) + ((count >> 2) & 0x3333333333333333ULL);
+        count = (count & 0x0f0f0f0f0f0f0f0fULL) + ((count >> 4) & 0x0f0f0f0f0f0f0f0fULL);
+        count = (count & 0x00ff00ff00ff00ffULL) + ((count >> 8) & 0x00ff00ff00ff00ffULL);
+        count = (count & 0x0000ffff0000ffffULL) + ((count >> 16) & 0x0000ffff0000ffffULL);
+        return (int)((count & 0x00000000ffffffffULL) + ((count >> 32) & 0x00000000ffffffffULL));
+    }
 #endif
 
 #if defined HAVE_BMI2
 #define pext(a, b) (int)_pext_u64(a, b)
 #else
-	inline uint64_t pext(uint64_t src, uint64_t mask)
-	{
-		// 自前のpextで代用
-		uint64_t dst = 0;
+    inline uint64_t pext(uint64_t src, uint64_t mask)
+    {
+        // 自前のpextで代用
+        uint64_t dst = 0;
 
-		for (int i = 1; mask; i += i, mask &= mask - 1)
-			if (mask & -(int64_t)mask & src)
-				dst |= i;
+        for (int i = 1; mask; i += i, mask &= mask - 1)
+            if (mask & -(int64_t)mask & src)
+                dst |= i;
 
-		return dst;
-	}
+        return dst;
+    }
 #endif
 
 

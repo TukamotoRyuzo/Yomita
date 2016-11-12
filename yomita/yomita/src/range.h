@@ -31,14 +31,14 @@ template<typename T, int, int> class Range {};
 template<typename T>
 class Iter
 {
-	T value;
+    T value;
 public:
-	constexpr Iter(T val) : value(val) {};
-	constexpr T operator *() const { return value; }
-	Iter operator ++ (int) { value = static_cast<T>(value + 1); return Iter(T(value - 1)); }
-	Iter& operator ++ () { value = static_cast<T>(value + 1); return *this; }
-	constexpr bool operator == (const Iter& itr) const { return value == itr.value; }
-	constexpr bool operator != (const Iter& itr) const { return value != itr.value; }
+    constexpr Iter(T val) : value(val) {};
+    constexpr T operator *() const { return value; }
+    Iter operator ++ (int) { value = static_cast<T>(value + 1); return Iter(T(value - 1)); }
+    Iter& operator ++ () { value = static_cast<T>(value + 1); return *this; }
+    constexpr bool operator == (const Iter& itr) const { return value == itr.value; }
+    constexpr bool operator != (const Iter& itr) const { return value != itr.value; }
 };
 
 template<typename T, int b, int e>

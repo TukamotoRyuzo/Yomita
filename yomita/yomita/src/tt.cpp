@@ -27,71 +27,71 @@ TranspositionTable TT;
 
 void TranspositionTable::resize(size_t mb_size)
 {
-	size_t new_cluster_count = size_t(1) << bsr64((mb_size * 1024 * 1024) / sizeof(Cluster));
+    size_t new_cluster_count = size_t(1) << bsr64((mb_size * 1024 * 1024) / sizeof(Cluster));
 
-	// 現在確保中の置換表用のメモリと等しいならば再確保は行わない
-	if (new_cluster_count == cluster_count_)
-		return;
+    // 現在確保中の置換表用のメモリと等しいならば再確保は行わない
+    if (new_cluster_count == cluster_count_)
+        return;
 
-	cluster_count_ = new_cluster_count;
+    cluster_count_ = new_cluster_count;
 
-	free(mem_);
+    free(mem_);
 
-	mem_ = calloc(cluster_count_ * sizeof(Cluster) + CACHE_LINE_SIZE - 1, 1);
+    mem_ = calloc(cluster_count_ * sizeof(Cluster) + CACHE_LINE_SIZE - 1, 1);
 
-	if (!mem_)
-	{
-		std::cerr << "Failed to allocate " << mb_size << "MB for transposition table." << std::endl;
-		exit(EXIT_FAILURE);
-	}
+    if (!mem_)
+    {
+        std::cerr << "Failed to allocate " << mb_size << "MB for transposition table." << std::endl;
+        exit(EXIT_FAILURE);
+    }
 
-	// mem_から64バイトでアラインされたアドレスを得て、それをtableとして使う。
-	table_ = (Cluster*)((uintptr_t(mem_) + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1));
+    // mem_から64バイトでアラインされたアドレスを得て、それをtableとして使う。
+    table_ = (Cluster*)((uintptr_t(mem_) + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1));
 
 }
 
 // TTEのポインタ、見つからなかったらreplaceできるTTEのポインタがpttに代入される
 bool TranspositionTable::probe(const Key key, TTEntry* &ptt) const
 {
-	TTEntry* const tte = firstEntry(key);
-	const uint32_t key32 = key >> 32;
+    TTEntry* const tte = firstEntry(key);
+    const uint32_t key32 = key >> 32;
 
-	for (int i = 0; i < CLUSTER_SIZE; ++i)
-		if (!tte[i].key32 || tte[i].key32 == key32) // 空か、同じ局面が見つかった
-		{
-			if (tte[i].generation8 != generation8_ && tte[i].key32)
-				tte[i].generation8 = generation8_; // Refresh
+    for (int i = 0; i < CLUSTER_SIZE; ++i)
+        if (!tte[i].key32 || tte[i].key32 == key32) // 空か、同じ局面が見つかった
+        {
+            if (tte[i].generation8 != generation8_ && tte[i].key32)
+                tte[i].generation8 = generation8_; // Refresh
 
-			// 空だったら見つかってないのでfalse ※Clusterは先頭から順番に埋まっていく
-			ptt = &tte[i];
-			return (bool)tte[i].key32;
-		}
-	
-	// 見つからなかったら、replaceできるポインタを返す。
-	TTEntry* replace = tte;
+            // 空だったら見つかってないのでfalse ※Clusterは先頭から順番に埋まっていく
+            ptt = &tte[i];
+            return (bool)tte[i].key32;
+        }
+    
+    // 見つからなかったら、replaceできるポインタを返す。
+    TTEntry* replace = tte;
 
-	for (int i = 1; i < CLUSTER_SIZE; ++i)
-		if (replace->depth8 > tte[i].depth8) // 一番残り深さの少ない局面をreplace候補とする
-			replace = &tte[i];
+    for (int i = 1; i < CLUSTER_SIZE; ++i)
+        if (replace->depth8 > tte[i].depth8) // 一番残り深さの少ない局面をreplace候補とする
+            replace = &tte[i];
 
-	ptt = replace;
-	return false;
+    ptt = replace;
+    return false;
 }
 
 // 1000個ほどサンプルを取り、今回の探索でどれほどハッシュ表を使ったかを返す。
 int TranspositionTable::hashfull() const
 {
-	int cnt = 0;
+    int cnt = 0;
 
-	for (int i = 0; i < 1000 / CLUSTER_SIZE; i++)
-	{
-		const TTEntry* tte = &table_[i].entry[0];
+    for (int i = 0; i < 1000 / CLUSTER_SIZE; i++)
+    {
+        const TTEntry* tte = &table_[i].entry[0];
 
-		for (int j = 0; j < CLUSTER_SIZE; j++)
-			if (tte[j].generation() == generation8_)
-				cnt++;
-	}
+        for (int j = 0; j < CLUSTER_SIZE; j++)
+            if (tte[j].generation() == generation8_)
+                cnt++;
+    }
 
-	return cnt;
+    return cnt;
 }
 

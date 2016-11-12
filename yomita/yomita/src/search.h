@@ -31,15 +31,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 enum Depth : int16_t
 {
-	ONE_PLY = 1,
+    ONE_PLY = 1,
 
-	DEPTH_ZERO = 0,
-	DEPTH_QS_CHECKS = 0,
-	DEPTH_QS_NO_CHECKS = -1,
-	DEPTH_QS_RECAPTURES = -5,
+    DEPTH_ZERO = 0,
+    DEPTH_QS_CHECKS = 0,
+    DEPTH_QS_NO_CHECKS = -1,
+    DEPTH_QS_RECAPTURES = -5,
 
-	DEPTH_NONE = -6,
-	DEPTH_MAX = MAX_PLY,
+    DEPTH_NONE = -6,
+    DEPTH_MAX = MAX_PLY,
 };
 
 ENABLE_OPERATORS_ON(Depth);
@@ -51,52 +51,52 @@ struct TTEntry;
 
 namespace Search
 {
-	struct Stack
-	{
-		Move* pv;
-		int ply; // ルートからの深さ
-		Move current_move;
-		Move excluded_move;
-		Move killers[2];
-		Score static_eval; // 現局面で評価関数を呼び出した時のスコア
-		Score history;
-		bool skip_early_pruning;
-		int move_count;
-		CounterMoveStats* counter_moves;
+    struct Stack
+    {
+        Move* pv;
+        int ply; // ルートからの深さ
+        Move current_move;
+        Move excluded_move;
+        Move killers[2];
+        Score static_eval; // 現局面で評価関数を呼び出した時のスコア
+        Score history;
+        bool skip_early_pruning;
+        int move_count;
+        CounterMoveStats* counter_moves;
 
-		Stack() {};
-		Stack(const Stack& s)
-		{
-			killers[0] = s.killers[0];
-			killers[1] = s.killers[1];
-		}
-	};
+        Stack() {};
+        Stack(const Stack& s)
+        {
+            killers[0] = s.killers[0];
+            killers[1] = s.killers[1];
+        }
+    };
 
-	struct RootMove
-	{
-		explicit RootMove(Move m) : pv(1, m) {}
+    struct RootMove
+    {
+        explicit RootMove(Move m) : pv(1, m) {}
 
-		bool operator < (const RootMove& m) const { return m.score < score; } // Descending sort
-		bool operator == (const Move& m) const { return pv[0] == m; }
-		bool extractPonderFromTT(Board& b, Move weak_ponder);
+        bool operator < (const RootMove& m) const { return m.score < score; } // Descending sort
+        bool operator == (const Move& m) const { return pv[0] == m; }
+        bool extractPonderFromTT(Board& b, Move weak_ponder);
 
-		Score score = -SCORE_INFINITE;
-		Score previous_score = -SCORE_INFINITE;
+        Score score = -SCORE_INFINITE;
+        Score previous_score = -SCORE_INFINITE;
 
-		// この局面での最善応手列
-		std::vector<Move> pv;
-	};
+        // この局面での最善応手列
+        std::vector<Move> pv;
+    };
 
-	void init();
-	void clear();
+    void init();
+    void clear();
 
-	extern StateStackPtr setup_status;
+    extern StateStackPtr setup_status;
 } // namespace Search
 
 #if defined LEARN || defined GENSFEN
 namespace Learn
 {
-	std::pair<Score, std::vector<Move>> qsearch(Board& b, Score alpha, Score beta);
-	std::pair<Score, std::vector<Move>>  search(Board& b, Score alpha, Score beta, int depth);
+    std::pair<Score, std::vector<Move>> qsearch(Board& b, Score alpha, Score beta);
+    std::pair<Score, std::vector<Move>>  search(Board& b, Score alpha, Score beta, int depth);
 } // namespace Learn
 #endif

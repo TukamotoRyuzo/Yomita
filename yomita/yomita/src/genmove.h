@@ -43,27 +43,27 @@ template <MoveType MT> MoveStack* generate(MoveStack* mlist, const Board& b, con
 template <MoveType MT> class MoveList
 {
 public:
-	explicit MoveList(const Board& b) : curr_(mlist_), last_(generate<MT>(mlist_, b)) {}
-	void operator ++ () { ++curr_; }
-	const MoveStack* begin() const { return mlist_; }
-	const MoveStack* end() const { return last_; }
-	Move move() const { return curr_->move; }
+    explicit MoveList(const Board& b) : curr_(mlist_), last_(generate<MT>(mlist_, b)) {}
+    void operator ++ () { ++curr_; }
+    const MoveStack* begin() const { return mlist_; }
+    const MoveStack* end() const { return last_; }
+    Move move() const { return curr_->move; }
 
-	// 生成した手の数を返す
-	size_t size() const { return static_cast<size_t>(last_ - mlist_); }
+    // 生成した手の数を返す
+    size_t size() const { return static_cast<size_t>(last_ - mlist_); }
 
-	// 渡されたmoveがリストの中にあるかどうか
-	bool contains(const Move move) const
-	{
-		for (const MoveStack* it(mlist_); it != last_; ++it)
-			if (it->move == move)
-				return true;
+    // 渡されたmoveがリストの中にあるかどうか
+    bool contains(const Move move) const
+    {
+        for (const MoveStack* it(mlist_); it != last_; ++it)
+            if (it->move == move)
+                return true;
 
-		return false;
-	}
+        return false;
+    }
 
 private:
-	MoveStack mlist_[MAX_MOVES];
-	MoveStack* curr_;
-	MoveStack* last_;
+    MoveStack mlist_[MAX_MOVES];
+    MoveStack* curr_;
+    MoveStack* last_;
 };

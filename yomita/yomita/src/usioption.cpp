@@ -31,9 +31,9 @@ using std::string;
 // optionの値が変更されたことをトリガーとして呼び出されるハンドラ。
 namespace
 {
-	void onThreads(const Option&) { Threads.readUsiOptions(); }
-	void onHashSize(const Option& opt) { TT.resize(opt);}
-	void onWriteDebugLog(const Option& opt) { startLogger(opt); }
+    void onThreads(const Option&) { Threads.readUsiOptions(); }
+    void onHashSize(const Option& opt) { TT.resize(opt);}
+    void onWriteDebugLog(const Option& opt) { startLogger(opt); }
 } // namespace
 
  // init()は引数で渡されたUSI option設定をhard codeされたデフォルト値で初期化する
@@ -49,87 +49,87 @@ void OptionsMap::init()
 #else
 #define MAX_MEMORY 2048
 #endif
-	(*this)["Hash"]					 = Option(64, 1, MAX_MEMORY, onHashSize);
-	(*this)["Ponder"]				 = Option(true);
-	(*this)["Threads"]				 = Option(12, 1, 128, onThreads);
-	(*this)["Minimum_Thinking_Time"] = Option(15, 0, 5000);
-	(*this)["Move_Overhead"]		 = Option(60, 0, 5000);
-	(*this)["Slow_Mover"]		     = Option(70, 10, 1000);
-	(*this)["nodestime"]			 = Option(0, 0, 10000);
-	(*this)["byoyomi_margin"]		 = Option(0, 0, 60000);
-	(*this)["Write_Debug_Log"]		 = Option(false, onWriteDebugLog);
-	(*this)["Draw_Score"]			 = Option(-50, -300, 300);
+    (*this)["Hash"]					 = Option(64, 1, MAX_MEMORY, onHashSize);
+    (*this)["Ponder"]				 = Option(true);
+    (*this)["Threads"]				 = Option(12, 1, 128, onThreads);
+    (*this)["Minimum_Thinking_Time"] = Option(15, 0, 5000);
+    (*this)["Move_Overhead"]		 = Option(60, 0, 5000);
+    (*this)["Slow_Mover"]		     = Option(70, 10, 1000);
+    (*this)["nodestime"]			 = Option(0, 0, 10000);
+    (*this)["byoyomi_margin"]		 = Option(0, 0, 60000);
+    (*this)["Write_Debug_Log"]		 = Option(false, onWriteDebugLog);
+    (*this)["Draw_Score"]			 = Option(-50, -300, 300);
     (*this)["ProgressDir"]           = Option("progress");
 #ifdef USE_EVAL
-	std::string eval = "eval/"     + std::string(EVAL_TYPE);
-	std::string save = "evalsave/" + std::string(EVAL_TYPE);
+    std::string eval = "eval/"     + std::string(EVAL_TYPE);
+    std::string save = "evalsave/" + std::string(EVAL_TYPE);
 #ifdef EVAL_KPPT
 #ifdef USE_FILE_SQUARE_EVAL
-	eval += "/SDT4";
+    eval += "/SDT4";
 #else
-	eval += "/7_2_177";
+    eval += "/7_2_177";
 #endif
 #elif defined EVAL_PPT
-	eval += "/44_260";
+    eval += "/44_260";
 #elif defined EVAL_KRB
-	eval += "/1_202";
+    eval += "/1_202";
 #elif defined EVAL_KPPL
-	eval += "/6_205";
+    eval += "/6_205";
 #endif
-	(*this)["EvalShare"]			 = Option(false);
-	(*this)["EvalSaveDir"]           = Option(save.c_str());
-	(*this)["EvalDir"]				 = Option(eval.c_str());
+    (*this)["EvalShare"]			 = Option(false);
+    (*this)["EvalSaveDir"]           = Option(save.c_str());
+    (*this)["EvalDir"]				 = Option(eval.c_str());
 #endif
 }
 
 // どんなオプション項目があるのかを表示する演算子。
 std::ostream& operator << (std::ostream& os, const OptionsMap& om)
 {
-	for (auto it = om.begin(); it != om.end(); ++it)
-	{
-		const Option& o = it->second;
-		os << "\noption name " << it->first << " type " << o.type_;
+    for (auto it = om.begin(); it != om.end(); ++it)
+    {
+        const Option& o = it->second;
+        os << "\noption name " << it->first << " type " << o.type_;
 
-		if (o.type_ != "button")
-			os << " default " << o.default_value_;
+        if (o.type_ != "button")
+            os << " default " << o.default_value_;
 
-		if (o.type_ == "spin")
-			os << " min " << o.min_ << " max " << o.max_;
-	}
-	return os;
+        if (o.type_ == "spin")
+            os << " min " << o.min_ << " max " << o.max_;
+    }
+    return os;
 }
 
 // Optionクラスのコンストラクターと変換子。 
 Option::Option(Fn* f) : type_("button"), min_(0), max_(0), on_change_(f) {}
 Option::Option(const char* v, Fn* f) : type_("string"), min_(0), max_(0), on_change_(f)
 {
-	default_value_ = current_value_ = v;
+    default_value_ = current_value_ = v;
 }
 Option::Option(bool v, Fn* f) : type_("check"), min_(0), max_(0), on_change_(f)
 {
-	default_value_ = current_value_ = (v ? "true" : "false");
+    default_value_ = current_value_ = (v ? "true" : "false");
 }
 Option::Option(int v, int minv, int maxv, Fn* f) : type_("spin"), min_(minv), max_(maxv), on_change_(f)
 {
-	default_value_ = current_value_ = std::to_string((_Longlong)v);
+    default_value_ = current_value_ = std::to_string((_Longlong)v);
 }
 
 // オプションに値をセットする。その際、範囲チェックも行う
 Option& Option::operator = (const string& v)
 { 
-	assert(!type_.empty());
+    assert(!type_.empty());
 
-	if ((type_ != "button" && v.empty())
-		|| (type_ == "check" && v != "true" && v != "false")
-		|| (type_ == "spin" && (stoi(v) < min_ || stoi(v) > max_)))
-		return *this;
+    if ((type_ != "button" && v.empty())
+        || (type_ == "check" && v != "true" && v != "false")
+        || (type_ == "spin" && (stoi(v) < min_ || stoi(v) > max_)))
+        return *this;
 
-	if (type_ != "button")
-		current_value_ = v;
+    if (type_ != "button")
+        current_value_ = v;
 
-	if (on_change_ != nullptr)
-		(*on_change_)(*this);
+    if (on_change_ != nullptr)
+        (*on_change_)(*this);
 
-	return *this;
+    return *this;
 }
 

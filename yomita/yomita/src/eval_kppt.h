@@ -33,33 +33,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace Eval
 {
-	typedef std::array<int32_t, 2> ValueKk;
-	typedef std::array<int16_t, 2> ValueKpp;
-	typedef std::array<int32_t, 2> ValueKkp;
+    typedef std::array<int32_t, 2> ValueKk;
+    typedef std::array<int16_t, 2> ValueKpp;
+    typedef std::array<int32_t, 2> ValueKkp;
 
-	// memory mapped file用
-	struct SharedEval
-	{
-		ValueKk kk_[SQ_MAX][SQ_MAX];
-		ValueKpp kpp_[SQ_MAX][fe_end][fe_end];
-		ValueKkp kkp_[SQ_MAX][SQ_MAX][fe_end];
-	};
+    // memory mapped file用
+    struct SharedEval
+    {
+        ValueKk kk_[SQ_MAX][SQ_MAX];
+        ValueKpp kpp_[SQ_MAX][fe_end][fe_end];
+        ValueKkp kkp_[SQ_MAX][SQ_MAX][fe_end];
+    };
 
-	struct EvalTable
-	{
-		ValueKk(*kk_)[SQ_MAX][SQ_MAX];
-		ValueKpp(*kpp_)[SQ_MAX][fe_end][fe_end];
-		ValueKkp(*kkp_)[SQ_MAX][SQ_MAX][fe_end];
+    struct EvalTable
+    {
+        ValueKk(*kk_)[SQ_MAX][SQ_MAX];
+        ValueKpp(*kpp_)[SQ_MAX][fe_end][fe_end];
+        ValueKkp(*kkp_)[SQ_MAX][SQ_MAX][fe_end];
 
-		void set(SharedEval* se)
-		{
-			kk_ = &se->kk_;
-			kpp_ = &se->kpp_;
-			kkp_ = &se->kkp_;
-		}
-	};
+        void set(SharedEval* se)
+        {
+            kk_ = &se->kk_;
+            kpp_ = &se->kpp_;
+            kkp_ = &se->kkp_;
+        }
+    };
 
-	extern EvalTable et;
+    extern EvalTable et;
 
 } // namespace Eval
 #endif

@@ -27,48 +27,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // 持ち駒の状態を32bitにパックするために必要なシフト回数
 const int Hand::HAND_SHIFT[] =
 {
-	BISHOP_SHIFT,
-	ROOK_SHIFT,
-	PAWN_SHIFT,
-	LANCE_SHIFT,
-	KNIGHT_SHIFT,
-	SILVER_SHIFT,
-	GOLD_SHIFT
+    BISHOP_SHIFT,
+    ROOK_SHIFT,
+    PAWN_SHIFT,
+    LANCE_SHIFT,
+    KNIGHT_SHIFT,
+    SILVER_SHIFT,
+    GOLD_SHIFT
 };
 
 // 持ち駒のあるなし、または枚数を取り出すためのマスク定数
 const uint32_t Hand::HAND_MASK[] =
 {
-	BISHOP_MASK,
-	ROOK_MASK,
-	PAWN_MASK,
-	LANCE_MASK,
-	KNIGHT_MASK,
-	SILVER_MASK,
-	GOLD_MASK
+    BISHOP_MASK,
+    ROOK_MASK,
+    PAWN_MASK,
+    LANCE_MASK,
+    KNIGHT_MASK,
+    SILVER_MASK,
+    GOLD_MASK
 };
 
 // 持ち駒を使うとき、または駒を取ったときにこの値を足し引きする
 const uint32_t Hand::HAND_INCREMENT[] =
 {
-	1 << BISHOP_SHIFT,
-	1 << ROOK_SHIFT,
-	1 << PAWN_SHIFT,
-	1 << LANCE_SHIFT,
-	1 << KNIGHT_SHIFT,
-	1 << SILVER_SHIFT,
-	1 << GOLD_SHIFT
+    1 << BISHOP_SHIFT,
+    1 << ROOK_SHIFT,
+    1 << PAWN_SHIFT,
+    1 << LANCE_SHIFT,
+    1 << KNIGHT_SHIFT,
+    1 << SILVER_SHIFT,
+    1 << GOLD_SHIFT
 };
 
 std::ostream& operator << (std::ostream &os, const Hand& h)
 {
-	os << "持ち駒:";
+    os << "持ち駒:";
 
-	if (!h)
-		os << "なし";
-	else
-		for (auto pt : HandPiece)
-			if (h.exists(pt))
-				os << pretty(pt) << h.count(pt);
-	return os;
+    if (!h)
+        os << "なし";
+    else
+        for (auto pt : HandPiece)
+            if (h.exists(pt))
+                os << pretty(pt) << h.count(pt);
+    return os;
 }
