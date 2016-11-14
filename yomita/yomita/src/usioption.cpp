@@ -45,21 +45,23 @@ namespace
 void OptionsMap::init()
 {
 #ifdef IS_64BIT
-#define MAX_MEMORY 8192
+#define MAX_MEMORY 65536
 #else
 #define MAX_MEMORY 2048
 #endif
-    (*this)["Hash"]					 = Option(64, 1, MAX_MEMORY, onHashSize);
-    (*this)["Ponder"]				 = Option(true);
-    (*this)["Threads"]				 = Option(12, 1, 128, onThreads);
+    (*this)["Hash"]                  = Option(64, 1, MAX_MEMORY, onHashSize);
+    (*this)["Ponder"]                = Option(true);
+    (*this)["Threads"]               = Option(1, 1, 128, onThreads);
     (*this)["Minimum_Thinking_Time"] = Option(15, 0, 5000);
-    (*this)["Move_Overhead"]		 = Option(60, 0, 5000);
-    (*this)["Slow_Mover"]		     = Option(70, 10, 1000);
-    (*this)["nodestime"]			 = Option(0, 0, 10000);
-    (*this)["byoyomi_margin"]		 = Option(0, 0, 60000);
-    (*this)["Write_Debug_Log"]		 = Option(false, onWriteDebugLog);
-    (*this)["Draw_Score"]			 = Option(-50, -300, 300);
+    (*this)["Move_Overhead"]         = Option(60, 0, 5000);
+    (*this)["Slow_Mover"]            = Option(70, 10, 1000);
+    (*this)["nodestime"]             = Option(0, 0, 10000);
+    (*this)["byoyomi_margin"]        = Option(0, 0, 60000);
+    (*this)["Write_Debug_Log"]       = Option(false, onWriteDebugLog);
+    (*this)["Draw_Score"]            = Option(-50, -300, 300);
+#ifdef USE_PROGRESS
     (*this)["ProgressDir"]           = Option("progress");
+#endif
 #ifdef USE_EVAL
     std::string eval = "eval/"     + std::string(EVAL_TYPE);
     std::string save = "evalsave/" + std::string(EVAL_TYPE);
@@ -76,9 +78,9 @@ void OptionsMap::init()
 #elif defined EVAL_KPPL
     eval += "/6_205";
 #endif
-    (*this)["EvalShare"]			 = Option(false);
+    (*this)["EvalShare"]             = Option(false);
     (*this)["EvalSaveDir"]           = Option(save.c_str());
-    (*this)["EvalDir"]				 = Option(eval.c_str());
+    (*this)["EvalDir"]               = Option(eval.c_str());
 #endif
 }
 

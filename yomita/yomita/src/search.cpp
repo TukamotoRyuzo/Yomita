@@ -62,7 +62,11 @@ namespace
     Score futilityMargin(Depth d, Board& b)
     {
 #ifdef EVAL_KPPT
+#ifdef USE_PROGRESS
         return Score((int)(70 + 100 * b.state()->progress.rate()) * (int)d);
+#else
+        return Score((70 + b.ply() * 2) * d);
+#endif
 #else
         return Score(80 * d);
 #endif
@@ -195,8 +199,8 @@ void Search::init()
 
     for (int d = 0; d < 16; ++d)
     {
-        FutilityMoveCounts[0][d] = int(2.4 + 0.773 * pow(d + 0.00, 1.8));
-        FutilityMoveCounts[1][d] = int(2.9 + 1.045 * pow(d + 0.49, 1.8));
+        FutilityMoveCounts[0][d] = int(12.4 + 0.773 * pow(d + 0.00, 1.8));
+        FutilityMoveCounts[1][d] = int(12.9 + 1.045 * pow(d + 0.49, 1.8));
     }
 }
 
@@ -684,9 +688,11 @@ namespace
             }
         }	
 #endif
+
+#ifdef USE_PROGRESS
         // 進行度を差分計算
         Prog::evaluateProgress(b);
-
+#endif
         // Step 5. 王手ならすぐ指し手ループへ行く
         if (in_check)
         {
@@ -784,7 +790,7 @@ namespace
                 // 今度こそスキップする
                 ss->skip_early_pruning = true;
                 Score s = depth - R < ONE_PLY ? -qsearch<NO_PV, false>(b, ss, beta - 1, beta, DEPTH_ZERO)
-                                               : -search<NO_PV       >(b, ss, beta - 1, beta, depth - R, false);
+                                              : - search<NO_PV       >(b, ss, beta - 1, beta, depth - R, false);
                 ss->skip_early_pruning = false;
 
                 if (s >= beta)
@@ -869,7 +875,7 @@ namespace
 
         // 2手前より評価値がよくなっているかどうか
         const bool improving =       ss->static_eval >= (ss - 2)->static_eval
-                            /*||       ss->static_eval == SCORE_NONE redundant condition*/
+                          /*||       ss->static_eval == SCORE_NONE redundant condition*/
                             || (ss - 2)->static_eval == SCORE_NONE;
 
         const bool singular_extension_node = !rootNode
@@ -1255,9 +1261,10 @@ namespace
             return tt_score;
         }
 
+#ifdef USE_PROGRESS
         // 進行度を差分計算
         Prog::evaluateProgress(b);
-
+#endif
         Score score, best_score, futility_base;
 
         // 評価関数を呼び出して現局面の評価値を得ておく

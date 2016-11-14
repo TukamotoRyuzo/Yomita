@@ -104,12 +104,12 @@ namespace Prog
     {
         auto now = b.state();
 
-        if (!now->progress.isNoProgress())
+        if (!now->progress.isNone())
             return now->progress.rate();
 
         auto prev = now->previous;
 
-        if (prev->progress.isNoProgress())
+        if (prev->progress.isNone())
             return computeProgress(b);
 
         auto sq_bk0 = b.kingSquare(BLACK);

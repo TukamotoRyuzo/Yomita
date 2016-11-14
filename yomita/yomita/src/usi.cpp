@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timeman.h" // for ponderhit 
 
 const std::string engine_name = "Yomita_";
-const std::string version = "1.6";
+const std::string version = "1.7";
 
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI

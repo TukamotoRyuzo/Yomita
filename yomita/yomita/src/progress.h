@@ -33,11 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define PROGRESS_BIN "progress.bin"
 #define SAVE_PROGRESS_DIR "save"
 
-namespace Learn
-{
-    extern double sigmoid(double x);
-}
-
 namespace Prog
 {
     // 進行度
@@ -70,10 +65,10 @@ namespace Prog
         double rate() const { return double(bkp + wkp) / double(1 << 20); }
 
         // まだ進行度の計算を済ませていないかどうかを返す。
-        inline bool isNoProgress() const { return bkp == INT64_MAX; }
+        bool isNone() const { return bkp == INT64_MAX; }
 
         // まだ進行度の計算を済ませていないことを示す値を入れておく。
-        inline void setNoProgress() { bkp = INT64_MAX; }
+        void setNoProgress() { bkp = INT64_MAX; }
         
         int64_t bkp, wkp;
     };
