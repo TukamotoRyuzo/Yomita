@@ -60,6 +60,7 @@ void OptionsMap::init()
     (*this)["byoyomi_margin"]        = Option(0, 0, 60000);
     (*this)["Write_Debug_Log"]       = Option(false, onWriteDebugLog);
     (*this)["Draw_Score"]            = Option(-50, -300, 300);
+    (*this)["MultiPV"]               = Option(1, 1, 500);
 #ifdef USE_PROGRESS
     (*this)["ProgressDir"]           = Option("progress");
 #endif

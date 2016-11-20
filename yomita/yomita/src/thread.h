@@ -69,6 +69,7 @@ struct Thread
     Board root_board;
     std::vector<Search::RootMove> root_moves;
     Depth root_depth, completed_depth;
+    size_t pv_idx;
 
     // calls_count : この変数を++した回数でcheckTime()を呼び出すかどうかを判定する.
     // max_ply : 現在探索しているノードのうち、最大の探索深さを表す
