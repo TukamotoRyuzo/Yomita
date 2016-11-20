@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timeman.h" // for ponderhit 
 
 const std::string engine_name = "Yomita_";
-const std::string version = "1.7";
+const std::string version = "1.8";
 
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI
@@ -77,6 +77,7 @@ namespace Learn
 #ifdef LEARN
     void learn(Board& b, std::istringstream& is);
     void learnProgress(Board& b, std::istringstream& is);
+    void analyzeFutility(std::istringstream& is);
 #endif
     
 } // namespace Learn
@@ -485,6 +486,9 @@ void USI::loop(int argc, char** argv)
 
         // 棋譜からの進行度学習
         else if (token == "learn_progress") { Learn::learnProgress(board, ss_cmd); }
+
+        // futility marginの解析
+        else if (token == "analyze") { Learn::analyzeFutility(ss_cmd); }
 #endif
         // 有効なコマンドではない。
         else { SYNC_COUT << "unknown command: " << cmd << SYNC_ENDL; }

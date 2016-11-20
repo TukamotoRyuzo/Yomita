@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-// 棋譜からの学習時に定義。
+// 棋譜からの学習時に定義（評価関数、進行度）
 //#define LEARN
 
 // 教師棋譜の生成時に定義。LEARNと同時に定義してもよい。

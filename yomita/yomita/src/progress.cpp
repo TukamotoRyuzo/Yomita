@@ -34,6 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "genmove.h"
 #include "usi.h"
 #include "multi_think.h"
+#include "tt.h"
+#include "timeman.h"
 
 namespace Prog
 {
@@ -150,7 +152,7 @@ namespace Prog
                 }
             }
         }
-        else 
+        else
         {
 #define ADD_BWKP(W0,W1,W2,W3) \
         prog.bkp -= PROGRESS[sq_bk0][W0]; \
@@ -173,7 +175,7 @@ namespace Prog
 
         return now->progress.rate();
     }
-    
+
     double evaluateProgress(const Board& b)
     {
         double s = calcProgressDiff(b);
@@ -201,7 +203,7 @@ namespace Learn
                 return m;
 
         return MOVE_NONE;
-}
+    }
 #endif
 
     // なので直接変換する
@@ -244,16 +246,8 @@ namespace Learn
         return ret;
     }
 
-    struct Game
-    {
-        short ply;
-        Move move[512];
-    };
-
-    typedef std::vector<Game> GameVector;
-
     struct Weight
-    { 
+    {
         double w, g, g2;
         static const int eta = 128;
 
@@ -315,7 +309,7 @@ namespace Learn
                 auto& w = prog_w[sq][i];
 
                 if (w.update())
-                    Prog::PROGRESS[sq][i] = w.w;
+                    Prog::PROGRESS[sq][i] = (Prog::ValueProg)w.w;
             }
     }
 
@@ -335,12 +329,20 @@ namespace Learn
         return diff * diff;
     }
 
+    struct Game
+    {
+        short ply;
+        Move move[512];
+    };
+
+    typedef std::vector<Game> GameVector;
+
     // 進行度学習をマルチスレッドで行うクラス
     struct ProgressLearner : public MultiThink
     {
-        ProgressLearner(){}
+        ProgressLearner() {}
         virtual void work(size_t thread_id);
-        
+
         std::vector<GameVector> games;
         GameVector errors;
 
@@ -348,7 +350,7 @@ namespace Learn
         std::atomic_bool updating;
 
         // 親クラスにもあるがこちらでも定義する。
-        int max_loop;
+        uint64_t max_loop;
     };
 
     void ProgressLearner::work(size_t thread_id)
@@ -394,13 +396,13 @@ namespace Learn
                     {
 #if 0
                         SYNC_COUT << b << "progress = " << p * 100.0 << "%\n"
-                                       << "teacher = "  << t * 100.0 << "%" << SYNC_ENDL;
+                            << "teacher = " << t * 100.0 << "%" << SYNC_ENDL;
 #endif
 #if 0
                         if (j % interval == 0)
                         {
                             SYNC_COUT << "now = " << std::setw(5) << std::setprecision(2) << p * 100 << "%"
-                                 << " teacher = " << std::setw(5) << std::setprecision(2) << t * 100 << "%" << SYNC_ENDL;
+                                << " teacher = " << std::setw(5) << std::setprecision(2) << t * 100 << "%" << SYNC_ENDL;
                         }
 #endif
                     }
@@ -414,7 +416,7 @@ namespace Learn
                 double sum_error = 0;
 
                 for (auto game : errors)
-                { 
+                {
                     // 平手初期局面セット
                     b.init(USI::START_POS, th);
 
@@ -453,11 +455,11 @@ namespace Learn
 
                 if (++loop % 100 == 0)
                 {
-                   Prog::save(std::to_string(loop / 1000));
-                   SYNC_COUT << localTime() << SYNC_ENDL;
+                    Prog::save(std::to_string(loop / 1000));
+                    SYNC_COUT << localTime() << SYNC_ENDL;
                 }
             }
-            
+
             // その他のスレッドは待ってもらう。
             else
             {
@@ -483,13 +485,13 @@ namespace Learn
 
         // 最後に一回保存！
         if (is_main)
-           Prog::save("end");
+            Prog::save("end");
     }
 
     // 進行度学習
     void learnProgress(Board& b, std::istringstream& is)
     {
-        std::string token, 
+        std::string token,
 
 #ifdef _DEBUG
             file_name = "records23.txt",
@@ -516,7 +518,7 @@ namespace Learn
             else if (token == "dir")
                 is >> dir;
         }
-        
+
         // 勾配配列の初期化
         Prog::load();
         initGrad();
@@ -532,7 +534,7 @@ namespace Learn
         int kifu_num = 0;
         int thread_size = USI::Options["Threads"];
         const int kifu_size = kifus.size() / 2;
-        const int kifu_per_thread = std::ceil((double)kifu_size / (double)thread_size);
+        const int kifu_per_thread = static_cast<int>(std::ceil((double)kifu_size / (double)thread_size));
 
         ProgressLearner pl;
         pl.max_loop = loop_max;
@@ -553,9 +555,9 @@ namespace Learn
                 iss >> std::skipws >> token;
 
             Game g;
-            
+
             g.ply = max_ply = atoi(token.c_str());
-    
+
             iss.clear(std::stringstream::goodbit);
             iss.str(*it);
 
@@ -582,7 +584,131 @@ namespace Learn
         pl.think();
     }
 
+    extern void initLearn(Board& b);
+    Score ab(Board& b, Score alpha, Score beta, Depth depth);
+
+    // 現在の評価関数で残り深さ1で読んだ時の評価値と、それ以上の残り深さで読んだときの評価値の誤差を調べる。
+    // futility marginを決定するのに使えるはず
+    void analyzeFutility(std::istringstream& is)
+    {
+        std::string token,
+
+#ifdef _DEBUG
+            file_name = "records23.txt",
+#else
+            file_name = "records_2800.txt",
+#endif
+            dir = "";
+
+        while (true)
+        {
+            token.clear();
+            is >> token;
+
+            if (token == "")
+                break;
+
+            if (token == "file")
+                is >> file_name;
+            else if (token == "dir")
+                is >> dir;
+        }
+
+        USI::isReady();
+
+        // file_nameは技巧形式の棋譜
+        std::vector<std::string> kifus;
+        readAllLines(path(dir, file_name), kifus);
+
+        std::ofstream ofs("futility.tsv");
+
+        ofs << "progress\tdiff\n";
+
+        // 手数
+        int max_ply;
+        StateInfo st[512];
+        USI::isReady();
+        auto& b = Threads.main()->root_board;
+        int num = 0;
+        std::vector<std::pair<double, int>> futility;
+
+        for (auto it = kifus.begin(); it < kifus.end(); ++it)
+        {
+            // (技巧の形式）
+            // 1行目 : <棋譜番号> <対局開始日> <先手名> <後手名> <勝敗(0:引き分け, 1 : 先手勝ち, 2 : 後手勝ち)> <手数> <棋戦> <戦型>
+            // 2行目 : <CSA形式の指し手(1手6文字)を一行に並べたもの>
+            std::istringstream iss(*it++);
+
+            // ゲームの手数を取得（plyが出てくるまで読み飛ばす)
+            for (int i = 0; i < 6; i++)
+                iss >> std::skipws >> token;
+
+            max_ply = atoi(token.c_str());
+
+            iss.clear(std::stringstream::goodbit);
+            iss.str(*it);
+
+            // 平手初期局面セット
+            b.init(USI::START_POS, Threads.main());
+            TT.clear();
+
+            // ゲームの進行
+            for (int i = 1; i < max_ply; i++)
+            {
+                token.clear();
+                iss >> std::skipws >> token;
+                Move m = csaToMove(token, b);
+                b.doMove(m, st[i]);
+
+                if (!b.inCheck())
+                {
+                    // 1手読み。evaluateだと駒取りが残っている状態なのでmarginが大きく出る。
+                    Score static_eval = Eval::evaluate(b); // ab(b, -SCORE_INFINITE, SCORE_INFINITE, ONE_PLY);
+                    Score deep_eval = ab(b, -SCORE_INFINITE, SCORE_INFINITE, 1 * ONE_PLY);
+
+                    // 進行度
+                    double progress_rate = (double)i / (double)max_ply;
+
+
+                    int diff = abs(static_eval - deep_eval);
+#if 0
+                    std::cout << b;
+
+                    std::cout << "p = " << progress_rate 
+                              << " diff = " << diff
+                              << " static_eval = " << static_eval 
+                              << " deep_eval = "<< deep_eval << std::endl;
+#endif
+                    if (diff < Score(3000))
+                        futility.push_back(std::make_pair(progress_rate, diff));
+                }
+            }
+
+            if (num++ > 1000)
+                break;
+        }
+
+        double stats[1001] = { 0.0 };
+        int count[1001] = { 0 };
+
+        for (auto f : futility)
+        {
+            int id = int(f.first * 100.0);
+            assert(id >= 0 && id < 100);
+            stats[id] += f.second;
+            count[id]++;
+        }
+
+        for (int i = 0; i < 100; i++)
+        {
+            if (count[i])
+                stats[i] /= (double)count[i];
+
+            ofs << (double)i / (double)100.0 << "\t" << stats[i] << std::endl;
+        }
+    }
 } // namespace Learn
+
 
 #endif // LEARN
 #endif // USE_PROGRESS

@@ -63,7 +63,7 @@ namespace
     {
 #ifdef EVAL_KPPT
 #ifdef USE_PROGRESS
-        return Score((int)(70 + 100 * b.state()->progress.rate()) * (int)d);
+        return Score((int)(50 + 150 * b.state()->progress.rate()) * (int)d);
 #else
         return Score((70 + b.ply() * 2) * d);
 #endif
@@ -199,8 +199,8 @@ void Search::init()
 
     for (int d = 0; d < 16; ++d)
     {
-        FutilityMoveCounts[0][d] = int(12.4 + 0.773 * pow(d + 0.00, 1.8));
-        FutilityMoveCounts[1][d] = int(12.9 + 1.045 * pow(d + 0.49, 1.8));
+        FutilityMoveCounts[0][d] = int(17.4 + 0.773 * pow(d + 0.00, 1.8));
+        FutilityMoveCounts[1][d] = int(17.9 + 1.045 * pow(d + 0.49, 1.8));
     }
 }
 
@@ -1640,9 +1640,6 @@ namespace Learn
         
         auto th = b.thisThread();
 
-        if (!th)
-            std::cout << "thがnull" << std::endl;
-
         th->max_ply = 0;
 
         auto& root_moves = th->root_moves;
@@ -1740,6 +1737,603 @@ namespace Learn
         return std::pair<Score, std::vector<Move>>(best_score, pvs);
     }
     
+    // 枝刈りなしの単純なαβ
+    template <NodeType NT>
+    Score ab(Board& b, Stack* ss, Score alpha, Score beta, Depth depth, bool cut_node)
+    {
+        const bool PvNode = NT == PV;
+        const bool rootNode = PvNode && (ss - 1)->ply == 0;
+
+        assert(-SCORE_INFINITE <= alpha && alpha < beta && beta <= SCORE_INFINITE);
+        assert(PvNode || (alpha == beta - 1));
+        assert(DEPTH_ZERO < depth && depth < DEPTH_MAX);
+
+        Move pv[MAX_PLY + 1], quiets_searched[QUIETS];
+        Score eval, score;
+        Move best_move, move;
+        int move_count, quiet_count;
+        StateInfo st;
+        TTEntry* tte;
+
+        // Step 1. ノード初期化
+        Thread* this_thread = b.thisThread();
+        const bool in_check = b.bbCheckers();
+        Score best_score = -SCORE_INFINITE;
+        ss->ply = (ss - 1)->ply + 1;
+        move_count = quiet_count = ss->move_count = 0;
+        ss->history = SCORE_ZERO;
+
+        // GUIへselDepth(現在、選択的に読んでいる手の探索深さ)情報を送信するために使用
+        if (PvNode && this_thread->max_ply < ss->ply)
+            this_thread->max_ply = ss->ply;
+
+        if (!rootNode)
+        {
+            // Step 2. 引き分けか探索中断かをチェックする
+
+            // 256手以上指していたら引き分け
+            if (b.ply() >= 256)
+                return SCORE_DRAW;
+
+            // 宣言法により勝ち。重いので190手目以降に呼ぶことにする
+            if (b.ply() >= 190 && b.isDeclareWin())
+                return mateIn(ss->ply);
+
+            switch (b.repetitionType(16))
+            {
+            case NO_REPETITION: if (!Signals.stop.load(std::memory_order_relaxed) && ss->ply < MAX_PLY) { break; }
+            case REPETITION_DRAW: return drawScore(RootTurn, b.turn()); // ※↑のifに引っかからなかったらここに来る
+            case REPETITION_WIN:  return mateIn(ss->ply);
+            case REPETITION_SUPERIOR: return SCORE_MATE_IN_MAX_PLY;
+            case REPETITION_LOSE:  return matedIn(ss->ply);
+            case REPETITION_INFERIOR: return SCORE_MATED_IN_MAX_PLY;
+            default: UNREACHABLE;
+            }
+
+            // Step 3. 詰み手数による枝刈り
+            alpha = std::max(matedIn(ss->ply), alpha);
+            beta = std::min(mateIn(ss->ply + 1), beta);
+
+            if (alpha >= beta)
+                return alpha;
+        }
+
+        assert(0 <= ss->ply && ss->ply < MAX_PLY);
+
+        ss->current_move = (ss + 1)->excluded_move = best_move = MOVE_NONE;
+        ss->counter_moves = nullptr;
+        (ss + 1)->skip_early_pruning = false;
+        (ss + 2)->killers[0] = (ss + 2)->killers[1] = MOVE_NONE;
+
+        // Step 4. 置換表のlook up
+        // singular extensionするべきノードかどうかを確かめるために、この局面の置換表の指し手を
+        // 除外して探索するときはss->excluded_moveが存在し、その場合異なる局面のキーを用いる必要がある
+        const Move excluded_move = ss->excluded_move;
+        const Key key = b.key() ^ (Key(excluded_move) << 1);
+        bool tt_hit = TT.probe(key, tte);
+
+        // stockfishではdepth, bound, evalをローカルにコピーしていないが、それだとアクセス競合が怖いのでコピーする。
+        // TODO:コピーをアトミックに行いたい。
+        Move tt_move = rootNode ? this_thread->root_moves[0].pv[0] : tt_hit ? tte->move() : MOVE_NONE;
+        Score tt_score = tt_hit ? scoreFromTT(tte->score(), ss->ply) : SCORE_NONE;
+        Depth tt_depth = tt_hit ? tte->depth() : DEPTH_NONE;
+        Bound tt_bound = tt_hit ? tte->bound() : BOUND_NONE;
+        Score tt_eval = tt_hit ? tte->eval() : SCORE_NONE;
+
+        // keyの0bit目は手番と同じになっていなければおかしい。
+        assert(Turn(key & 1) == b.turn());
+
+        // pvノードではないなら置換表を見て枝刈りする
+        if (!PvNode
+            && tt_hit
+            && tt_depth >= depth
+            && tt_score != SCORE_NONE
+            && (tt_score >= beta ? (tt_bound & BOUND_LOWER) : (tt_bound & BOUND_UPPER)))
+        {
+            // historyのupdateはしないほうがいいようだ。
+            if (tt_score >= beta
+                && tt_move
+                && !isCaptureOrPawnPromote(tt_move)
+                && tt_move != ss->killers[0])
+            {
+                ss->killers[1] = ss->killers[0];
+                ss->killers[0] = tt_move;
+            }
+
+            return tt_score;
+        }
+
+        // Step 4a. Tablebase probe
+        // Tablebaseはないので、代わりに詰みチェックを行う。
+#ifdef MATE1PLY
+        if (!rootNode
+            && b.ply() >= MATE_PLY
+            && !tt_hit
+            && depth > ONE_PLY
+            && !in_check)
+        {
+            best_move = b.mate1ply();
+
+            if (best_move != MOVE_NONE)
+            {
+                // staticEvalはなんでもいい
+                best_score = mateIn(ss->ply);
+
+                tte->save(key, scoreToTT(best_score, ss->ply), BOUND_EXACT,
+                    DEPTH_MAX, best_move, SCORE_NONE, TT.generation());
+
+                return best_score;
+            }
+        }
+#endif
+
+        // Step 5. 王手ならすぐ指し手ループへ行く
+        if (in_check)
+        {
+            ss->static_eval = eval = SCORE_NONE;
+            goto moves_loop;
+        }
+        else if (tt_hit)
+        {
+            if ((ss->static_eval = eval = tt_eval) == SCORE_NONE)
+                eval = ss->static_eval = evaluate(b);
+
+            // tt_scoreが局面の評価値として使えるかどうか
+            if ((tt_score != SCORE_NONE))
+                if (tt_bound & (tt_score > eval ? BOUND_LOWER : BOUND_UPPER))
+                    eval = tt_score;
+        }
+        else
+        {
+#if defined USE_EVAL_TURN
+            // 手番評価があるため、(ss-1)->static_evalは使えない。
+            eval = ss->static_eval = evaluate(b);
+#else
+            eval = ss->static_eval = (ss - 1)->current_move != MOVE_NULL ? evaluate(b) : -(ss - 1)->static_eval;
+#endif
+            // 評価関数を呼び出したので置換表に登録しておく。この後すぐに枝刈りされるかもしれないのでこのタイミングがベスト
+            tte->save(key, SCORE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE, eval, TT.generation());
+        }
+
+        // 枝刈りしない
+        if (ss->skip_early_pruning)
+            goto moves_loop;
+
+    moves_loop: // 指し手生成ループ
+
+        const CounterMoveStats* cmh = (ss - 1)->counter_moves;
+        const CounterMoveStats* fmh = (ss - 2)->counter_moves;
+        const CounterMoveStats* fm2 = (ss - 4)->counter_moves;
+
+#ifdef EVAL_DIFF
+        if (b.state()->sum.isNotEvaluated())
+            evaluate(b);
+#endif
+        MovePicker mp(b, tt_move, depth, ss);
+
+        score = best_score;
+
+        // 2手前より評価値がよくなっているかどうか
+        const bool improving = ss->static_eval >= (ss - 2)->static_eval
+            /*||       ss->static_eval == SCORE_NONE redundant condition*/
+            || (ss - 2)->static_eval == SCORE_NONE;
+
+        const bool singular_extension_node = !rootNode
+            && depth >= 8 * ONE_PLY
+            && !isNone(tt_move)
+            && abs(tt_score) < SCORE_KNOWN_WIN
+            && !excluded_move
+            && (tt_bound & BOUND_LOWER)
+            && tt_depth >= depth - 3 * ONE_PLY;
+
+        // Step 11. Loop through moves
+        while (move = mp.nextMove())
+        {
+            assert(isOK(move));
+
+            if (move == excluded_move)
+                continue;
+
+            // root nodeでは、rootMoves()の集合に含まれていない指し手は探索をスキップする
+            if (rootNode && !std::count(this_thread->root_moves.begin(), this_thread->root_moves.end(), move))
+                continue;
+
+            if (PvNode)
+                (ss + 1)->pv = nullptr;
+
+            // この深さで探索し終わった手の数
+            ss->move_count = ++move_count;
+
+            const bool capture_or_pawn_promotion = isCaptureOrPawnPromote(move);
+            const bool gives_check = b.givesCheck(move);
+            const bool move_count_pruning = depth < 16 * ONE_PLY && move_count >= FutilityMoveCounts[improving][depth];
+            Depth extension = DEPTH_ZERO;
+
+            // Step 12. 王手延長
+            // 王手でしかも駒得なら延長して探索する価値あり
+            if (gives_check
+                && !move_count_pruning
+                && b.seeGe(move, SCORE_ZERO))
+                extension = ONE_PLY;
+
+            // singular extension search
+            // ここでのsearchは純粋に延長する/しないだけを求めたいのであり、historyのupdateはしたくない。
+            else if (singular_extension_node
+                && move == tt_move
+                && b.legal(move))
+            {
+                Score rbeta = tt_score - 16 * depth / ONE_PLY;
+                ss->excluded_move = move;
+
+                // このノード自体もskip_early_pruning中かもしれない。このフラグはupdateStatsで使うので大事。
+                bool save = ss->skip_early_pruning;
+
+                ss->skip_early_pruning = true;
+                score = ab<NO_PV>(b, ss, rbeta - 1, rbeta, depth / 2, cut_node);
+                ss->skip_early_pruning = save;
+                ss->excluded_move = MOVE_NONE;
+
+                // 上の処理で壊れたので復活。
+                ss->move_count = move_count;
+
+                if (score < rbeta)
+                    extension = ONE_PLY;
+            }
+
+            Depth new_depth = depth - ONE_PLY + extension;
+
+            prefetch(TT.firstEntry(b.afterKey(move)));
+
+            // 指し手が本当に合法かどうかのチェック(ルートならチェック済みなので要らない)
+            if (!rootNode && !b.legal(move))
+            {
+                ss->move_count = --move_count;
+                continue;
+            }
+
+            // この深さでの(現在探索中の)指し手
+            ss->current_move = move;
+            ss->counter_moves = &this_thread->counter_move_history.refer(move);
+
+            // Step 14. 指し手で局面を進める
+            b.doMove(move, st, gives_check);
+
+            bool do_full_depth_search;
+
+            // Step 15. 探索深さを減らす(LMR) もしfail highならフル探索深さで探索する
+            do_full_depth_search = !PvNode || move_count > 1;
+
+            // Step 16. フル探索。when LMR skipped or fails high 
+            // Nullwindow探索をしてみて、alpha < score < betaでなければ通常の探索をスキップしてもよい
+            if (do_full_depth_search)
+                score = new_depth < ONE_PLY ?
+                gives_check ? -qab<NO_PV, true>(b, ss + 1, -(alpha + 1), -alpha, DEPTH_ZERO)
+                : -qab<NO_PV, false>(b, ss + 1, -(alpha + 1), -alpha, DEPTH_ZERO)
+                : -ab<NO_PV       >(b, ss + 1, -(alpha + 1), -alpha, new_depth, !cut_node);
+
+            if (PvNode && (move_count == 1 || (score > alpha && (rootNode || score < beta))))
+            {
+                (ss + 1)->pv = pv;
+                (ss + 1)->pv[0] = MOVE_NONE;
+
+                // 残り深さがないならqsearchを呼び出す
+                score = new_depth < ONE_PLY ?
+                    gives_check ? -qab<PV,  true>(b, ss + 1, -beta, -alpha, DEPTH_ZERO)
+                                : -qab<PV, false>(b, ss + 1, -beta, -alpha, DEPTH_ZERO)
+                                : -ab <PV       >(b, ss + 1, -beta, -alpha, new_depth, false);
+            }
+
+            // Step 17. 局面を戻す
+            b.undoMove(move);
+
+            assert(score > -SCORE_INFINITE && score < SCORE_INFINITE);
+
+            // 探索終了したけどstopの時はsearchの戻り値は信用できないので置換表もpvも更新せずに戻る
+            if (Signals.stop.load(std::memory_order_relaxed))
+                return SCORE_ZERO;
+
+            // Step 18. bestmoveのチェック
+            if (rootNode)
+            {
+                RootMove& rm = *std::find(this_thread->root_moves.begin(), this_thread->root_moves.end(), move);
+
+                if (move_count == 1 || score > alpha)
+                {
+                    rm.score = score;
+                    rm.pv.resize(1);
+
+                    assert((ss + 1)->pv);
+
+                    // pv構築
+                    for (Move* m = (ss + 1)->pv; *m != MOVE_NONE; ++m)
+                        rm.pv.push_back(*m);
+
+                    // どれくらいの頻度で最善手が変わったかを記憶しておく
+                    // これは時間制御に使われ、最善手が変わる頻度が高いほど追加で思考時間が与えられる
+                    if (move_count > 1 && this_thread == Threads.main())
+                        ++static_cast<MainThread*>(this_thread)->best_move_changes;
+                }
+                else
+                    rm.score = -SCORE_INFINITE;
+            }
+
+            if (score > best_score)
+            {
+                best_score = score;
+
+                if (score > alpha)
+                {
+                    best_move = move;
+
+                    if (PvNode && !rootNode) // Update pv even in fail-high case
+                        updatePv(ss->pv, move, (ss + 1)->pv);
+
+                    if (PvNode && score < beta)
+                        alpha = score;
+
+                    else
+                    {
+                        // scoreがbetaを超えてたら一手前のループでbreakしてるはず
+                        assert(score >= beta);
+
+                        // beta cut
+                        break;
+                    }
+                }
+            }
+
+            // 成りでも駒取りでもない手は、おとなしいquietな手
+            if (!capture_or_pawn_promotion && move != best_move && quiet_count < QUIETS)
+                quiets_searched[quiet_count++] = move;
+        }
+
+        // 一手も指されなかったということは、引き分けか詰み
+        if (!move_count)
+            best_score = excluded_move ? alpha
+            : in_check ? matedIn(ss->ply) : drawScore(RootTurn, b.turn());
+
+        // quietな手が最善だった。統計を更新する
+        else if (best_move && !isCaptureOrPawnPromote(best_move))
+            updateStats(b, ss, best_move, depth, quiets_searched, quiet_count);
+
+        // 一手前の指し手がfail lowを引き起こしたことによるボーナス
+        // PVノードではこのsearch()の呼び出し元でbeta cutが起きてupdateStatsが呼ばれるので、ここでhistoryのupdateを行ってしまうと
+        // 2重にupdateすることになってしまう。なので!PvNodeが正しい。
+        else if (!PvNode
+            && depth >= 3 * ONE_PLY
+            && best_move == MOVE_NONE
+            && !isCaptureOrPawnPromote((ss - 1)->current_move) // stockfishだと!capturePieceだけど歩のpromoteもだめなはず
+            && isOK((ss - 1)->current_move))
+        {
+            // bonusとしてmove_countを足してやるとちょっとだけいい感じ。多分、指し手の後ろのほうで試された手を前に持ってきやすくなるのが理由。
+            Score bonus = Score((depth / ONE_PLY) * (depth / ONE_PLY) + depth / ONE_PLY - 1) + (ss - 1)->move_count;
+            updateCmStats(ss - 1, (ss - 1)->current_move, bonus);
+        }
+
+        tte->save(key, scoreToTT(best_score, ss->ply),
+            best_score >= beta ? BOUND_LOWER :
+            PvNode && best_move ? BOUND_EXACT : BOUND_UPPER,
+            depth, best_move, ss->static_eval, TT.generation());
+
+        assert(best_score > -SCORE_INFINITE && best_score < SCORE_INFINITE);
+
+        return best_score;
+    }
+
+    template<NodeType NT, bool InCheck>
+    Score qab(Board& b, Stack* ss, Score alpha, Score beta, Depth depth)
+    {
+        const bool PvNode = NT == PV;
+
+        assert(InCheck == b.inCheck());
+        assert(alpha >= -SCORE_INFINITE && alpha < beta && beta <= SCORE_INFINITE);
+        assert(PvNode || alpha == beta - 1);
+        assert(depth <= DEPTH_ZERO);
+
+        Move pv[MAX_PLY + 1], best_move;
+        Score old_alpha;
+
+        if (PvNode)
+        {
+            old_alpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
+            (ss + 1)->pv = pv;
+            ss->pv[0] = MOVE_NONE;
+        }
+
+        ss->current_move = best_move = MOVE_NONE;
+        ss->ply = (ss - 1)->ply + 1;
+
+        if (b.ply() >= 190 && b.isDeclareWin())
+            return mateIn(ss->ply);
+
+        switch (b.repetitionType(16))
+        {
+        case NO_REPETITION:		  if (ss->ply < MAX_PLY) { break; }
+        case REPETITION_DRAW: return ss->ply >= MAX_PLY && !InCheck ? evaluate(b) : drawScore(RootTurn, b.turn()); // ※↑のifに引っかからなかったらここに来る
+        case REPETITION_WIN:  return mateIn(ss->ply);
+        case REPETITION_SUPERIOR: return SCORE_MATE_IN_MAX_PLY;
+        case REPETITION_LOSE:  return matedIn(ss->ply);
+        case REPETITION_INFERIOR: return SCORE_MATED_IN_MAX_PLY;
+        default: UNREACHABLE;
+        }
+
+        assert(0 <= ss->ply && ss->ply < MAX_PLY);
+
+        // 王手を含めるかどうかを決定する。また使用しようとしているTTエントリの深さのタイプを修正する
+        Depth qdepth = (InCheck || depth >= DEPTH_QS_CHECKS) ? DEPTH_QS_CHECKS : DEPTH_QS_NO_CHECKS;
+
+        TTEntry* tte;
+        const Key key = b.key();
+        bool tt_hit = TT.probe(key, tte);
+        Move tt_move = tt_hit ? tte->move() : MOVE_NONE;
+        Score tt_score = tt_hit ? scoreFromTT(tte->score(), ss->ply) : SCORE_NONE;
+        Depth tt_depth = tt_hit ? tte->depth() : DEPTH_NONE;
+        Bound tt_bound = tt_hit ? tte->bound() : BOUND_NONE;
+        Score tt_eval = tt_hit ? tte->eval() : SCORE_NONE;
+
+        // 置換表のほうが読みが深いなら置換表の評価値を返す
+        if (!PvNode
+            && tt_hit
+            && tt_depth >= qdepth
+            && tt_score != SCORE_NONE
+            && (tt_score >= beta ? (tt_bound & BOUND_LOWER)
+                : (tt_bound & BOUND_UPPER)))
+        {
+            ss->current_move = tt_move;
+            return tt_score;
+        }
+
+        Score score, best_score, futility_base;
+
+        // 評価関数を呼び出して現局面の評価値を得ておく
+        if (InCheck)
+        {
+            ss->static_eval = SCORE_NONE;
+            best_score = futility_base = -SCORE_INFINITE;
+        }
+        else
+        {
+            if (tt_hit)
+            {
+                // 置換表に評価値が入っていない
+                if ((ss->static_eval = best_score = tt_eval) == SCORE_NONE)
+                    ss->static_eval = best_score = evaluate(b);
+
+                // 置換表のスコア（評価値ではない)がこの局面の評価値より使えるかどうか？
+                if (tt_score != SCORE_NONE)
+                    if (tt_bound & (tt_score > best_score ? BOUND_LOWER : BOUND_UPPER))
+                        best_score = tt_score;
+            }
+            else
+            {
+#if defined USE_EVAL_TURN
+                ss->static_eval = best_score = evaluate(b);
+#else
+                ss->static_eval = best_score = (ss - 1)->current_move != MOVE_NULL ? evaluate(b) : -(ss - 1)->static_eval;
+#endif
+            }
+
+            // stand pat。評価値が少なくともbetaよりも大きいのであればすぐに戻る
+            if (best_score >= beta)
+            {
+                if (!tt_hit) // 置換表に値がないのなら登録
+                    tte->save(key, scoreToTT(best_score, ss->ply), BOUND_LOWER,
+                        DEPTH_NONE, MOVE_NONE, ss->static_eval, TT.generation());
+
+                return best_score;
+            }
+
+            if (b.ply() >= MATE_PLY)
+            {
+                best_move = b.mate1ply();
+
+                if (best_move != MOVE_NONE)
+                {
+                    best_score = mateIn(ss->ply + 1);
+
+                    tte->save(key, scoreToTT(best_score, ss->ply), BOUND_EXACT,
+                        DEPTH_MAX, best_move, SCORE_NONE, TT.generation());
+
+                    return best_score;
+                }
+            }
+
+            if (PvNode && best_score > alpha)
+                alpha = best_score;
+
+            futility_base = best_score + 128;
+        }
+
+#ifdef EVAL_DIFF
+        if (b.state()->sum.isNotEvaluated())
+            evaluate(b);
+#endif
+
+        // 探索深さが0以下なのでRecaptureか成り、depthがDEPTH_QS_CHECKより大きい場合は王手を生成する
+        MovePicker mp(b, tt_move, depth, (ss - 1)->current_move);
+        Move move;
+        StateInfo si;
+
+        while (move = mp.nextMove())
+        {
+            const bool gives_check = b.givesCheck(move);
+
+            prefetch(TT.firstEntry(b.afterKey(move)));
+
+            ss->current_move = move;
+
+            if (!b.legal(move))
+                continue;
+
+            b.doMove(move, si, gives_check);
+
+            score = gives_check ? -qab<NT, true>(b, ss + 1, -beta, -alpha, depth - ONE_PLY)
+                                : -qab<NT, false>(b, ss + 1, -beta, -alpha, depth - ONE_PLY);
+            b.undoMove(move);
+
+            assert(score > -SCORE_INFINITE && score < SCORE_INFINITE);
+
+            // Check for a new best move
+            if (score > best_score)
+            {
+                best_score = score;
+
+                if (score > alpha)
+                {
+                    if (PvNode) // Update pv even in fail-high case
+                        updatePv(ss->pv, move, (ss + 1)->pv);
+
+                    if (PvNode && score < beta) // Update alpha here!
+                    {
+                        alpha = score;
+                        best_move = move;
+                    }
+                    else // Fail high
+                    {
+                        tte->save(key, scoreToTT(score, ss->ply), BOUND_LOWER,
+                            qdepth, move, ss->static_eval, TT.generation());
+
+                        return score;
+                    }
+                }
+            }
+        }
+
+        if (InCheck && best_score == -SCORE_INFINITE)
+            return matedIn(ss->ply);
+
+        tte->save(key, scoreToTT(best_score, ss->ply),
+            PvNode && best_score > old_alpha ? BOUND_EXACT : BOUND_UPPER,
+            qdepth, best_move, ss->static_eval, TT.generation());
+
+        assert(best_score > -SCORE_INFINITE && best_score < SCORE_INFINITE);
+
+        return best_score;
+    }
+
+    Score ab(Board& b, Score alpha, Score beta, Depth depth)
+    {
+        Search::Stack stack[MAX_PLY + 7], *ss = stack + 5;
+        memset(ss - 5, 0, 8 * sizeof(Search::Stack));
+
+        Learn::initLearn(b);
+        Time.reset();
+        TT.newSearch();
+        Score best_score = -SCORE_INFINITE;
+
+        auto th = b.thisThread();
+        auto& root_depth = th->root_depth;
+        auto& root_moves = th->root_moves;
+
+        for (root_depth = ONE_PLY; root_depth <= depth; root_depth += ONE_PLY)
+        {
+            best_score = ab<PV>(b, ss, -SCORE_INFINITE, SCORE_INFINITE, root_depth, false);
+            std::stable_sort(root_moves.begin(), root_moves.end());
+            //std::cout << USI::pv(b, root_depth, -SCORE_INFINITE, SCORE_INFINITE) << std::endl;
+        }
+
+        return best_score;
+    }
 } // namespace Learn
 
 #endif

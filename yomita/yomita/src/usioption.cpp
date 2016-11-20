@@ -32,8 +32,9 @@ using std::string;
 namespace
 {
     void onThreads(const Option&) { Threads.readUsiOptions(); }
-    void onHashSize(const Option& opt) { TT.resize(opt);}
+    void onHashSize(const Option& opt) { TT.resize(opt); }
     void onWriteDebugLog(const Option& opt) { startLogger(opt); }
+
 } // namespace
 
  // init()は引数で渡されたUSI option設定をhard codeされたデフォルト値で初期化する
@@ -79,7 +80,9 @@ void OptionsMap::init()
     eval += "/6_205";
 #endif
     (*this)["EvalShare"]             = Option(false);
+#ifdef LEARN
     (*this)["EvalSaveDir"]           = Option(save.c_str());
+#endif
     (*this)["EvalDir"]               = Option(eval.c_str());
 #endif
 }
