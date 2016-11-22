@@ -120,7 +120,7 @@ void TimeManagement::init(LimitsType & limits, Turn t, int ply)
         maximum_time = std::min(t2, maximum_time);
     }
 
-    if (Options["Ponder"])
+    if (Options["USI_Ponder"])
         optimum_time += optimum_time / 4;
 
     // 秒読みルールなら少し追加

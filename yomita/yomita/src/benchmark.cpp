@@ -53,7 +53,7 @@ void benchmark(Board& b)
         {
             "name Threads value 1",
             "name Hash value 1024"
-            "name Ponder value true",
+            "name USI_Ponder value true",
             "name Minimum_Thinking_Time value 15",
             "name Move_Overhead value 70",
             "name nodestime value 0",

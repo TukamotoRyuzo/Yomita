@@ -1,4 +1,8 @@
-﻿1.8 (2016/11/20)
+﻿1.81 (2016/11/22)
+    合法手が1手しかなくても検討モードなら探索するように変更
+    "Ponder"→"USI_Ponder"
+
+1.8 (2016/11/20)
     FutilityMoveCountsの調整 + futility marginの計算式の変更
     
     for (int d = 0; d < 16; ++d)

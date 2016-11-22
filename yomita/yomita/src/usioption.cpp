@@ -51,7 +51,7 @@ void OptionsMap::init()
 #define MAX_MEMORY 2048
 #endif
     (*this)["Hash"]                  = Option(64, 1, MAX_MEMORY, onHashSize);
-    (*this)["Ponder"]                = Option(true);
+    (*this)["USI_Ponder"]                = Option(true);
     (*this)["Threads"]               = Option(1, 1, 128, onThreads);
     (*this)["Minimum_Thinking_Time"] = Option(15, 0, 5000);
     (*this)["Move_Overhead"]         = Option(60, 0, 5000);

@@ -285,7 +285,8 @@ void MainThread::search()
                 }
             }
 
-            if (root_moves.size() == 1 && !Limits.move_time) // 一手しかないのですぐ指す
+            // 検討モード時や秒読み時は合法手が1手しかなくても思考する
+            if (!Limits.infinite && root_moves.size() == 1 && !Limits.move_time) // 一手しかないのですぐ指す
             {
                 root_depth = DEPTH_MAX;
                 root_moves[0].score = SCORE_INFINITE; // 絶対この手が選ばれるように
@@ -340,7 +341,7 @@ void MainThread::search()
 
         SYNC_COUT << "bestmove " << toUSI(best_move);
 
-        if (Options["Ponder"]
+        if (Options["USI_Ponder"]
             && best_thread->root_moves[0].pv.size() > 1
             || (!isNone(best_thread->root_moves[0].pv[0]) && best_thread->root_moves[0].extractPonderFromTT(root_board, ponder_candidate)))
             std::cout << " ponder " << toUSI(best_thread->root_moves[0].pv[1]);
