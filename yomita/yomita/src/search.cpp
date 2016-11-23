@@ -245,7 +245,10 @@ void MainThread::search()
     {
         auto it = book.find(root_board.sfen());
 
-        if (!Limits.infinite && it != book.end() && it->second.best_move != MOVE_NONE)
+        if (Options["UseBook"]
+            && !Limits.infinite 
+            && it != book.end() 
+            && it->second.best_move != MOVE_NONE)
         {
             // 定跡にヒット
             Move m = it->second.best_move;
@@ -414,10 +417,12 @@ void Thread::search()
                 std::stable_sort(root_moves.begin() + pv_idx, root_moves.end());
 
                 // 勝ちを見つけたら速攻指す
-                if (best_score >= SCORE_MATE_IN_MAX_PLY || best_score >= SCORE_KNOWN_WIN && root_moves.size() == 1)
+                if (!Limits.infinite
+                    && (best_score >= SCORE_MATE_IN_MAX_PLY 
+                    || (best_score >= SCORE_KNOWN_WIN && root_moves.size() == 1)))
                 {
-                    root_moves[0].score = SCORE_INFINITE;
-                    return;
+                    SYNC_COUT << USI::pv(root_board, root_depth, alpha, beta) << SYNC_ENDL;
+                    Signals.stop = true;
                 }
 
                 if (Signals.stop)
