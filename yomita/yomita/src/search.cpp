@@ -418,6 +418,7 @@ void Thread::search()
 
                 // 勝ちを見つけたら速攻指す
                 if (!Limits.infinite
+                    && !Limits.ponder
                     && (best_score >= SCORE_MATE_IN_MAX_PLY 
                     || (best_score >= SCORE_KNOWN_WIN && root_moves.size() == 1)))
                 {
@@ -470,11 +471,8 @@ void Thread::search()
             if (!main_thread)
                 continue;
 
-            if (Signals.stop)
-                SYNC_COUT << "info nodes " << Threads.nodeSearched()
-                << " time " << Time.elapsed() << SYNC_ENDL;
-
-            else if ((pv_idx + 1 == multi_pv || Time.elapsed() > 3000)
+            if (Signals.stop 
+                || (pv_idx + 1 == multi_pv || Time.elapsed() > 3000)
                 && (root_depth < 3 || last_info_time + pv_interval < Time.elapsed()))
             {
                 last_info_time = Time.elapsed();
