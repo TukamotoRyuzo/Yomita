@@ -175,7 +175,6 @@ private:
     void scoreCaptures();
     void scoreQuiets();
     void scoreEvasions();
-    void scoreChecks();
     void nextStage();
     MoveStack* begin() { return moves; }
     MoveStack* end() { assert(end_moves < moves + MAX_MOVES); return end_moves; }

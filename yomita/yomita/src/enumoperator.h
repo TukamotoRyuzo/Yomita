@@ -48,5 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     inline T& operator -- (T& d) { return d = T(int(d) - 1); }\
     inline T  operator ++ (T& d,int) { T prev = d; d = T(int(d) + 1); return prev; } \
     inline T  operator -- (T& d,int) { T prev = d; d = T(int(d) - 1); return prev; } \
-    inline constexpr T  operator / (const T d, int i) { return T(int(d) / i); }\
+    inline T  operator / (const T d, int i) { return T(int(d) / i); }\
+    inline int operator / (T d1, T d2) { return int(d1) / int(d2); }\
     inline T& operator /= (T& d, int i) { return d = T(int(d) / i); }

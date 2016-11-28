@@ -29,10 +29,10 @@ std::string toUSI(const Move m)
     // 持ち駒を打つとき、USIにこの文字列を送信する。
     static const std::string hand_to_usi_str[] = { "", "B*", "R*", "P*", "L*", "N*", "S*", "G*", };
 
-    if (isNone(m))
+    if (m == MOVE_NONE)
         return "resign";
 
-    if (isNull(m))
+    if (m == MOVE_NULL)
         return "0000";
 
     // 駒打ちなら
@@ -55,10 +55,10 @@ std::string toCSA(const Move m)
 {
     static const std::string piece_to_csa[] = { "", "KA", "HI", "FU", "KY", "KE", "GI", "KI", "OU", "UM", "RY", "TO", "NY", "NK", "NG" };
 
-    if (isNone(m))
+    if (m == MOVE_NONE)
         return "resign";
 
-    if (isNull(m))
+    if (m == MOVE_NULL)
         return "0000";
 
     if (isDrop(m))
@@ -71,10 +71,10 @@ std::string toCSA(const Move m)
 
 std::string pretty(const Move m)
 { 
-    if (isNone(m))
+    if (m == MOVE_NONE)
         return "none";
 
-    if (isNull(m))
+    if (m == MOVE_NULL)
         return "null";
 
     std::string ret = ::pretty(toSq(m)) + ::pretty(movedPieceType(m)) + (isDrop(m) ? "打" : isPromote(m) ? "成" : "");

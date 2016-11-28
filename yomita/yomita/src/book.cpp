@@ -135,7 +135,7 @@ namespace Book
             std::cin >> str;
             Move m = USI::toMove(b, str);
 
-            if (!isNone(m))
+            if (m != MOVE_NONE)
             {
                 std::cout << "登録していいですか?(y/n)";
                 std::cin >> y;

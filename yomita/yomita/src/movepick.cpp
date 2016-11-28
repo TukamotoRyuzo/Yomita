@@ -65,7 +65,7 @@ MovePicker::MovePicker(const Board& b, Move ttm, Depth d, Search::Stack* s)
 
     // 置換表の指し手が合法なら先頭に入れておく
     tt_move = ttm && b.pseudoLegal(ttm) ? ttm : MOVE_NONE;
-    end_moves += !isNone(tt_move);
+    end_moves += tt_move != MOVE_NONE;
 }
 
 // 静止探索から呼び出される時用。
@@ -94,7 +94,7 @@ MovePicker::MovePicker(const Board& b, Move ttm, Depth d, Move prev)
     }
 
     tt_move = ttm && b.pseudoLegal(ttm) ? ttm : MOVE_NONE;
-    end_moves += !isNone(tt_move);
+    end_moves += tt_move != MOVE_NONE;
 }
 
 MovePicker::MovePicker(const Board& b, Move ttm, Score th)
@@ -110,7 +110,7 @@ MovePicker::MovePicker(const Board& b, Move ttm, Score th)
         && isCapture(ttm)
         && b.seeGe(ttm, threshold + 1)) ? ttm : MOVE_NONE;
 
-    end_moves += !isNone(tt_move);
+    end_moves += tt_move != MOVE_NONE;
 }
 
 const Score LVATable[PIECETYPE_MAX] =
@@ -294,7 +294,7 @@ Move MovePicker::nextMove()
         case KILLERS: // KILLERS faseでは駒を取る手は試す必要はない。この前のフェーズで駒を取る手はすべて試したから。
             move = *current++;
 
-            if (!isNone(move)
+            if (move != MOVE_NONE
                 && move != tt_move
                 && !board.piece(toSq(move))
                 && !isPawnPromote(move)

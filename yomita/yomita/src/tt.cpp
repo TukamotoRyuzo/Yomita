@@ -71,7 +71,7 @@ bool TranspositionTable::probe(const Key key, TTEntry* &ptt) const
     TTEntry* replace = tte;
 
     for (int i = 1; i < CLUSTER_SIZE; ++i)
-        if (replace->depth8 > tte[i].depth8) // 一番残り深さの少ない局面をreplace候補とする
+        if (replace->depth16 > tte[i].depth16) // 一番残り深さの少ない局面をreplace候補とする
             replace = &tte[i];
 
     ptt = replace;

@@ -1226,7 +1226,7 @@ Key Board::afterKey(const Move m) const
 void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
 {
     assert(verify());
-    assert(!isNone(move));
+    assert(move != MOVE_NONE);
 
     // 現局面のhash_key
     Key k = st_->board_key ^ Zobrist::turn;
@@ -1423,7 +1423,7 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
 void Board::undoMove(const Move move)
 {
     assert(verify());
-    assert(!isNone(move));
+    assert(move != MOVE_NONE);
 
     const Turn enemy = turn();
     const Turn self = ~enemy;
@@ -2590,7 +2590,7 @@ Failed:
 void Board::doMoveNearCheck(const Move move, StateInfo& new_st)
 {
     assert(verify());
-    assert(!isNone(move));
+    assert(move != MOVE_NONE);
     assert(isOK(move, turn()));
 
     std::memcpy(&new_st, st_, offsetof(StateInfo, checkers));
@@ -2696,7 +2696,7 @@ void Board::doMoveNearCheck(const Move move, StateInfo& new_st)
 void Board::doMoveKingAndCapture(const Move move, StateInfo& new_st)
 {
     assert(verify());
-    assert(!isNone(move));
+    assert(move != MOVE_NONE);
     assert(isOK(move, turn()));
 
     std::memcpy(&new_st, st_, offsetof(StateInfo, checkers));

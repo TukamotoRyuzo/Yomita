@@ -21,40 +21,54 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <fstream>
 #include "test.h"
 #include "board.h"
 #include "usi.h"
 #include "genmove.h"
-#include <fstream>
 #include "sfen_rw.h"
-
-int ply1;
-int zentai;
 
 // 引数で与えられるbはランダムな配置なのでさまざまなテストができる。
 void testOnRandomPosition(Board& b)
 {
     if (!b.inCheck())
     {
-        auto d = b.is1mate();
-        auto m = b.mate1ply();
+        MoveStack mlist[MAX_MOVES];
+        auto p = generate<NO_CAPTURE_MINUS_PROMOTE>(mlist, b);
+        p = generate<DROP>(p, b);
 
-        if (m)
+        MoveStack clist[MAX_MOVES];
+        auto c = generate<SPEED_CHECK>(clist, b);
+
+        MoveStack* curr = mlist;
+
+        while (curr != p)
         {
-            if (!d)
-            {
-                std::cout << b;
-            }
+            if (!b.givesCheck(curr->move) || isCaptureOrPawnPromote(curr->move))
+                *curr = *(--p);
+            else
+                ++curr;
         }
 
-        if (d)
-        {
-            zentai++;
+        curr = mlist;
+        auto legal_checks = p - curr;
+        auto speed_checks = c - clist;
 
-            if (m)
-            {
-                ply1++;
-            }
+        if (legal_checks != speed_checks)
+        {
+            std::cout << b << "legals :";
+
+            while (curr != p)
+                std::cout << pretty((curr++)->move) << " ";
+
+            curr = clist;
+
+            std::cout << "\nspeeds: ";
+
+            while (curr != c)
+                std::cout << pretty((curr++)->move) << " ";
+
+            std::cout << std::endl;
         }
     }
 }
@@ -109,8 +123,6 @@ void randomPlayer(Board& b, uint64_t loop_max)
         if ((i % 1000) == 0)
             std::cout << ".";
     }
-
-    std::cout << "zentai = " << zentai << "  1ply = " << ply1 << std::endl;;
 }
 
 struct PerftSolverResult 
@@ -214,7 +226,7 @@ void userTest()
 {
 #if 1 // ランダムプレイヤーテスト
     USI::isReady();
-    uint64_t loop_max = 10000;
+    uint64_t loop_max = 1000000;
     std::cout << "Random Player test , loop_max = " << loop_max << std::endl;
     Board b;
     randomPlayer(b, loop_max);

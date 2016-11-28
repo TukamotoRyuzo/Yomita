@@ -33,18 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // 指し手の種類
 enum MoveType
 {
-    DROP,					  // 駒打ち。 二歩は含まない。
+    DROP,                     // 駒打ち。 二歩は含まない。
     CAPTURE_PLUS_PROMOTE,     // 駒を取る手 + (歩の駒を取らない成る手)。
     NO_CAPTURE_MINUS_PROMOTE, // 駒を取らない手 - (歩の駒を取らない成る手) - (香の2段目への駒を取らない不成)
-    RECAPTURES,				  // 特定の位置への取り返しの手
-    EVASIONS,				  // 王手回避。歩, 飛, 角 の不成は含まない。
-    NO_EVASIONS,			  // 王手が掛かっていないときの合法手 (玉の移動による自殺手、pinされている駒の移動による自殺手は回避しない。)
-    LEGAL,					  // 王手が掛かっていれば EVASION, そうでないならNO_EVASIONSを生成し、玉の自殺手とpinされてる駒の移動による自殺手を排除。(連続王手の千日手は排除しない)
-    LEGAL_ALL,				  // LEGAL + 不成をすべて生成
-    CHECK,					  // 王手生成だが使ってない。
-    CHECK_ALL,				  // 前に作ったんだがどこかに行ってしまった。
-    SPEED_CHECK,			  // 駒を取らない王手生成
-    NEAR_CHECK,				  // 近接王手生成。3手詰めルーチンに必要。
+    RECAPTURES,               // 特定の位置への取り返しの手
+    EVASIONS,                 // 王手回避。歩, 飛, 角 の不成は含まない。
+    NO_EVASIONS,              // 王手が掛かっていないときの合法手 (玉の移動による自殺手、pinされている駒の移動による自殺手は回避しない。)
+    LEGAL,                    // 王手が掛かっていれば EVASION, そうでないならNO_EVASIONSを生成し、玉の自殺手とpinされてる駒の移動による自殺手を排除。(連続王手の千日手は排除しない)
+    LEGAL_ALL,                // LEGAL + 不成をすべて生成
+    CHECK,                    // 王手生成だが使ってない。
+    CHECK_ALL,                // 前に作ったんだがどこかに行ってしまった。
+    SPEED_CHECK,              // 駒を取らない王手生成
+    NEAR_CHECK,               // 近接王手生成。3手詰めルーチンに必要。
     MOVETYPE_NO
 };
 
@@ -63,7 +63,7 @@ namespace
     // 00000011 11100000 00000000 00000000 captured piece
 
     // Moveに格納するときに必要なシフト数
-    const uint32_t TO_SHIFT		 = 0;
+    const uint32_t TO_SHIFT      = 0;
     const uint32_t FROM_SHIFT    = 7;
     const uint32_t PROMOTE_SHIFT = 14;
     const uint32_t DROP_SHIFT    = 15;
@@ -71,14 +71,14 @@ namespace
     const uint32_t CAPTURE_SHIFT = 21;
 
     // Moveとのマスク定数
-    const uint32_t TO_MASK			= 0x7f << TO_SHIFT;
-    const uint32_t FROM_MASK		= 0x7f << FROM_SHIFT;
-    const uint32_t TURN_MASK		= 0x10 << PIECE_SHIFT;
-    const uint32_t DROP_MASK		= 0x01 << DROP_SHIFT;
-    const uint32_t PROMOTE_MASK		= 0x01 << PROMOTE_SHIFT;
-    const uint32_t PIECE_MASK		= 0x1f << PIECE_SHIFT;
-    const uint32_t CAPTURE_MASK		= 0x1f << CAPTURE_SHIFT;
-    const uint32_t PIECETYPE_MASK	= 0x0f << PIECE_SHIFT;
+    const uint32_t TO_MASK          = 0x7f << TO_SHIFT;
+    const uint32_t FROM_MASK        = 0x7f << FROM_SHIFT;
+    const uint32_t TURN_MASK        = 0x10 << PIECE_SHIFT;
+    const uint32_t DROP_MASK        = 0x01 << DROP_SHIFT;
+    const uint32_t PROMOTE_MASK     = 0x01 << PROMOTE_SHIFT;
+    const uint32_t PIECE_MASK       = 0x1f << PIECE_SHIFT;
+    const uint32_t CAPTURE_MASK     = 0x1f << CAPTURE_SHIFT;
+    const uint32_t PIECETYPE_MASK   = 0x0f << PIECE_SHIFT;
     const uint32_t CAPTURETYPE_MASK = 0x0f << CAPTURE_SHIFT;
     
     // 歩を成る手かどうかを確かめるときに見なければならないビット
@@ -134,9 +134,9 @@ inline Square toSq(const Move m) { return Square(m & TO_MASK); }
 inline Square fromSq(const Move m) { return Square((m & FROM_MASK) >> FROM_SHIFT); }
 
 // Moveの種類の判定
-inline bool isDrop				  (const Move m) { return m & DROP_MASK;        }
-inline bool isPromote			  (const Move m) { return m & PROMOTE_MASK;     }
-inline bool isCapture			  (const Move m) { return m & CAPTURETYPE_MASK; }
+inline bool isDrop                (const Move m) { return m & DROP_MASK;        }
+inline bool isPromote             (const Move m) { return m & PROMOTE_MASK;     }
+inline bool isCapture             (const Move m) { return m & CAPTURETYPE_MASK; }
 inline bool isPawnPromote         (const Move m) { return (m & (PROMOTE_MASK | PIECETYPE_MASK)) == PAWN_PROMOTE; }
 inline bool isCaptureOrPawnPromote(const Move m) { return isCapture(m) || isPawnPromote(m); }
 
@@ -155,12 +155,8 @@ inline PieceType capturePieceType (const Move m) { return PieceType((m & CAPTURE
 // 指し手の手番を返す
 inline Turn turnOf(const Move m) { return Turn(!!(m & TURN_MASK)); }
 
-// 値が入っているか。
-inline bool isNone(const Move m) { return m == MOVE_NONE; }
-inline bool isNull(const Move m) { return m == MOVE_NULL; }
-
 // NULLMOVEやNONEでないかの確認
-inline bool isOK(const Move m) { return !isNone(m) && !isNull(m); }
+inline bool isOK(const Move m) { return m != MOVE_NONE && m != MOVE_NULL; }
 
 // USI変換用
 std::string toUSI(const Move m);

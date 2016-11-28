@@ -73,6 +73,11 @@ void benchmark(Board& b)
             //"startpos moves 2g2f 3c3d 2f2e 2b3c 9g9f 8c8d 3i4h 7a6b 3g3f 4a3b 4h3g 8d8e 6i7h 3a2b 3g4f 7c7d 5i6h 3c4b 7g7f 5c5d 6h6i 6b5c 5g5f 5a4a 3f3e 3d3e 4f3e 8e8f 8g8f 4c4d 2h3h 8b8f P*8g",
             "startpos moves 2g2f 3c3d 2f2e 2b3c 7g7f 3a2b 5g5f 3c8h+ 7i8h B*5g 3g3f 1c1d 3i4h 5g1c+ B*7i 1c1b 5i6h 2b1c 6h7h 1b2b 7i4f 4c4d 4f5e 8b4b 8g8f 2b3b 8h8g 3b5d 4h3g 5d4e 5e7g 4e5f 4i5h 5c5d 3g4f 5f7d 3f3e 3d3e 4f3e 7d6d 4g4f 5d5e 2e2d 2c2d 3e2d 6d5d 2d1c+ P*2g 2h3h 1a1c P*3d 2g2h+ 3h2h S*2g S*6e 5d3f 2h4h P*2h P*5d 2h2i+ 5d5c+", // 250付近ｎ
 
+            // △59飛車が詰めろ(19手詰み)
+            //"startpos moves 7g7f 8c8d 5g5f 8d8e 8h7g 7a6b 5f5e 5a4b 2h5h 7c7d 5i4h 6b7c 4h3h 7c6d 7i7h 6a5b 6g6f 7d7e 7f7e 8b8d 3h2h 4b3b 3i3h 6d7e 7g6h P*7f 6h4f 6c6d 5e5d 3a4b 5d5c+ 4b5c P*7b 8e8f 8g8f P*8h 7b7a+ 8h8i+ 7a8a 8d8a P*5d 5c4b P*7c 8a8c 7c7b+ 8i8h 7b7c 8c7c N*6e 8h7h 6e7c+ 7h6i R*7b G*5i 5d5c+ 5i5h 5c5b 5h4i 5b4b 4a4b 3h4i R*8h G*3h G*6a 7b4b+ 3b4b 4f3e P*5b G*5d N*4a 7c6c 2b3a S*5c 5b5c 6c5c 4a5c 3e5c+ 4b4a 5c4c",
+
+            // ▲23銀で21手詰み
+            //"sfen lr6+L/2P3gk1/4g4/4pppp1/p8/1Pnp+s1P2/P5SP1/LS7/K7R b BGS2NL6Pbgnp 1",
 #if 1
             //"sfen lR1B3nl/2gp5/ngk1+BspPp/1s2p2p1/p4S3/1Pp6/P5P1P/LGG6/KN5NL b Prs5p 1", // 240
             //"sfen 5S2l/1rP2s1k1/p2+B1gnp1/5np2/3G3n1/5S2p/P1+p1PpPP1/1P1PG2KP/L2+rLPGNL b Bs3p 1", // 260

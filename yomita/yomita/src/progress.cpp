@@ -246,10 +246,10 @@ namespace Learn
         return ret;
     }
 
+#define eta 0.1
     struct Weight
     {
         double w, g, g2;
-        static const int eta = 128;
 
         void addGrad(double delta) { g += delta; }
 
@@ -496,7 +496,7 @@ namespace Learn
 #ifdef _DEBUG
             file_name = "records23.txt",
 #else
-            file_name = "records_2000.txt",
+            file_name = "records_2800.txt",
 #endif
             dir = "";
 

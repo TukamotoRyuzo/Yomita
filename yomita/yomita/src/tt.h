@@ -30,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct TTEntry
 {
-    Key		key()		 const { return (Key  )  key32; }
+    Key     key()        const { return (Key  )  key32; }
     Move    move()       const { return (Move ) move32; }
     Score   score()      const { return (Score)score16; }
-    Score   eval()		 const { return (Score) eval16; }
-    Depth   depth()		 const { return (Depth) depth8; }
-    Bound   bound()		 const { return (Bound) bound8; }
+    Score   eval()       const { return (Score) eval16; }
+    Depth   depth()      const { return (Depth)depth16; }
+    Bound   bound()      const { return (Bound) bound8; }
     uint8_t generation() const { return    generation8; }
 
     // 書き込みはアトミックに行いたい。
@@ -47,15 +47,15 @@ struct TTEntry
 
         // このエントリーの現在の内容のほうが価値があるなら上書きしない。
         if ((k >> 32) != key32
-            || d > depth8 - 4 
+            || d > depth16 - 4 * ONE_PLY 
             || b == BOUND_EXACT)
         {
-            key32	    = (uint32_t)(k >> 32);
+            key32       = (uint32_t)(k >> 32);
             score16     = (int16_t)s;
             eval16      = (int16_t)ev;
             generation8 = (uint8_t)g;
             bound8      = (uint8_t)b;
-            depth8      = (int8_t)d;
+            depth16     = (int16_t)d;
         }
     }
 
@@ -74,15 +74,15 @@ private:
     // 評価関数の評価値
     int16_t eval16;
 
+    // 残り深さ。ONE_PLYが1以外の場合もあり、中途半端なdepthも書き込みたいので16bitにしている。
+    int16_t depth16;
+
+    // 登録されたときの世代
     uint8_t generation8;
 
+    // 評価値のタイプ
     uint8_t bound8;
-
-    // そのときの残り深さ(これが大きいものほど価値がある)
-    int8_t depth8;
 };
-
-// 32 + 32 + 16 + 16 + 8 + 8 + 8 = 120bit = 15byte → 16byteになる模様
 
 class TranspositionTable 
 {
@@ -90,8 +90,8 @@ class TranspositionTable
     static const int CLUSTER_SIZE = 4;
 
     struct Cluster { TTEntry entry[CLUSTER_SIZE]; };
-
-    static_assert(CACHE_LINE_SIZE % sizeof(Cluster) == 0, "Cluster size incorrect");
+    
+    static_assert(sizeof(Cluster) == CACHE_LINE_SIZE, "Cluster size incorrect");
 
 public:
     ~TranspositionTable() { free(mem_); }
