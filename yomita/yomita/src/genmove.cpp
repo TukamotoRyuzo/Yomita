@@ -69,7 +69,7 @@ namespace
             mlist++->move = makeMove<MT>(from, to, P, b);
         }
 
-        if (MT != NO_CAPTURE_MINUS_PROMOTE)
+        if (MT != NO_CAPTURE_MINUS_PAWN_PROMOTE)
         {
             uint64_t to_1_3 = (T == BLACK ? bb_from.b(T_HIGH) >> 9 : bb_from.b(T_HIGH) << 9) & target.b(T_HIGH) & ENEMY_MASK[T];
 
@@ -222,7 +222,7 @@ namespace
     {
         const Index T_HIGH = T == BLACK ? HIGH : LOW;
         const Index T_LOW  = T == BLACK ? LOW : HIGH;
-        const bool isCapture = MT == CAPTURE_PLUS_PROMOTE;
+        const bool isCapture = MT == CAPTURE_PLUS_PAWN_PROMOTE;
         const Piece p = T == BLACK ? B_LANCE : W_LANCE;
         Bitboard bb_from = b.bbPiece(LANCE, T);
         uint64_t from_3_9 = bb_from.b(T_LOW);
@@ -262,7 +262,7 @@ namespace
                     if (isBehind(T, RANK_1, to)) // 1段目の不成は除く。
                         mlist++->move = makeMove<MT>(from, to, p, b);
                 }
-                else if (MT != NO_CAPTURE_MINUS_PROMOTE)
+                else if (MT != NO_CAPTURE_MINUS_PAWN_PROMOTE)
                 {
                     if (isBehind(T, RANK_2, to)) // 2段目の不成は除く。
                         mlist++->move = makeMove<MT>(from, to, p, b);
@@ -1258,7 +1258,7 @@ namespace
     template <Turn T, MoveType MT>
     MoveStack* generateCheckRBB(MoveStack* mlist, const Board& b)
     {
-        static_assert(MT == SPEED_CHECK || MT == NEAR_CHECK, "");
+        static_assert(MT == QUIET_CHECKS || MT == NEAR_CHECK, "");
         const Index T_HIGH = T == BLACK ? HIGH : LOW;
         const Index T_LOW = T == BLACK ? LOW : HIGH;
         const Square ksq = b.kingSquare(~T);
@@ -1306,7 +1306,7 @@ namespace
 
                     // 玉が素抜かれるかどうかはlegalで。
                     while (bb_to)
-                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_DRAGON : W_DRAGON, b);
+                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_DRAGON : W_DRAGON, b);
 
                 } while (bb_from);
             }
@@ -1328,7 +1328,7 @@ namespace
                     Bitboard bb_to = rook_target & rookAttack(from, b.bbOccupied());
 
                     while (bb_to)
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_ROOK : W_ROOK, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_ROOK : W_ROOK, b);
 
                 } while (from123);
             }
@@ -1351,10 +1351,10 @@ namespace
                     bb_to &= bb_target;
 
                     while (bb_to)
-                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_ROOK : W_ROOK, b);
+                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_ROOK : W_ROOK, b);
 
                     while (to64_123)
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, firstOne<TK>(to64_123), self == BLACK ? B_ROOK : W_ROOK, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, firstOne<TK>(to64_123), self == BLACK ? B_ROOK : W_ROOK, b);
                 } while (from4_9);
             }
         }
@@ -1371,7 +1371,7 @@ namespace
                     Bitboard bb_to = bb_target & horseAttack(from, b.bbOccupied());
 
                     while (bb_to)
-                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_HORSE : W_HORSE, b);
+                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_HORSE : W_HORSE, b);
 
                 } while (bb_from);
             }
@@ -1394,13 +1394,13 @@ namespace
                     Bitboard bb_to = bb_target & bishop_attack;
 
                     while (bb_to)
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_BISHOP : W_BISHOP, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_BISHOP : W_BISHOP, b);
 
                     // 成ることで王手になるところ。玉の十文字。
                     uint64_t to_cross64 = target_pro & bishop_attack.b(TK);
 
                     while (to_cross64)
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, firstOne<TK>(to_cross64), self == BLACK ? B_BISHOP : W_BISHOP, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, firstOne<TK>(to_cross64), self == BLACK ? B_BISHOP : W_BISHOP, b);
 
                 } while (from123);
             }
@@ -1423,10 +1423,10 @@ namespace
                     bb_to &= bb_target;
 
                     while (bb_to)
-                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_BISHOP : W_BISHOP, b);
+                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, bb_to.firstOne(), self == BLACK ? B_BISHOP : W_BISHOP, b);
 
                     while (to64_123)
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, firstOne<T_HIGH>(to64_123), self == BLACK ? B_BISHOP : W_BISHOP, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, firstOne<T_HIGH>(to64_123), self == BLACK ? B_BISHOP : W_BISHOP, b);
 
                 } while (from4_9);
             }
@@ -1447,7 +1447,7 @@ namespace
                     uint64_t to64 = gold_target & goldAttack(self, from).b(TK);
 
                     while (to64)
-                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, firstOne<TK>(to64), b.piece(from), b);
+                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), b.piece(from), b);
                 } while (from64);
             }
         }
@@ -1476,11 +1476,11 @@ namespace
                         const Square to = firstOne<TK>(to_pro);
 
                         if (canPromote(self, from) || canPromote(self, to))
-                            mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, to, self == BLACK ? B_SILVER : W_SILVER, b);
+                            mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_SILVER : W_SILVER, b);
                     }
 
                     while (to64)
-                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_SILVER : W_SILVER, b);
+                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_SILVER : W_SILVER, b);
 
                 } while (from64);
             }
@@ -1503,10 +1503,10 @@ namespace
                     to64 &= chk;
 
                     while (to_pro)
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, firstOne<TK>(to_pro), self == BLACK ? B_KNIGHT : W_KNIGHT, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, firstOne<TK>(to_pro), self == BLACK ? B_KNIGHT : W_KNIGHT, b);
 
                     while (to64)
-                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_KNIGHT : W_KNIGHT, b);
+                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_KNIGHT : W_KNIGHT, b);
 
                 } while (from64);
             }
@@ -1527,7 +1527,7 @@ namespace
                     uint64_t to_pro = target64 & lanceAttack(self, from, b.bbOccupied()).b(TK) & chk_pro;
 
                     while (to_pro)
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, firstOne<TK>(to_pro), self == BLACK ? B_LANCE : W_LANCE, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, firstOne<TK>(to_pro), self == BLACK ? B_LANCE : W_LANCE, b);
 
                 } while (bb_from);
             }
@@ -1546,7 +1546,7 @@ namespace
                 {
                     if (isBehind(self, RANK_2, krank))
                     {
-                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, b);
+                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, b);
                     }
                 }
             }
@@ -1577,7 +1577,7 @@ namespace
                     while (to64)
                     {
                         const Square to = firstOne<T_HIGH>(to64);
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, to, pc, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, pc, b);
                     }
                 }
                 else
@@ -1588,7 +1588,7 @@ namespace
                     while (to64)
                     {
                         const Square to = firstOne<T_HIGH>(to64);
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, to, pc, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, pc, b);
                     }
                 }
             }
@@ -1602,7 +1602,7 @@ namespace
                     while (bb_to_promote)
                     {
                         const Square to = bb_to_promote.firstOne();
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, to, pc, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, pc, b);
                     }
                 }
                 else
@@ -1613,7 +1613,7 @@ namespace
                     while (bb_to_promote)
                     {
                         const Square to = bb_to_promote.firstOne();
-                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PROMOTE>(from, to, pc, b);
+                        mlist++->move = makeMovePromote<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, pc, b);
                     }
                 }
             }
@@ -1631,15 +1631,15 @@ namespace
                     {
                         // 香の駒を取らない不成による空き王手は生成しない。
                         if (pt > LANCE && (pt != KNIGHT || isBehind(self, RANK_2, to)))
-                            mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, to, pc, b);
+                            mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, pc, b);
                     }
                     else
                     {
-                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, to, pc, b);
+                        mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, pc, b);
                     }
                 }
                 else
-                    mlist++->move = makeMove<NO_CAPTURE_MINUS_PROMOTE>(from, to, pc, b);
+                    mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, pc, b);
             }
         }
         
@@ -1712,7 +1712,7 @@ namespace
                 uint64_t to64 = target64 & dragonAttack(from, b.bbOccupied()).b(TK);
 
                 while (to64)
-                    mlist++->move = makeMove<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_DRAGON : W_DRAGON, b);
+                    mlist++->move = makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_DRAGON : W_DRAGON, b);
             }
         }
 
@@ -1728,7 +1728,7 @@ namespace
                 uint64_t to64 = target64 & rookAttack(from, b.bbOccupied()).b(TK);
 
                 while (to64)
-                    mlist++->move = makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_ROOK : W_ROOK, b);
+                    mlist++->move = makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_ROOK : W_ROOK, b);
             }
 
             uint64_t from4_9 = bb_from.b(T_LOW) & SELF_MASK[T];
@@ -1748,12 +1748,12 @@ namespace
                         to64 &= ~to64_123;
 
                         do {
-                            mlist++->move = makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64_123), self == BLACK ? B_ROOK : W_ROOK, b);
+                            mlist++->move = makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64_123), self == BLACK ? B_ROOK : W_ROOK, b);
                         } while (to64_123);
                     }
 
                     while (to64)
-                        mlist++->move = makeMove<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_ROOK : W_ROOK, b);
+                        mlist++->move = makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_ROOK : W_ROOK, b);
                 }
             }
         }
@@ -1769,7 +1769,7 @@ namespace
                 uint64_t to64 = target64 & horseAttack(from, b.bbOccupied()).b(TK);
 
                 while (to64)
-                    mlist++->move = makeMove<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_HORSE : W_HORSE, b);
+                    mlist++->move = makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_HORSE : W_HORSE, b);
             }
         }
 
@@ -1785,7 +1785,7 @@ namespace
                 uint64_t to64 = target64 & bishopAttack(from, b.bbOccupied()).b(TK);
 
                 while (to64)
-                    mlist++->move = makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_BISHOP : W_BISHOP, b);
+                    mlist++->move = makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_BISHOP : W_BISHOP, b);
             }
 
             uint64_t from4_9 = bb_from.b(T_LOW) & SELF_MASK[T];
@@ -1802,10 +1802,10 @@ namespace
                     to64 &= ~to64_123;
 
                     while (to64_123)
-                        mlist++->move = makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64_123), self == BLACK ? B_BISHOP : W_BISHOP, b);
+                        mlist++->move = makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64_123), self == BLACK ? B_BISHOP : W_BISHOP, b);
 
                     while (to64)
-                        mlist++->move = makeMove<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_BISHOP : W_BISHOP, b);
+                        mlist++->move = makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_BISHOP : W_BISHOP, b);
                 }
             }
         }
@@ -1825,7 +1825,7 @@ namespace
                     uint64_t to64 = gold_target & goldAttack(self, from).b(TK);
 
                     while (to64)
-                        mlist++->move = makeMove<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64), b.piece(from), b);
+                        mlist++->move = makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), b.piece(from), b);
                 } while (from64);
             }
         }
@@ -1854,11 +1854,11 @@ namespace
                         const Square to = firstOne<TK>(to_pro);
 
                         if (canPromote(self, from) || canPromote(self, to))
-                            mlist++->move = makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_SILVER : W_SILVER, b);
+                            mlist++->move = makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_SILVER : W_SILVER, b);
                     }
 
                     while (to64)
-                        mlist++->move = makeMove<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_SILVER : W_SILVER, b);
+                        mlist++->move = makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_SILVER : W_SILVER, b);
 
                 } while (from64);
             }
@@ -1880,10 +1880,10 @@ namespace
                     to64 &= knightAttack(enemy, ksq).b(TK);
 
                     while (to_pro)
-                        mlist++->move = makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to_pro), self == BLACK ? B_KNIGHT : W_KNIGHT, b);
+                        mlist++->move = makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to_pro), self == BLACK ? B_KNIGHT : W_KNIGHT, b);
 
                     while (to64)
-                        mlist++->move = makeMove<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_KNIGHT : W_KNIGHT, b);
+                        mlist++->move = makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to64), self == BLACK ? B_KNIGHT : W_KNIGHT, b);
 
                 } while (from64);
             }
@@ -1911,11 +1911,11 @@ namespace
                         assert(b.piece(to) != EMPTY);
 
                         if (isBehind(self, RANK_2, to))
-                            mlist++->move = makeMove<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_LANCE : W_LANCE, b);
+                            mlist++->move = makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_LANCE : W_LANCE, b);
                     }
 
                     while (to_pro)
-                        mlist++->move = makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, firstOne<TK>(to_pro), self == BLACK ? B_LANCE : W_LANCE, b);
+                        mlist++->move = makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, firstOne<TK>(to_pro), self == BLACK ? B_LANCE : W_LANCE, b);
 
                 } while (bb_from);
             }
@@ -1939,7 +1939,7 @@ namespace
                     {
                         const Square from = firstOne<TK>(from_pro);
                         const Square to = from + tnorth;
-                        mlist++->move = makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, b);
+                        mlist++->move = makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, b);
                     }
                 }
                 // 不成
@@ -1951,7 +1951,7 @@ namespace
                 {
                     if (isBehind(self, RANK_2, krank))
                     {
-                        mlist++->move = makeMove<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, b);
+                        mlist++->move = makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, b);
                     }
                 }
             }
@@ -2026,7 +2026,7 @@ namespace
 
 template <MoveType MT, Turn T, bool ALL> MoveStack* generate(MoveStack* mlist, const Board& b)
 {
-    if (MT == CAPTURE_PLUS_PROMOTE || MT == NO_CAPTURE_MINUS_PROMOTE)
+    if (MT == CAPTURE_PLUS_PAWN_PROMOTE || MT == NO_CAPTURE_MINUS_PAWN_PROMOTE)
     {
         const Rank t_rank4 = (T == BLACK ? RANK_4 : RANK_6);
         const Rank t_rank3 = (T == BLACK ? RANK_3 : RANK_7);
@@ -2037,13 +2037,13 @@ template <MoveType MT, Turn T, bool ALL> MoveStack* generate(MoveStack* mlist, c
         const Turn enemy_turn = ~T;
 
         const Bitboard target_pawn =
-            MT == CAPTURE_PLUS_PROMOTE ? (b.bbTurn(enemy_turn) | (b.bbEmpty() & t_bb_rank_123)) :
-            MT == NO_CAPTURE_MINUS_PROMOTE ? b.bbEmpty() & t_bb_rank_4_9 :
+            MT == CAPTURE_PLUS_PAWN_PROMOTE ? (b.bbTurn(enemy_turn) | (b.bbEmpty() & t_bb_rank_123)) :
+            MT == NO_CAPTURE_MINUS_PAWN_PROMOTE ? b.bbEmpty() & t_bb_rank_4_9 :
             allZeroMask();
 
         const Bitboard target_other =
-            MT == CAPTURE_PLUS_PROMOTE ? b.bbTurn(enemy_turn) :
-            MT == NO_CAPTURE_MINUS_PROMOTE ? b.bbEmpty() :
+            MT == CAPTURE_PLUS_PAWN_PROMOTE ? b.bbTurn(enemy_turn) :
+            MT == NO_CAPTURE_MINUS_PAWN_PROMOTE ? b.bbEmpty() :
             allZeroMask();
 
         mlist = generatePawnMove <MT, T, ALL>(mlist, b, target_pawn);
@@ -2054,6 +2054,12 @@ template <MoveType MT, Turn T, bool ALL> MoveStack* generate(MoveStack* mlist, c
     else if (MT == DROP)
         // ターゲットは駒がない場所
         mlist = generateDrop<T>(mlist, b, b.bbEmpty());
+
+    else if (MT == QUIETS)
+    {
+        mlist = generate<NO_CAPTURE_MINUS_PAWN_PROMOTE, T, false>(mlist, b);
+        mlist = generate<DROP, T, false>(mlist, b);
+    }
 
     else if (MT == EVASIONS)
         mlist = generateEvasion<T, ALL>(mlist, b);
@@ -2067,8 +2073,8 @@ template <MoveType MT, Turn T, bool ALL> MoveStack* generate(MoveStack* mlist, c
     else if (MT == LEGAL_ALL)
         mlist = generateLegal<T, true>(mlist, b);
 
-    else if (MT == SPEED_CHECK)
-        mlist = generateCheckRBB<T, SPEED_CHECK>(mlist, b);
+    else if (MT == QUIET_CHECKS)
+        mlist = generateCheckRBB<T, QUIET_CHECKS>(mlist, b);
 #ifdef MATE3PLY
     else if (MT == NEAR_CHECK)
         mlist = generateCheckRBB<T, NEAR_CHECK>(mlist, b);
@@ -2095,14 +2101,15 @@ MoveStack* generate(MoveStack* mlist, const Board& b)
 }
 
 // 明示的なインスタンス化
-template MoveStack* generate<DROP                    >(MoveStack* mlist, const Board& b);
-template MoveStack* generate<CAPTURE_PLUS_PROMOTE    >(MoveStack* mlist, const Board& b);
-template MoveStack* generate<NO_CAPTURE_MINUS_PROMOTE>(MoveStack* mlist, const Board& b);
-template MoveStack* generate<EVASIONS                >(MoveStack* mlist, const Board& b);
-template MoveStack* generate<NO_EVASIONS             >(MoveStack* mlist, const Board& b);
-template MoveStack* generate<LEGAL                   >(MoveStack* mlist, const Board& b);
-template MoveStack* generate<LEGAL_ALL               >(MoveStack* mlist, const Board& b);
-template MoveStack* generate<SPEED_CHECK             >(MoveStack* mlist, const Board& b);
-//template MoveStack* generate<NEAR_CHECK              >(MoveStack* mlist, const Board& b);
-//template MoveStack* generate<CHECK_ALL				 >(MoveStack* mlist, const Board& b);
+template MoveStack* generate<DROP                         >(MoveStack* mlist, const Board& b);
+template MoveStack* generate<CAPTURE_PLUS_PAWN_PROMOTE    >(MoveStack* mlist, const Board& b);
+template MoveStack* generate<QUIETS                       >(MoveStack* mlist, const Board& b);
+template MoveStack* generate<NO_CAPTURE_MINUS_PAWN_PROMOTE>(MoveStack* mlist, const Board& b);
+template MoveStack* generate<EVASIONS                     >(MoveStack* mlist, const Board& b);
+template MoveStack* generate<NO_EVASIONS                  >(MoveStack* mlist, const Board& b);
+template MoveStack* generate<LEGAL                        >(MoveStack* mlist, const Board& b);
+template MoveStack* generate<LEGAL_ALL                    >(MoveStack* mlist, const Board& b);
+template MoveStack* generate<QUIET_CHECKS                 >(MoveStack* mlist, const Board& b);
+//template MoveStack* generate<NEAR_CHECK                 >(MoveStack* mlist, const Board& b);
+//template MoveStack* generate<CHECK_ALL				  >(MoveStack* mlist, const Board& b);
 template MoveStack* generate<RECAPTURES				 >(MoveStack* mlist, const Board& b, const Square to);

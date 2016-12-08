@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timeman.h" // for ponderhit 
 
 const std::string engine_name = "Yomita_";
-const std::string version = "1.9";
+const std::string version = "2.0";
 
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI
@@ -250,7 +250,7 @@ void USI::measureGenerateMoves(const Board& b, bool check = false)
             for (uint64_t i = 0; i < num; i++)
             {
                 pms = &legal_moves[0];
-                pms = generate<SPEED_CHECK>(pms, b);
+                pms = generate<QUIET_CHECKS>(pms, b);
                 //pms = generate<CHECK>(pms, b);
             }
         }
@@ -259,9 +259,8 @@ void USI::measureGenerateMoves(const Board& b, bool check = false)
             for (uint64_t i = 0; i < num; i++)
             {
                 pms = &legal_moves[0];
-                pms = generate<CAPTURE_PLUS_PROMOTE>(pms, b);
-                pms = generate<NO_CAPTURE_MINUS_PROMOTE>(pms, b);
-                pms = generate<DROP>(pms, b);
+                pms = generate<CAPTURE_PLUS_PAWN_PROMOTE>(pms, b);
+                pms = generate<QUIETS>(pms, b);
             }
         }
     }
@@ -403,7 +402,7 @@ void USI::loop(int argc, char** argv)
         else if (token == "mate") { std::cout << board.mate1ply() << std::endl; }
 
         // この局面の王手
-        else if (token == "c") { for (auto m : MoveList<SPEED_CHECK>(board)) std::cout << pretty(m); }
+        else if (token == "c") { for (auto m : MoveList<QUIET_CHECKS>(board)) std::cout << pretty(m); }
 
         // この局面での王手生成速度チェック
         else if (token == "cs") { measureGenerateMoves(board, true); }

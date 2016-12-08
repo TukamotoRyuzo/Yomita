@@ -765,20 +765,20 @@ namespace
     constexpr PieceType NEXT_ATTACKER[PIECETYPE_MAX] =
     {
         NO_PIECE_TYPE,  // 空
-        HORSE,		    // 角
-        DRAGON,			// 飛車
-        LANCE,			// 歩
-        KNIGHT,			// 香
-        PRO_PAWN,		// 桂
-        PRO_SILVER,		// 銀
-        BISHOP,			// 金
-        NO_PIECE_TYPE,	// 王
-        ROOK,			// 馬
-        KING,			// 竜
-        PRO_LANCE,		// と
-        PRO_KNIGHT,		// 杏
-        SILVER,			// 圭
-        GOLD,			// 全
+        HORSE,          // 角
+        DRAGON,         // 飛車
+        LANCE,          // 歩
+        KNIGHT,         // 香
+        PRO_PAWN,       // 桂
+        PRO_SILVER,     // 銀
+        BISHOP,         // 金
+        NO_PIECE_TYPE,  // 王
+        ROOK,           // 馬
+        KING,           // 竜
+        PRO_LANCE,      // と
+        PRO_KNIGHT,     // 杏
+        SILVER,         // 圭
+        GOLD,           // 全
     };
 
     // toにある駒と盤面を渡すと、次にどの駒でtoにある駒を取るのかを返す。
@@ -1122,13 +1122,12 @@ std::string Board::sfen() const
     ss << (turn() == WHITE ? " w " : " b ");
 
     // 持ち駒
-    int n;
     bool found = false;
 
     for (Turn t : Turns)
         for (PieceType p : HandPiece)
         {
-            n = hand(t).count(p);
+            int n = hand(t).count(p);
 
             if (n != 0)
             {
@@ -1854,7 +1853,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(DRAGON, from, self);
-                            return makeMove<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_DRAGON : W_DRAGON, *this);
+                            return makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_DRAGON : W_DRAGON, *this);
                         }
                     }
                 } while (to64);
@@ -1891,7 +1890,7 @@ SilverDropEnd:
                         && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                     {
                         xorBBs(ROOK, from, self);
-                        return makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_ROOK : W_ROOK, *this);
+                        return makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_ROOK : W_ROOK, *this);
                     }
 
                 } while (to64);
@@ -1929,7 +1928,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(ROOK, from, self);
-                            return makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_ROOK : W_ROOK, *this);
+                            return makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_ROOK : W_ROOK, *this);
                         }
                     } while (to64_123);
                 }
@@ -1944,7 +1943,7 @@ SilverDropEnd:
                         && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                     {
                         xorBBs(ROOK, from, self);
-                        return makeMove<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_ROOK : W_ROOK, *this);
+                        return makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_ROOK : W_ROOK, *this);
                     }
                 }
                 xorBBs(ROOK, from, self);
@@ -1980,7 +1979,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(HORSE, from, self);
-                            return makeMove<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_HORSE : W_HORSE, *this);
+                            return makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_HORSE : W_HORSE, *this);
                         }
                     }
                 } while (to64);
@@ -2017,7 +2016,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(BISHOP, from, self);
-                            return makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_BISHOP : W_BISHOP, *this);
+                            return makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_BISHOP : W_BISHOP, *this);
                         }
 
                     } while (to64);
@@ -2056,7 +2055,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(BISHOP, from, self);
-                            return makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_BISHOP : W_BISHOP, *this);
+                            return makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_BISHOP : W_BISHOP, *this);
                         }
                     } while (to64_123);
                 }
@@ -2071,7 +2070,7 @@ SilverDropEnd:
                         && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                     {
                         xorBBs(BISHOP, from, self);
-                        return makeMove<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_BISHOP : W_BISHOP, *this);
+                        return makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_BISHOP : W_BISHOP, *this);
                     }
                 }
                 xorBBs(BISHOP, from, self);
@@ -2106,7 +2105,7 @@ SilverDropEnd:
                     {
                         xorBBs(typeOf(p), from, self);
                         bb_gold_ ^= from;
-                        return makeMove<CAPTURE_PLUS_PROMOTE>(from, to, p, *this);
+                        return makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, p, *this);
                     }
 
                 } while (to64);
@@ -2152,7 +2151,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(SILVER, from, self);
-                            return makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_SILVER : W_SILVER, *this);
+                            return makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_SILVER : W_SILVER, *this);
                         }
                     }
 
@@ -2170,7 +2169,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(SILVER, from, self);
-                            return makeMove<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_SILVER : W_SILVER, *this);
+                            return makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_SILVER : W_SILVER, *this);
                         }
                     }
                     xorBBs(SILVER, from, self);
@@ -2217,7 +2216,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(KNIGHT, from, self);
-                            return makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_KNIGHT : W_KNIGHT, *this);
+                            return makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_KNIGHT : W_KNIGHT, *this);
                         }
                     }
 
@@ -2232,7 +2231,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(KNIGHT, from, self);
-                            return makeMove<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_KNIGHT : W_KNIGHT, *this);
+                            return makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_KNIGHT : W_KNIGHT, *this);
                         }
                     }
                     xorBBs(KNIGHT, from, self);
@@ -2273,7 +2272,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(LANCE, from, self);
-                            return makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_LANCE : W_LANCE, *this);
+                            return makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_LANCE : W_LANCE, *this);
                         }
                     }
 
@@ -2290,7 +2289,7 @@ SilverDropEnd:
                             && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                         {
                             xorBBs(LANCE, from, self);
-                            return makeMove<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_LANCE : W_LANCE, *this);
+                            return makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_LANCE : W_LANCE, *this);
                         }
                     }
                     xorBBs(LANCE, from, self);
@@ -2328,7 +2327,7 @@ SilverDropEnd:
                         && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                     {
                         xorBBs(PAWN, from, self);
-                        return makeMovePromote<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, *this);
+                        return makeMovePromote<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, *this);
                     }
                     xorBBs(PAWN, from, self);
                 }
@@ -2352,7 +2351,7 @@ SilverDropEnd:
                         && !isDiscoveredCheck(from, to, kingSquare(self), pinned))
                     {
                         xorBBs(PAWN, from, self);
-                        return makeMove<CAPTURE_PLUS_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, *this);
+                        return makeMove<CAPTURE_PLUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, *this);
                     }
                     xorBBs(PAWN, from, self);
                 }
@@ -2445,7 +2444,7 @@ bool Board::verify() const
     }
 #endif
 
-#if 0
+#if 1
     failed_step++;
 
     // step 4
@@ -2509,7 +2508,7 @@ bool Board::verify() const
     failed_step++;
 #endif
 
-#if 0
+#if 1
     // step 10
 
     // 相手玉を取れないことを確認

@@ -96,6 +96,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\更新履歴.txt" />
+    <Text Include="気になること.txt" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{70D62DC5-76BE-4831-BEEB-7A48283445A0}</ProjectGuid>
@@ -164,7 +165,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>../../yomita_engine/</OutDir>
-    <TargetName>$(ProjectName)_kppt1.9</TargetName>
+    <TargetName>$(ProjectName)_kppt2.0</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

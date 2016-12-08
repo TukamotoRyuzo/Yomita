@@ -128,31 +128,6 @@ struct FromToStats
 private:
     Score table[TURN_MAX][SQ_MAX_PLUS1][SQ_MAX];
 };
-enum Stage
-{
-    // 置換表の指し手、駒を取る手、取らない手
-    MAIN_SEARCH, GOOD_CAPTURES, KILLERS, GOOD_QUIETS, BAD_QUIETS, BAD_CAPTURES,
-
-    // 回避
-    EVASION, ALL_EVASIONS,
-
-    // 駒を取る手と王手
-    QSEARCH_WITH_CHECKS, QCAPTURES_1, CHECKS,
-
-    // 駒を取る手
-    QSEARCH_WITHOUT_CHECKS, QCAPTURES_2,
-
-    // ProbCutフェーズ
-    PROBCUT, PROBCUT_CAPTURES,
-
-    // 取り返しの手
-    RECAPTURE, PH_RECAPTURES,
-
-    // これになったら指し手生成をストップ
-    STOP,
-};
-
-ENABLE_OPERATORS_ON(Stage);
 
 // 指し手を生成していい順番にひとつずつ手を取り出してくれる。
 // いきなり全部の指し手を生成するわけではないので効率がいい。
@@ -175,7 +150,6 @@ private:
     void scoreCaptures();
     void scoreQuiets();
     void scoreEvasions();
-    void nextStage();
     MoveStack* begin() { return moves; }
     MoveStack* end() { assert(end_moves < moves + MAX_MOVES); return end_moves; }
 
@@ -187,7 +161,7 @@ private:
     Score threshold;
     Square recapture_square;
     Move tt_move;
-    MoveStack *end_quiets, *end_bad_captures = moves + MAX_MOVES - 1;
-    MoveStack moves[MAX_MOVES], *current = moves, *end_moves = moves;
-    Stage stage;
+    int stage;
+    MoveStack *cur, *end_moves, *end_bad_captures;
+    MoveStack moves[MAX_MOVES];
 };

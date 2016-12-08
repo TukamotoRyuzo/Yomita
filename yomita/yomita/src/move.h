@@ -33,18 +33,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // 指し手の種類
 enum MoveType
 {
-    DROP,                     // 駒打ち。 二歩は含まない。
-    CAPTURE_PLUS_PROMOTE,     // 駒を取る手 + (歩の駒を取らない成る手)。
-    NO_CAPTURE_MINUS_PROMOTE, // 駒を取らない手 - (歩の駒を取らない成る手) - (香の2段目への駒を取らない不成)
-    RECAPTURES,               // 特定の位置への取り返しの手
-    EVASIONS,                 // 王手回避。歩, 飛, 角 の不成は含まない。
-    NO_EVASIONS,              // 王手が掛かっていないときの合法手 (玉の移動による自殺手、pinされている駒の移動による自殺手は回避しない。)
-    LEGAL,                    // 王手が掛かっていれば EVASION, そうでないならNO_EVASIONSを生成し、玉の自殺手とpinされてる駒の移動による自殺手を排除。(連続王手の千日手は排除しない)
-    LEGAL_ALL,                // LEGAL + 不成をすべて生成
-    CHECK,                    // 王手生成だが使ってない。
-    CHECK_ALL,                // 前に作ったんだがどこかに行ってしまった。
-    SPEED_CHECK,              // 駒を取らない王手生成
-    NEAR_CHECK,               // 近接王手生成。3手詰めルーチンに必要。
+    DROP,                          // 駒打ち。 二歩は含まない。
+    CAPTURE_PLUS_PAWN_PROMOTE,     // 駒を取る手 + (歩の駒を取らない成る手)。
+    NO_CAPTURE_MINUS_PAWN_PROMOTE, // 駒を取らない手 - (歩の駒を取らない成る手) - (香の2段目への駒を取らない不成)
+    QUIETS,                        // DROP + NO_CAPTURE_MINUS_PROMOTE
+    RECAPTURES,                    // 特定の位置への取り返しの手
+    EVASIONS,                      // 王手回避。歩, 飛, 角 の不成は含まない。
+    NO_EVASIONS,                   // 王手が掛かっていないときの合法手 (玉の移動による自殺手、pinされている駒の移動による自殺手は回避しない。)
+    LEGAL,                         // 王手が掛かっていれば EVASION, そうでないならNO_EVASIONSを生成し、玉の自殺手とpinされてる駒の移動による自殺手を排除。(連続王手の千日手は排除しない)
+    LEGAL_ALL,                     // LEGAL + 不成をすべて生成
+    CHECK,                         // 王手生成だが使ってない。
+    CHECK_ALL,                     // 前に作ったんだがどこかに行ってしまった。
+    QUIET_CHECKS,                  // 駒を取らない王手生成
+    NEAR_CHECK,                    // 近接王手生成。3手詰めルーチンに必要。
     MOVETYPE_NO
 };
 
@@ -97,7 +98,7 @@ template <MoveType MT> inline Move makeMove(const Square from, const Square to, 
     assert(typeOf(b.piece(to)) != KING);
     assert(b.piece(from) != EMPTY);
 
-    if (MT == NO_CAPTURE_MINUS_PROMOTE)
+    if (MT == NO_CAPTURE_MINUS_PAWN_PROMOTE)
         return toToMove(to) | fromToMove(from) | pieceToMove(p);
     else
         return toToMove(to) | fromToMove(from) | pieceToMove(p) | captureToMove(b.piece(to));
@@ -109,7 +110,7 @@ template <MoveType MT> inline Move makeMovePromote(const Square from, const Squa
     assert(typeOf(b.piece(to)) != KING);
     assert(b.piece(from) != EMPTY);
 
-    if (MT == NO_CAPTURE_MINUS_PROMOTE)
+    if (MT == NO_CAPTURE_MINUS_PAWN_PROMOTE)
         return toToMove(to) | fromToMove(from) | pieceToMove(p) | Move(PROMOTE_MASK);
     else
         return toToMove(to) | fromToMove(from) | pieceToMove(p) | captureToMove(b.piece(to)) | Move(PROMOTE_MASK);

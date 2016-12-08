@@ -26,6 +26,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace
 {
+    enum Stages 
+    {
+        MAIN_SEARCH, CAPTURES_INIT, GOOD_CAPTURES, KILLERS, COUNTERMOVE, QUIET_INIT, QUIET, BAD_CAPTURES,
+        EVASION, EVASIONS_INIT, ALL_EVASIONS,
+        PROBCUT, PROBCUT_INIT, PROBCUT_CAPTURES,
+        QSEARCH_WITH_CHECKS, QCAPTURES_1_INIT, QCAPTURES_1, QCHECKS,
+        QSEARCH_NO_CHECKS, QCAPTURES_2_INIT, QCAPTURES_2,
+        QSEARCH_RECAPTURES, QRECAPTURES
+    };
+
     // Our insertion sort, which is guaranteed to be stable, as it should be
     void insertionSort(MoveStack* begin, MoveStack* end)
     {
@@ -62,10 +72,8 @@ MovePicker::MovePicker(const Board& b, Move ttm, Depth d, Search::Stack* s)
 
     // 王手がかかっているなら回避手(EVASIONS)
     stage = board.inCheck() ? EVASION : MAIN_SEARCH;
-
-    // 置換表の指し手が合法なら先頭に入れておく
     tt_move = ttm && b.pseudoLegal(ttm) ? ttm : MOVE_NONE;
-    end_moves += tt_move != MOVE_NONE;
+    stage += (tt_move == MOVE_NONE);
 }
 
 // 静止探索から呼び出される時用。
@@ -81,20 +89,20 @@ MovePicker::MovePicker(const Board& b, Move ttm, Depth d, Move prev)
         stage = QSEARCH_WITH_CHECKS;
 
     else if (d > DEPTH_QS_RECAPTURES)
-        stage = QSEARCH_WITHOUT_CHECKS;
+        stage = QSEARCH_NO_CHECKS;
 
     else
     {
         // qsearchのdepthがDEPTH_QS_RECAPTURESより深くなってくるとここにくる。
         // なので前回の指し手はqsearch内で生成されたものであり、MOVE_NULLはありえない。
         assert(prev != MOVE_NULL);
-        stage = RECAPTURE;
+        stage = QSEARCH_RECAPTURES;
         recapture_square = toSq(prev);
-        ttm = MOVE_NONE;
+        return;
     }
 
     tt_move = ttm && b.pseudoLegal(ttm) ? ttm : MOVE_NONE;
-    end_moves += tt_move != MOVE_NONE;
+    stage += (tt_move == MOVE_NONE);
 }
 
 MovePicker::MovePicker(const Board& b, Move ttm, Score th)
@@ -105,12 +113,12 @@ MovePicker::MovePicker(const Board& b, Move ttm, Score th)
     stage = PROBCUT;
 
     // ProbCutフェーズではSEEがthresholdより高い手を生成する。
-    tt_move = (ttm
-        && b.pseudoLegal(ttm)
-        && isCapture(ttm)
-        && b.seeGe(ttm, threshold + 1)) ? ttm : MOVE_NONE;
+    tt_move = ttm
+            && b.pseudoLegal(ttm)
+            && isCapture(ttm)
+            && b.seeGe(ttm, threshold + 1) ? ttm : MOVE_NONE;
 
-    end_moves += tt_move != MOVE_NONE;
+    stage += (tt_move == MOVE_NONE);
 }
 
 const Score LVATable[PIECETYPE_MAX] =
@@ -162,7 +170,7 @@ void MovePicker::scoreQuiets()
 void MovePicker::scoreEvasions()
 {
     const HistoryStats& history = board.thisThread()->history;
-    const FromToStats& from_to = board.thisThread()->from_to_history;
+    const  FromToStats& from_to = board.thisThread()->from_to_history;
     Turn t = board.turn();
     Score see;
 
@@ -186,190 +194,218 @@ void MovePicker::scoreEvasions()
     }
 }
 
-// 指し手が尽きたら、ステージに応じた指し手を生成する.
-void MovePicker::nextStage()
-{
-    assert(stage != Stage::STOP);
-
-    current = moves;
-
-    switch (++stage)
-    {
-        // 見た目の通り駒を取る手を生成。
-    case GOOD_CAPTURES: case QCAPTURES_1: case QCAPTURES_2: case PROBCUT_CAPTURES:
-        end_moves = generate<CAPTURE_PLUS_PROMOTE>(moves, board);
-        scoreCaptures();
-        break;
-
-        // 直前の手を取り返す手のみを生成。
-    case PH_RECAPTURES:
-        end_moves = generate<RECAPTURES>(moves, board, recapture_square);
-        scoreCaptures();
-        break;
-
-        // キラー手を試すフェーズ
-    case KILLERS:
-        killers[0] = ss->killers[0];
-        killers[1] = ss->killers[1];
-        killers[2] = counter_move;
-        current = killers;
-        end_moves = current + 2 + (counter_move != killers[0].move && counter_move != killers[1].move);
-        break;
-
-    case GOOD_QUIETS:
-        end_moves = generate<NO_CAPTURE_MINUS_PROMOTE>(moves, board);
-        end_moves = generate<DROP>(end_moves, board);
-        end_quiets = end_moves;
-        scoreQuiets();
-
-        // SCORE_ZERO以上の手を先頭付近に持ってくる。
-        end_moves = std::partition(current, end_moves, [](const MoveStack& m) { return m.score > SCORE_ZERO; });
-        insertionSort(current, end_moves);
-        break;
-
-    case BAD_QUIETS:
-        current = end_moves;
-        end_moves = end_quiets;
-        if (depth >= 3 * ONE_PLY)
-            insertionSort(current, end_moves);
-        break;
-
-    case BAD_CAPTURES:
-        current = moves + MAX_MOVES - 1;
-        end_moves = end_bad_captures;
-        break;
-
-    case ALL_EVASIONS:
-        end_moves = generate<EVASIONS>(moves, board);
-        if (end_moves - moves > 1)
-            scoreEvasions();
-        break;
-
-    case CHECKS:
-        end_moves = generate<SPEED_CHECK>(moves, board);
-        break;
-
-    case EVASION: case QSEARCH_WITH_CHECKS: case QSEARCH_WITHOUT_CHECKS: case PROBCUT:
-    case RECAPTURE: case STOP:
-        stage = STOP;
-        break;
-
-    default: UNREACHABLE;
-    }
-}
-
 // 次の指し手をひとつ返す
 // 指し手が尽きればMOVE_NONEが返る。
 Move MovePicker::nextMove()
 {
     Move move;
 
-    while (true)
+    switch (stage)
     {
-        // 現在指し手がなければ、何か指し手が生成されるか、最後のステージまで行くまでステージを進める。
-        while (current == end_moves && stage != STOP)
-            nextStage();
+    case MAIN_SEARCH: case EVASION: case QSEARCH_WITH_CHECKS:
+    case QSEARCH_NO_CHECKS: case PROBCUT:
+        ++stage;
+        return tt_move;
 
-        switch (stage)
+    case CAPTURES_INIT:
+        end_bad_captures = cur = moves;
+        end_moves = generate<CAPTURE_PLUS_PAWN_PROMOTE>(cur, board);
+        scoreCaptures();
+        ++stage;
+
+    case GOOD_CAPTURES:
+        while (cur < end_moves)
         {
-        case MAIN_SEARCH: case EVASION: case QSEARCH_WITH_CHECKS:
-        case QSEARCH_WITHOUT_CHECKS: case PROBCUT:
-            ++current;
-            return tt_move;
-
-        case GOOD_CAPTURES:
-            move = pickBest(current++, end_moves);
-
+            move = pickBest(cur++, end_moves);
+        
             if (move != tt_move)
             {
                 if (board.seeGe(move, SCORE_ZERO))
                     return move;
 
-                // 駒を損するcapturePieceは指し手バッファの一番後ろにやる。
-                *end_bad_captures-- = move;
+                // 駒を損するcapturePieceは指し手バッファの一番前にやる。
+                *end_bad_captures++ = move;
             }
+        }
 
-            break;
+        ++stage;
+        move = ss->killers[0];
 
-        case KILLERS: // KILLERS faseでは駒を取る手は試す必要はない。この前のフェーズで駒を取る手はすべて試したから。
-            move = *current++;
+        if (move != MOVE_NONE
+            && move != tt_move
+            && !board.piece(toSq(move))
+            && !isPawnPromote(move)
+            && board.pseudoLegal(move))
+        {
+            assert(!isCapture(move));
+            return move;
+        }
 
-            if (move != MOVE_NONE
-                && move != tt_move
-                && !board.piece(toSq(move))
-                && !isPawnPromote(move)
-                && board.pseudoLegal(move))
-            {
-                assert(!isCapture(move));
-                return move;
-            }
+    case KILLERS: // KILLERS faseでは駒を取る手は試す必要はない。この前のフェーズで駒を取る手はすべて試したから。
+        ++stage;
+        move = ss->killers[1];
 
-            break;
+        if (move != MOVE_NONE
+            && move != tt_move
+            && !board.piece(toSq(move))
+            && !isPawnPromote(move)
+            && board.pseudoLegal(move))
+        {
+            assert(!isCapture(move));
+            return move;
+        }
 
-        case GOOD_QUIETS: case BAD_QUIETS:
-            move = *current++;
+    case COUNTERMOVE:
+        ++stage;
+        move = counter_move;
+        if (move != MOVE_NONE
+            && move != tt_move
+            && move != ss->killers[0]
+            && move != ss->killers[1]
+            && !board.piece(toSq(move))
+            && !isPawnPromote(move)
+            && board.pseudoLegal(move))
+        {
+            assert(!isCapture(move));
+            return move;
+        }
+
+    case QUIET_INIT:
+        cur = end_bad_captures;
+        end_moves = generate<QUIETS>(cur, board);
+        scoreQuiets();
+
+        if (depth < 3 * ONE_PLY)
+        {
+            MoveStack* good_quiet = std::partition(cur, end_moves, [](const MoveStack& m) { return m.score > SCORE_ZERO; });
+            insertionSort(cur, good_quiet);
+        }
+        else 
+            insertionSort(cur, end_moves);
+
+        ++stage;
+
+    case QUIET:
+        while (cur < end_moves)
+        {
+            move = *cur++;
 
             if (move != tt_move
-                && move != killers[0].move
-                && move != killers[1].move
-                && move != killers[2].move)
+                && move != ss->killers[0]
+                && move != ss->killers[1]
+                && move != counter_move)
                 return move;
+        }
 
-            break;
+        ++stage;
+        cur = moves; // bad capturesの先頭を指す
 
-        case BAD_CAPTURES:
-            return *current--;
+    case BAD_CAPTURES:
+        if (cur < end_bad_captures)
+            return *cur++;
 
-        case ALL_EVASIONS: case QCAPTURES_1: case QCAPTURES_2:
-            move = pickBest(current++, end_moves);
+        break;
+
+    case EVASIONS_INIT:
+        cur = moves;
+        end_moves = generate<EVASIONS>(cur, board);
+        scoreEvasions();
+        ++stage;
+
+    case ALL_EVASIONS:
+        while (cur < end_moves)
+        {
+            move = pickBest(cur++, end_moves);
 
             if (move != tt_move)
                 return move;
+        }
 
-            break;
+        break;
 
-        case PROBCUT_CAPTURES:
-            move = pickBest(current++, end_moves);
+    case PROBCUT_INIT:
+        cur = moves;
+        end_moves = generate<CAPTURE_PLUS_PAWN_PROMOTE>(cur, board);
+        scoreCaptures();
+        ++stage;
 
-            if (move != tt_move && board.seeGe(move, threshold + 1))
+    case PROBCUT_CAPTURES:
+        while (cur < end_moves)
+        {
+            move = pickBest(cur++, end_moves);
+
+            if (move != tt_move
+                && board.seeGe(move, threshold + 1))
                 return move;
+        }
 
+        break;
+
+    case QCAPTURES_1_INIT: case QCAPTURES_2_INIT:
+        cur = moves;
+        end_moves = generate<CAPTURE_PLUS_PAWN_PROMOTE>(cur, board);
+        scoreCaptures();
+        ++stage;
+
+    case QCAPTURES_1: case QCAPTURES_2:
+        while (cur < end_moves)
+        {
+            move = pickBest(cur++, end_moves);
+
+            if (move != tt_move)
+                return move;
+        }
+
+        if (stage == QCAPTURES_2)
             break;
 
+        cur = moves;
+        end_moves = generate<QUIET_CHECKS>(cur, board);
+        ++stage;
 
-        case PH_RECAPTURES:
-            move = pickBest(current++, end_moves);
-            return move;
-
-        case CHECKS:
-            move = *current++;
+    case QCHECKS:
+        while (cur < end_moves)
+        {
+            move = cur++->move;
 
             if (move != tt_move)
             {
                 assert(!board.inCheck());
-                //assert(MoveList<LEGAL>(board).contains(move));
+                assert(MoveList<QUIETS>(board).contains(move));
                 assert(!isCaptureOrPawnPromote(move));
                 assert(board.givesCheck(move));
 
                 return move;
             }
-
-            break;
-
-        case STOP:
-            return MOVE_NONE;
-
-        default:
-            UNREACHABLE;
         }
+
+        break;
+
+    case QSEARCH_RECAPTURES:
+        cur = moves;
+        end_moves = generate<RECAPTURES>(cur, board, recapture_square);
+        scoreCaptures();
+        ++stage;
+
+    case QRECAPTURES:
+        while (cur < end_moves)
+        {
+            move = pickBest(cur++, end_moves);
+            assert(toSq(move) == recapture_square);
+            return move;
+        }
+
+        break;
+
+    default:
+        UNREACHABLE;
     }
 
-    return move;
+    return MOVE_NONE;
 }
 
 int MovePicker::seeSign() const
 {
     return stage == GOOD_CAPTURES ? 1
          : stage == BAD_CAPTURES ? -1 : 0;
-    return 0;
 }

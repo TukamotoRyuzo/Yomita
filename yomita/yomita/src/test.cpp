@@ -34,11 +34,10 @@ void testOnRandomPosition(Board& b)
     if (!b.inCheck())
     {
         MoveStack mlist[MAX_MOVES];
-        auto p = generate<NO_CAPTURE_MINUS_PROMOTE>(mlist, b);
-        p = generate<DROP>(p, b);
+        auto p = generate<QUIETS>(mlist, b);
 
         MoveStack clist[MAX_MOVES];
-        auto c = generate<SPEED_CHECK>(clist, b);
+        auto c = generate<QUIET_CHECKS>(clist, b);
 
         MoveStack* curr = mlist;
 

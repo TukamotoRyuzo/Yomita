@@ -238,5 +238,8 @@
     <Text Include="..\..\更新履歴.txt">
       <Filter>リソース ファイル</Filter>
     </Text>
+    <Text Include="気になること.txt">
+      <Filter>リソース ファイル</Filter>
+    </Text>
   </ItemGroup>
 </Project>
