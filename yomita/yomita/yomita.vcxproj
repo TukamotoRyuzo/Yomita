@@ -96,7 +96,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\..\更新履歴.txt" />
-    <Text Include="気になること.txt" />
+    <Text Include="..\..\気になること.txt" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{70D62DC5-76BE-4831-BEEB-7A48283445A0}</ProjectGuid>
