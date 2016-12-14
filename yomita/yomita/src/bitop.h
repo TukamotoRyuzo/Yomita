@@ -70,7 +70,7 @@ inline int bsr64(const uint64_t mask)
     for (int i = 63; 0 <= i; --i)
     {
         if (mask >> i)
-            return 63 - i;
+            return i;
     }
     return 0;
 #endif
@@ -92,7 +92,7 @@ inline int bsr64(const uint64_t mask)
 #endif
 
 #if defined HAVE_BMI2
-#define pext(a, b) (int)_pext_u64(a, b)
+#define pext(a, b) _pext_u64(a, b)
 #else
     inline uint64_t pext(uint64_t src, uint64_t mask)
     {

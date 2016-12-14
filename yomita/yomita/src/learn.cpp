@@ -72,7 +72,7 @@ namespace Learn
     }
 
     // 学習に対応している評価関数のときだけ定義。
-#if defined EVAL_KPPT || defined EVAL_PPT || defined EVAL_KRB || defined EVAL_KPPL
+#if defined EVAL_KPPT || defined EVAL_PPT
 
     // 複数スレッドで学習するためのクラス
     struct LearnerThink : public MultiThink

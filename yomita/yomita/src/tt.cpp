@@ -33,6 +33,8 @@ void TranspositionTable::resize(size_t mb_size)
     if (new_cluster_count == cluster_count_)
         return;
 
+    assert(new_cluster_count >= 1000 / CLUSTER_SIZE);
+
     cluster_count_ = new_cluster_count;
 
     free(mem_);

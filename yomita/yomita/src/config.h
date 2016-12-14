@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // 棋譜からの学習時に定義（評価関数、進行度）
 //#define LEARN
 
-// 教師棋譜の生成時に定義。LEARNと同時に定義してもよい。
+// 教師棋譜の生成時に定義。
 //#define GENSFEN
 
 // 評価関数。
@@ -36,17 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // KKP + KPP型
 //#define EVAL_KPP
 
-// kpp light型。kppだけ。
-//#define EVAL_KPPL
-
 // KPP + 手番型の評価関数
 #define EVAL_KPPT
 
 // PP + 手番型の評価関数
 //#define EVAL_PPT
-
-// KRB型
-//#define EVAL_KRB
 
 // 評価関数バイナリの縦横変換を行いたいときに定義する。
 //#define CONVERT_EVAL
@@ -76,22 +70,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 #elif defined EVAL_PPT
 #define EVAL_TYPE "ppt"
-#elif defined EVAL_KRB
-#define EVAL_TYPE "krb"
-#elif defined EVAL_KPPL
-#define EVAL_TYPE "kppl"
 #else
 #define EVAL_TYPE "komadoku_only"
 #endif
 
 // なんらかの評価関数バイナリを使う場合のdefine。
-#if defined EVAL_KPP || defined EVAL_KPPT || defined EVAL_PPT || defined EVAL_KRB || defined EVAL_KPPL
+#if defined EVAL_KPP || defined EVAL_KPPT || defined EVAL_PPT
 #define USE_EVAL
 #endif
 
 // 評価関数で手番を考慮しているときとそうでないときのdefine。
 #if defined EVAL_KPPT || defined EVAL_PPT
 #define USE_EVAL_TURN
-#elif defined EVAL_KRB || defined EVAL_KPP || defined EVAL_KPPL
+#elif defined EVAL_KPP
 #define USE_EVAL_NO_TURN
 #endif

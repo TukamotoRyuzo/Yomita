@@ -286,7 +286,6 @@ namespace Learn
     // 現在の局面で出現している特徴すべてに対して、勾配値を勾配配列に加算する。
     void addGrad(Board& b, double delta_grad)
     {
-        // 手番を考慮しない値と手番を考慮する値
         auto f = delta_grad;
         auto list_fb = b.evalList()->pieceListFb();
         auto list_fw = b.evalList()->pieceListFb();

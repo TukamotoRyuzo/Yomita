@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timeman.h" // for ponderhit 
 
 const std::string engine_name = "Yomita_";
-const std::string version = "2.0";
+const std::string version = "2.01";
 
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI
@@ -85,6 +85,7 @@ namespace Learn
 
 void USI::isReady()
 {
+#if defined IS_64BIT
     static bool first = true;
 
     // 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
@@ -99,7 +100,7 @@ void USI::isReady()
 #endif
         first = false;
     }
-
+#endif
     SYNC_COUT << "readyok" << SYNC_ENDL;
 }
 
@@ -297,7 +298,14 @@ void USI::loop(int argc, char** argv)
     // デフォルトでログを取る。
     startLogger(true);
 
-    // 評価関数の読み込みが行われてからでないと局面のセットはできない。
+#if !defined IS_64BIT
+    // x86環境では置換表の確保が行われた後に評価関数を読み込むとbad_allocを起こすことがある。
+    // これは評価関数の縦型→横型変換をするときにKPPTと同じ大きさの一時バッファを確保するので、
+    // 大きな置換表が既に確保された状態だと邪魔だからである。
+    Eval::load();
+    Prog::load();
+#endif
+
     Board board(Threads.main());
 
     // USIから送られてくるコマンドを受け取るバッファ

@@ -51,33 +51,6 @@ namespace Eval
 
 } // namespace Eval
 
-#elif defined EVAL_KPPL
-
-#include "platform.h"
-#include "turn.h"
-#include "score.h"
-
-namespace Eval
-{
-    // 特に必要ではないが、評価関数の差分計算のinterfaceをそろえるために定義しておく。
-    struct EvalSum
-    {
-        EvalSum() {}
-
-        // その局面でevaluate()が呼ばれており評価値がセットされているかどうかを返す。
-        bool isNotEvaluated() { return sumBKPP == SCORE_NOT_EVALUATED; }
-
-        // まだその局面でevaluate()が呼ばれていないことを表す値をセットしておく。
-        void setNotEvaluated() { sumBKPP = SCORE_NOT_EVALUATED; }
-
-        int calcScore() const { return sumBKPP + sumWKPP; }
-        int sumBKPP;
-        int sumWKPP;
-    };
-
-} // namespace Eval
-
-
 #elif defined EVAL_KPPT
 
 #include <array>
@@ -233,34 +206,4 @@ namespace Eval
     };
 } // namespace Eval
 
-#elif defined EVAL_KRB
-
-namespace Eval
-{
-    // 特に必要ではないが、評価関数の差分計算のinterfaceをそろえるために定義しておく。
-    struct EvalSum
-    {
-        EvalSum() {}
-
-        void clear() { memset(this, 0, sizeof(EvalSum)); }
-
-        // その局面でevaluate()が呼ばれており評価値がセットされているかどうかを返す。
-        bool isNotEvaluated() { return sumKPP[0] == SCORE_NOT_EVALUATED; }
-
-        // まだその局面でevaluate()が呼ばれていないことを表す値をセットしておく。
-        void setNotEvaluated() { sumKPP[0] = SCORE_NOT_EVALUATED; }
-
-        int calcScore() const 
-        {
-            return sumKPP[0] + sumKPP[1] + sumRPP[0] + sumRPP[1] + sumBPP[0] + sumBPP[1]; 
-        }
-
-        // 玉は先手後手必ず1枚ずつある。
-        int sumKPP[TURN_MAX];
-
-        // それ以外は先手後手一枚ずつとは限らない。[0]は一枚目、[1]は二枚目を表す
-        int sumRPP[2];
-        int sumBPP[2];
-    };
-} // namespace Eval
 #endif

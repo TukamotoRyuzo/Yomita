@@ -32,8 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "usi.h"
 #include "eval_kppt.h"
 #include "eval_ppt.h"
-#include "eval_krb.h"
-#include "eval_kppl.h"
 
 // memory mapped fileに必要。
 namespace Eval

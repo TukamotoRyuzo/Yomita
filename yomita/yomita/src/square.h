@@ -49,11 +49,6 @@ enum Square
     SQ_MAX_PLUS1 = SQ_MAX + 1,
     DELTA_N = -9, DELTA_S = 9, DELTA_E = 1, DELTA_W = -1,
     DELTA_NE = -8, DELTA_SE = 10, DELTA_SW = 8, DELTA_NW = -10,
-
-#ifdef EVAL_KRB
-    // 成り、持ち駒判定も含めた駒位置の最大値
-    SQ_MAX_PRO_HAND = SQ_MAX * 2 + 1,
-#endif
 };
 
 // 方向を意味するbit
@@ -87,19 +82,6 @@ inline Square inverse(const Square sq) { return Square(SQ_MAX - 1 - sq); }
 
 // 左右でミラーした位置を返す。
 inline Square mirror(const Square sq) { return sqOf(inverse(fileOf(sq)), rankOf(sq)); }
-
-#ifdef EVAL_KRB
-// 成りと持ち駒を含めたSquareをmirrorしたいときに使う。
-inline Square mirrorProHand(const Square sq)
-{
-    if (sq == SQ_MAX_PRO_HAND - 1)
-        return sq;
-    else if (sq >= SQ_MAX)
-        return mirror(sq - SQ_MAX) + SQ_MAX;
-    
-    return mirror(sq);
-}
-#endif
 
 // 先手から見たRankを返す。
 inline Rank relativeRank(const Rank r, const Turn t) { return t == BLACK ? r : inverse(r); }

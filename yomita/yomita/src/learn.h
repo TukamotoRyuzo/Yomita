@@ -37,10 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //#define USE_ADAM_UPDATE
 
 // 目的関数が勝率の差の二乗和
-#define LOSS_FUNCTION_IS_WINNING_PERCENTAGE
+//#define LOSS_FUNCTION_IS_WINNING_PERCENTAGE
 
 // 目的関数が交差エントロピー
-//#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
+#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
 
 // タイムスタンプの出力をこの回数に一回に抑制する。
 #define GEN_SFENS_TIMESTAMP_OUTPUT_INTERVAL 1
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define EVAL_FILE_NAME_CHANGE_INTERVAL (1000 * 1000 * 1000)
 
 // ゼロベクトルからの学習を行うか。
-//#define RESET_TO_ZERO_VECTOR
+#define RESET_TO_ZERO_VECTOR
 
 // KPP以外をリセットするか。
 //#define RESET_TO_ZERO_EXCEPT_KPP
@@ -185,7 +185,7 @@ namespace Eval
         static double rt;
 #endif
 
-#if defined EVAL_KPPT || defined EVAL_PPT
+#if defined USE_EVAL_TURN
         // 手番の学習率
         static LearnFloatType eta2;
 #endif

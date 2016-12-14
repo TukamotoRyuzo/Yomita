@@ -1707,9 +1707,9 @@ namespace Learn
         {
             if (root_depth >= 5)
             {
-                delta = Score(18);
+                delta = Score(60);
                 alpha = std::max(root_moves[0].previous_score - delta, -SCORE_INFINITE);
-                beta = std::min(root_moves[0].previous_score + delta, SCORE_INFINITE);
+                beta  = std::min(root_moves[0].previous_score + delta, SCORE_INFINITE);
             }
 
             while (true)
@@ -1764,7 +1764,7 @@ namespace Learn
         auto th = b.thisThread();
         const bool in_check = b.inCheck();
         Score best_score = in_check ? ::qsearch<PV, true>(b, ss, alpha, beta, DEPTH_ZERO)
-            : ::qsearch<PV, false>(b, ss, alpha, beta, DEPTH_ZERO);
+                                    : ::qsearch<PV, false>(b, ss, alpha, beta, DEPTH_ZERO);
 
         std::vector<Move> pvs;
 

@@ -63,18 +63,13 @@ namespace Eval
         std::ifstream ifsKPP(path((std::string)USI::Options["EvalDir"], KPP_BIN), std::ios::binary);
 
         if (!ifsKK || !ifsKKP || !ifsKPP)
-            goto Error;
+        {
+            std::cout << "\ninfo string open evaluation file failed.\n";
+            return;
+        }
 
 #ifdef USE_FILE_SQUARE_EVAL
         // 縦型Square用の評価関数バイナリを使うときは横型に変換して読み込む。
-        EvalTable et2;
-        auto tempeval = new SharedEval();
-        et2.set(tempeval);
-
-        ifsKK.read(reinterpret_cast<char*>(*et2.kk_), sizeof(*et2.kk_));
-        ifsKKP.read(reinterpret_cast<char*>(*et2.kkp_), sizeof(*et2.kkp_));
-        ifsKPP.read(reinterpret_cast<char*>(*et2.kpp_), sizeof(*et2.kpp_));
-    
         int y2b[fe_end];
 
         for (BonaPiece p = BONA_PIECE_ZERO; p < fe_end; p++)
@@ -92,6 +87,17 @@ namespace Eval
                 y2b[p] = np;
             }
         }
+
+        // x86環境ではKPPT二つ分のメモリを確保しようとするとbad_allocを起こすことがある。
+        // 一時バッファ無しで縦型→横型変換するコードが理想だが今のところ思いつかない。
+
+        EvalTable et2;
+        auto tempeval = new SharedEval();
+        et2.set(tempeval);
+
+        ifsKK.read(reinterpret_cast<char*>(*et2.kk_), sizeof(*et2.kk_));
+        ifsKKP.read(reinterpret_cast<char*>(*et2.kkp_), sizeof(*et2.kkp_));
+        ifsKPP.read(reinterpret_cast<char*>(*et2.kpp_), sizeof(*et2.kpp_));
 
         // 元の重みをコピー
         for (auto k1 : Squares)
@@ -118,9 +124,6 @@ namespace Eval
         evalLearnInit();
 #endif
         return;
-
-    Error:;
-        std::cout << "\ninfo string open evaluation file failed.\n";
     }
 
     // KPP,KPのスケール
@@ -150,6 +153,8 @@ namespace Eval
         // †白美神†で行われているGATHERを使った高速化。
         // cf. http://denou.jp/tournament2016/img/PR/Hakubishin.pdf
         // ただ、_mm256_load_si256が使えなかったので代わりにloaduを使った。
+        // →BonaPieceがalignされていないから。ただalignしてloadを使っても早くならなかった。
+
         __m256i zero = _mm256_setzero_si256();
         __m256i sb = zero, sw = zero;
 
@@ -198,11 +203,10 @@ namespace Eval
             {
                 auto l0 = list_fb[j];
                 auto l1 = list_fw[j];
-#if 0
+
                 // やりたい処理はこれ。
-                sum.p[0] += pkppb[l0];
-                sum.p[1] += pkppw[l1];
-#else
+                // sum.p[0] += kpp[sq_bk0][k0][l0];
+                // sum.p[1] += kpp[sq_wk1][k1][l1];
                 // SSEによる実装
                 // pkppw[l1][0],pkppw[l1][1],pkppb[l0][0],pkppb[l0][1]の16bit変数4つを整数拡張で32bit化して足し合わせる
                 __m128i tmp;
@@ -211,7 +215,6 @@ namespace Eval
                     *reinterpret_cast<const int32_t*>(&kpp[sq_bk0][k0][l0][0]));
                 tmp = _mm_cvtepi16_epi32(tmp);
                 sum.m[0] = _mm_add_epi32(sum.m[0], tmp);
-#endif
             }
 
             sum.p[2] += kkp[sq_bk0][sq_wk0][k0];

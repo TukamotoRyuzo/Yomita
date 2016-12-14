@@ -399,8 +399,6 @@ void Board::setFromPackedSfen(uint8_t data[32])
     for (auto sq : Squares)
 #endif
     {
-        sq = (Square)toEvalSq(sq);
-
         // すでに玉がいるようだ
         Piece pc;
         if (typeOf(board_[sq]) != KING)

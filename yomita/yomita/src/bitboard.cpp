@@ -137,9 +137,10 @@ namespace
 
     // 引数のindexをbits桁の2進数としてみなす。
     // 与えられたmask(1の数がbitsだけある)に対して、1のbitのいくつかを(indexの値に従って)0にする。
-    Bitboard indexToOccupied(const int index, const int bits, Bitboard mask)
+    Bitboard indexToOccupied(const int index, const int bits, const Bitboard& m)
     {
         auto result = allZeroMask();
+        auto mask = m;
 
         for (int i = 0; i < bits; ++i)
         {

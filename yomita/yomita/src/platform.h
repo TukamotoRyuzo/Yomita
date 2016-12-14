@@ -70,6 +70,10 @@ typedef unsigned __int64 uint64_t;
 #define HAVE_BMI2
 #endif
 
+#if !defined(IS_64BIT)
+#define HAVE_SSE2
+#endif
+
 #if defined (HAVE_BMI2)
 #include <immintrin.h>
 #endif

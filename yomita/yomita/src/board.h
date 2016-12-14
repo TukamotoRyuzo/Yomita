@@ -360,79 +360,6 @@ public:
     Board& operator = (const Board& b);
     std::string sfen() const;
 
-#ifdef EVAL_KRB
-
-    // 飛車の先手から見た位置を返す。nは0か1で、0なら一枚目,1なら二枚目の飛車を表している。
-    // 0 ～ SQ_MAXが先手の飛車、SQ_MAX ～ SQ_MAX * 2が先手の竜 SQ_MAX * 2が先手の持ち駒
-    // SQ_MAX * 2 + 1 ～ SQ_MAX * 3 + 1が後手の飛車 SQ_MAX * 3 + 1 ～ SQ_MAX * 4 + 1が後手の竜
-    // SQ_MAX * 4 + 1なら後手の持ち駒
-    Square rookSquare(int n) const
-    {
-        auto r = evalList()->pieceListFb()[PIECE_NO_ROOK + n];
-        Square ret = Square(-1);
-
-        // どちらかの持ち駒になっている
-        if (r < Eval::fe_hand_end)
-        {
-            if (r >= Eval::e_hand_rook)
-                ret = SQ_MAX * 4 + 1;
-            else
-                ret = SQ_MAX * 2;
-        }
-        // 竜になっている
-        else if (r >= Eval::f_dragon)
-        {
-            if (r >= Eval::e_dragon)
-                ret = SQ_MAX * 3 + 1 + inverse(Square(r - Eval::e_dragon));
-            else
-                ret = SQ_MAX + Square(r - Eval::f_dragon);
-        }
-        else
-        {
-            if (r >= Eval::e_rook)
-                ret = SQ_MAX * 2 + 1 + inverse(Square(r - Eval::e_rook));
-            else
-                ret = Square(r - Eval::f_rook);
-        }
-
-        assert(ret >= 0 && ret < SQ_MAX_PRO_HAND * 2);
-        return ret;
-    }
-
-    Square bishopSquare(int n) const
-    {
-        auto r = evalList()->pieceListFb()[PIECE_NO_BISHOP + n];
-        Square ret = Square(-1);
-
-        // どちらかの持ち駒になっている
-        if (r < Eval::fe_hand_end)
-        {
-            if (r >= Eval::e_hand_bishop)
-                ret = SQ_MAX * 4 + 1;
-            else
-                ret = SQ_MAX * 2;
-        }
-        // 竜になっている
-        else if (r >= Eval::f_horse)
-        {
-            if (r >= Eval::e_horse)
-                ret = SQ_MAX * 3 + 1 + inverse(Square(r - Eval::e_horse));
-            else
-                ret = SQ_MAX + Square(r - Eval::f_horse);
-        }
-        else
-        {
-            if (r >= Eval::e_bishop)
-                ret = SQ_MAX * 2 + 1 + inverse(Square(r - Eval::e_bishop));
-            else
-                ret = Square(r - Eval::f_bishop);
-        }
-
-        assert(ret >= 0 && ret < SQ_MAX_PRO_HAND * 2);
-        return ret;
-    }
-#endif
-
 #if defined LEARN || defined GENSFEN
     template <bool Test = false> void setFromPackedSfen(uint8_t data[32]);
     static std::string sfenFromRawdata(Piece board[81], Hand hands[2], Turn turn, int gamePly_);
@@ -445,8 +372,8 @@ private:
     
     // 1手詰め判定のヘルパー関数。
     bool canPieceCapture(const Turn t, const Square sq, const Square king_square) const;
-    bool canPieceCapture(const Turn t, const Square sq, const Square king_square, Bitboard bb_discovered) const;
-    template <Index TK> bool canKingEscape(const Square ksq, const Turn t, const Square, Bitboard bb) const;
+    bool canPieceCapture(const Turn t, const Square sq, const Square king_square, const Bitboard& bb_discovered) const;
+    template <Index TK> bool canKingEscape(const Square ksq, const Turn t, const Square, const Bitboard& bb) const;
 
 private:
     // 手番側の、駒がいる場所が1になっているビットボード

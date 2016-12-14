@@ -29,8 +29,7 @@
     <ClInclude Include="src\enumoperator.h" />
     <ClInclude Include="src\evalsum.h" />
     <ClInclude Include="src\evaluate.h" />
-    <ClInclude Include="src\eval_kppl.h" />
-    <ClInclude Include="src\eval_krb.h" />
+    <ClInclude Include="src\eval_kkpt.h" />
     <ClInclude Include="src\eval_ppt.h" />
     <ClInclude Include="src\eval_kppt.h" />
     <ClInclude Include="src\genmove.h" />
@@ -63,9 +62,7 @@
     <ClCompile Include="src\bonapiece.cpp" />
     <ClCompile Include="src\book.cpp" />
     <ClCompile Include="src\common.cpp" />
-    <ClCompile Include="src\eval_kppl.cpp" />
     <ClCompile Include="src\eval_kpp.cpp" />
-    <ClCompile Include="src\eval_krb.cpp" />
     <ClCompile Include="src\eval_ppt.cpp" />
     <ClCompile Include="src\eval_kppt.cpp" />
     <ClCompile Include="src\genmove.cpp" />
@@ -73,9 +70,7 @@
     <ClCompile Include="src\haffman.cpp" />
     <ClCompile Include="src\hand.cpp" />
     <ClCompile Include="src\learn.cpp" />
-    <ClCompile Include="src\learn_kppl.cpp" />
     <ClCompile Include="src\learn_kppt.cpp" />
-    <ClCompile Include="src\learn_krb.cpp" />
     <ClCompile Include="src\learn_ppt.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\move.cpp" />
@@ -160,12 +155,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>../../yomita_engine/</OutDir>
-    <TargetName>yomita_kppt_nosse_x86</TargetName>
+    <TargetName>$(ProjectName)_kppt2.0_x86_sse2</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>../../yomita_engine/</OutDir>
-    <TargetName>$(ProjectName)_kppt2.0</TargetName>
+    <TargetName>$(ProjectName)_kppt2.01_avx2</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

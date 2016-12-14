@@ -1530,7 +1530,7 @@ void Board::undoNullMove()
 
 // t側がsqにある駒を取れるならばtrueを返す。
 // pinも考慮するので、bb_discoveredにはpinnedPieces(自分の王手駒と敵玉の間にいてpinされている敵の駒)を渡す。
-bool Board::canPieceCapture(const Turn t, const Square sq, const Square king_square, Bitboard bb_discovered) const
+bool Board::canPieceCapture(const Turn t, const Square sq, const Square king_square, const Bitboard& bb_discovered) const
 {
     Bitboard bb_from = attackers<true>(t, sq);
 
@@ -1565,7 +1565,7 @@ bool Board::canPieceCapture(const Turn t, const Square sq, const Square king_squ
 // sqから王手されているenemy側の玉が逃げられるかどうかを返す。
 // bbはsqに置かれた王手駒の利きを表しており、敵玉はbbが1になっているマスには動けない。
 template <Index TK>
-bool Board::canKingEscape(const Square ksq, const Turn self, const Square sq, Bitboard bb) const
+bool Board::canKingEscape(const Square ksq, const Turn self, const Square sq, const Bitboard& bb) const
 {
     const Turn enemy = ~self;
     uint64_t bb_kingmove = ~bb.b(TK) & ~bbTurn(enemy).b(TK) & kingAttack(ksq).b(TK);
