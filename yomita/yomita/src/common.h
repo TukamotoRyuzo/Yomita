@@ -101,9 +101,7 @@ const int MAX_PLY = 128;
 const int MAX_MOVES = 593 + 1;
 
 // L1 / L2キャッシュ内の指定されたアドレスをプリロードする。
-#ifdef NO_PREFETCH
-inline void prefetch(void*) {}
-#else
+#if defined HAVE_SSE4 || defined HAVE_SSE2
 inline void prefetch(void* addr) {
 #if defined(__INTEL_COMPILER)
     // This hack prevents prefetches from being optimized away by
@@ -117,6 +115,8 @@ inline void prefetch(void* addr) {
     __builtin_prefetch(addr);
 #endif
 }
+#else
+inline void prefetch(void*) {}
 #endif
 
 // cin/coutへの入出力をファイルにリダイレクトを開始/終了する。
@@ -155,3 +155,8 @@ private:
 };
 
 void mkdir(std::string dir);
+
+namespace WinProcGroup
+{
+    void bindThisThread(size_t idx);
+}

@@ -31,14 +31,23 @@ namespace
 {
     template<typename T> T* newThread() 
     {
+#if defined HAVE_SSE2 || defined HAVE_SSE4
         T* th = new (_mm_malloc(sizeof(T), alignof(T))) T();
+#else
+        T* th = new T;
+#endif
         return (T*)th;
     }
 
     void deleteThread(Thread *th) 
     {
         th->terminate();
+#if defined HAVE_SSE2 || defined HAVE_SSE4
         _mm_free(th);
+#else
+        delete th;
+#endif
+        
     }
 }
 
@@ -101,6 +110,8 @@ void Thread::startSearching(bool resume)
 
 void Thread::idleLoop()
 {
+    WinProcGroup::bindThisThread(idx);
+
     while (!exit)
     {
         std::unique_lock<Mutex> lk(mutex);
@@ -146,14 +157,22 @@ void ThreadPool::startThinking(const Board& b, const LimitsType& limits)
     main()->join();
 
     USI::Signals.stop_on_ponderhit = USI::Signals.stop = false;
-
-    main()->root_moves.clear();
-    main()->root_board = b;
     USI::Limits = limits;
+    Search::RootMoves root_moves;
 
     for (const auto& m : MoveList<LEGAL>(b))
         if (limits.search_moves.empty() || count(limits.search_moves.begin(), limits.search_moves.end(), m))
-            main()->root_moves.push_back(Search::RootMove(m));
+            root_moves.push_back(Search::RootMove(m));
+
+    // slaveスレッドに探索開始局面を設定する
+    for (auto th : Threads)
+    {
+        // このとき探索ノード数(Board::nodes_)もリセットされる
+        th->root_board = Board(b, th);
+        th->root_moves = root_moves;
+        th->max_ply = 0;
+        th->root_depth = th->completed_depth = DEPTH_ZERO;
+    }
 
     main()->startSearching();
 }

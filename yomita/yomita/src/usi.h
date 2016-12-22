@@ -30,8 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct OptionsMap;
 
-const std::string BOOK_STR = "book.txt";
-
 // USIプロトコルで定義されているオプションを実装するOptionクラス
 class Option
 {

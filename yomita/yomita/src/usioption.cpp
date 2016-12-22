@@ -48,7 +48,7 @@ void OptionsMap::init()
 #ifdef IS_64BIT
 #define MAX_MEMORY 65536
 #else
-#define MAX_MEMORY 64
+#define MAX_MEMORY 512
 #endif
     (*this)["Hash"]                  = Option(1, 1, MAX_MEMORY, onHashSize);
     (*this)["USI_Ponder"]            = Option(true);
@@ -62,6 +62,7 @@ void OptionsMap::init()
     (*this)["Draw_Score"]            = Option(-50, -300, 300);
     (*this)["MultiPV"]               = Option(1, 1, 500);
     (*this)["UseBook"]               = Option(true);
+    (*this)["BookDir"]               = Option("book.txt");
 #ifdef USE_PROGRESS
     (*this)["ProgressDir"]           = Option("progress");
 #endif

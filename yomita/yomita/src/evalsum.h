@@ -108,22 +108,32 @@ namespace Eval
         {
 #if defined HAVE_BMI2
             mm = _mm256_add_epi32(mm, rhs.mm);
-#else
+#elif defined HAVE_SSE2 || defined HAVE_SSE4
             m[0] = _mm_add_epi32(m[0], rhs.m[0]);
             m[1] = _mm_add_epi32(m[1], rhs.m[1]);
+#else
+            data[0] += rhs.data[0];
+            data[1] += rhs.data[1];
+            data[2] += rhs.data[2];
 #endif
             return *this;
         }
+
         EvalSum& operator -= (const EvalSum& rhs) 
         {
 #ifdef HAVE_BMI2
             mm = _mm256_sub_epi32(mm, rhs.mm);
-#else
+#elif defined HAVE_SSE2 || defined HAVE_SSE4
             m[0] = _mm_sub_epi32(m[0], rhs.m[0]);
             m[1] = _mm_sub_epi32(m[1], rhs.m[1]);
+#else
+            data[0] -= rhs.data[0];
+            data[1] -= rhs.data[1];
+            data[2] -= rhs.data[2];
 #endif
             return *this;
         }
+
         EvalSum operator + (const EvalSum& rhs) const { return EvalSum(*this) += rhs; }
         EvalSum operator - (const EvalSum& rhs) const { return EvalSum(*this) -= rhs; }
 
@@ -144,23 +154,15 @@ namespace Eval
                 uint64_t data[3];
                 uint64_t key; 
             };
+
+#if defined HAVE_SSE2 || defined HAVE_SSE4
 #if defined HAVE_BMI2
             __m256i mm;
-            __m128i m[2];
-#else 
+#endif
             __m128i m[2];
 #endif
         };
     };
-
-    static std::ostream& operator << (std::ostream& os, const EvalSum& sum)
-    {
-        os << "sum BKPP = " << sum.p[0][0] << " + " << sum.p[0][1] << std::endl;
-        os << "sum WKPP = " << sum.p[1][0] << " + " << sum.p[1][1] << std::endl;
-        os << "sum KK   = " << sum.p[2][0] << " + " << sum.p[2][1] << std::endl;
-        return os;
-    }
-
 } // namespace Eval
 
 #elif defined EVAL_PPT

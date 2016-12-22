@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timeman.h" // for ponderhit 
 
 const std::string engine_name = "Yomita_";
-const std::string version = "2.01";
+const std::string version = "2.02";
 
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI
@@ -440,7 +440,7 @@ void USI::loop(int argc, char** argv)
         }
 
         // 手動で定跡手を追加。これで一手ずつ定跡を登録するのはつらすぎるが、定跡を読み込めてるかチェックするときには便利。
-        else if (token == "mb") { Book::makeBook(board, BOOK_STR); }
+        else if (token == "mb") { Book.make(board, Options["BookDir"]); }
 
         // 評価関数を呼び出す
         else if (token == "eval") { std::cout << "eval = " << Eval::evaluate(board) << std::endl; }

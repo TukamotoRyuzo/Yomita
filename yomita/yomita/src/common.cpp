@@ -23,6 +23,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define _CRT_SECURE_NO_WARNINGS 1
 
+#ifdef _WIN32
+#if _WIN32_WINNT < 0x0601
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
+#include <windows.h>
+
+extern "C"
+{
+    typedef bool(*fun1_t)(LOGICAL_PROCESSOR_RELATIONSHIP,
+                          PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, PDWORD);
+    typedef bool(*fun2_t)(USHORT, PGROUP_AFFINITY);
+    typedef bool(*fun3_t)(HANDLE, CONST GROUP_AFFINITY*, PGROUP_AFFINITY);
+}
+#endif
+
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -30,8 +46,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <vector>
 #include <codecvt>
 #include "common.h"
+#include "thread.h"
 
 using namespace std;
+
+namespace WinProcGroup {
+#ifndef _WIN32
+    void bindThisThread(size_t) {};
+#else
+    int getGroup(size_t idx)
+    {
+        int threads = 0;
+        int nodes = 0;
+        int cores = 0;
+        DWORD return_length = 0;
+        DWORD byte_offset = 0;
+
+        HMODULE k32 = GetModuleHandle(TEXT("Kernel32.dll"));
+        auto fun1 = (fun1_t)GetProcAddress(k32, "GetLogicalProcessorInformationEx");
+
+        if (!fun1)
+            return -1;
+
+        if (fun1(RelationAll, nullptr, &return_length))
+            return -1;
+
+        SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *buffer, *ptr;
+        ptr = buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)malloc(return_length);
+
+        if (!fun1(RelationAll, buffer, &return_length))
+        {
+            free(buffer);
+            return -1;
+        }
+
+        while (ptr->Size > 0 && byte_offset + ptr->Size <= return_length)
+        {
+            if (ptr->Relationship == RelationNumaNode)
+                nodes++;
+
+            else if (ptr->Relationship == RelationProcessorCore)
+            {
+                cores++;
+                threads += (ptr->Processor.Flags == LTP_PC_SMT) ? 2 : 1;
+            }
+
+            byte_offset += ptr->Size;
+            ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)(((char*)ptr) + ptr->Size);
+        }
+
+        free(buffer);
+
+        std::vector<int> groups;
+
+        for (int n = 0; n < nodes; n++)
+            for (int i = 0; i < cores / nodes; i++)
+                groups.push_back(n);
+
+        for (int t = 0; t < threads - cores; t++)
+            groups.push_back(t % nodes);
+
+        return idx < groups.size() ? groups[idx] : -1;
+    }
+
+    void bindThisThread(size_t idx)
+    {
+        if (Threads.size() < 8)
+            return;
+
+        int group = getGroup(idx);
+
+        if (group == -1)
+            return;
+        
+        HMODULE k32 = GetModuleHandle(TEXT("Kernel32.dll"));
+        auto fun2 = (fun2_t)GetProcAddress(k32, "GetNumaNodeProcessorMaskEx");
+        auto fun3 = (fun3_t)GetProcAddress(k32, "SetThreadGroupAffinity");
+
+        if (!fun2 || !fun3)
+            return;
+
+        GROUP_AFFINITY affinity;
+
+        if (fun2(group, &affinity))
+            fun3(GetCurrentThread(), &affinity, nullptr);
+    }
+#endif
+} // namespace WinProcGroup
 
 // logging用のhack。streambufをこれでhookしてしまえば追加コードなしで普通に
 // cinからの入力とcoutへの出力をファイルにリダイレクトできる。

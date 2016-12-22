@@ -144,7 +144,11 @@ namespace Eval
         EvalSum sum;
 
         // sum.p[0](BKPP)とsum.p[1](WKPP)をゼロクリア
+#if defined HAVE_SSE2 || defined HAVE_SSE4
         sum.m[0] = _mm_setzero_si128();
+#else
+        sum.data[0] = sum.data[1] = 0;
+#endif
 
         // KKの計算
         sum.p[2] = kk[sq_bk0][sq_wk0];
@@ -204,9 +208,7 @@ namespace Eval
                 auto l0 = list_fb[j];
                 auto l1 = list_fw[j];
 
-                // やりたい処理はこれ。
-                // sum.p[0] += kpp[sq_bk0][k0][l0];
-                // sum.p[1] += kpp[sq_wk1][k1][l1];
+#if defined HAVE_SSE2 || defined HAVE_SSE4
                 // SSEによる実装
                 // pkppw[l1][0],pkppw[l1][1],pkppb[l0][0],pkppb[l0][1]の16bit変数4つを整数拡張で32bit化して足し合わせる
                 __m128i tmp;
@@ -215,6 +217,11 @@ namespace Eval
                     *reinterpret_cast<const int32_t*>(&kpp[sq_bk0][k0][l0][0]));
                 tmp = _mm_cvtepi16_epi32(tmp);
                 sum.m[0] = _mm_add_epi32(sum.m[0], tmp);
+#else
+                // やりたい処理はこれ。
+                sum.p[0] += kpp[sq_bk0][k0][l0];
+                sum.p[1] += kpp[sq_wk1][k1][l1];
+#endif
             }
 
             sum.p[2] += kkp[sq_bk0][sq_wk0][k0];

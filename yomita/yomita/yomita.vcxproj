@@ -29,7 +29,6 @@
     <ClInclude Include="src\enumoperator.h" />
     <ClInclude Include="src\evalsum.h" />
     <ClInclude Include="src\evaluate.h" />
-    <ClInclude Include="src\eval_kkpt.h" />
     <ClInclude Include="src\eval_ppt.h" />
     <ClInclude Include="src\eval_kppt.h" />
     <ClInclude Include="src\genmove.h" />
@@ -155,12 +154,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>../../yomita_engine/</OutDir>
-    <TargetName>$(ProjectName)_kppt2.0_x86_sse2</TargetName>
+    <TargetName>$(ProjectName)_kppt2.02_x86_nosse</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>../../yomita_engine/</OutDir>
-    <TargetName>$(ProjectName)_kppt2.01_avx2</TargetName>
+    <TargetName>$(ProjectName)_kppt2.02_sse42</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -224,7 +223,7 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -232,6 +231,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

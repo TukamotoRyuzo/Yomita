@@ -62,7 +62,6 @@ namespace Search
         Move killers[2];
         Score static_eval; // 現局面で評価関数を呼び出した時のスコア
         Score history;
-        bool skip_early_pruning;
         int move_count;
         CounterMoveStats* counter_moves;
 
@@ -88,6 +87,8 @@ namespace Search
         // この局面での最善応手列
         std::vector<Move> pv;
     };
+
+    typedef std::vector<RootMove> RootMoves;
 
     void init();
     void clear();

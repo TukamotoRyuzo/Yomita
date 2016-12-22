@@ -28,24 +28,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "board.h"
 
 // 定跡処理関係
-namespace Book
+struct MemoryBook
 {
-    // 局面における指し手(定跡を格納するのに用いる)
-    struct BookPos
-    {
-        Move best_move; // この局面での指し手
+    // 定跡ファイルの読み込み、書き込み
+    int read(const std::string filename);
+    int write(const std::string filename);
 
-        BookPos() : best_move(MOVE_NONE) {}
-        BookPos(Move best) : best_move(best) {}
-        bool operator == (const BookPos& rhs) const { return best_move == rhs.best_move; }
-    };
+    // 手動登録
+    void make(const Board& b, const std::string filename);
 
-    // メモリ上にある定跡ファイル
-    // sfen文字列をkeyとして、局面の指し手へ変換。(重複した指し手は除外するものとする)
-    typedef std::unordered_map<std::string, BookPos> MemoryBook;
-    void makeBook(Board& b, std::string filename);
-    void store(MemoryBook& memory_book, std::string book, std::string sfen, Move best_move);
-    int readBook(const std::string& filename, MemoryBook& book);
-    int writeBook(const std::string& filename, const MemoryBook& book);
-    void insertBookPos(MemoryBook& book, const std::string sfen, const BookPos& bp);
-}
+    // bookに指し手を加えてファイルに書き出す。
+    void store(const std::string filename, const std::string sfen, const Move m);
+
+    // bookに指し手を加える。
+    void insert(const std::string sfen, const Move m);
+
+    // 局面のsfenをkeyとして定跡登録されていればmoveを返す。
+    // 登録されていなければMOVE_NONEを返す。
+    Move probe(const Board& b) const;
+
+private:
+    std::unordered_map<std::string, Move> book;
+};
+
+extern MemoryBook Book;

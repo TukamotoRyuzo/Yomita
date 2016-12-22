@@ -21,11 +21,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "book.h"
 #include <fstream>
 #include <sstream>
+#include "book.h"
 #include "common.h"
 #include "usi.h"
+
+// bookはグローバルに用意。
+MemoryBook Book;
 
 using namespace std;
 
@@ -56,12 +59,13 @@ namespace USI
     // usi形式から指し手への変換。movepiece, capturepieceの情報が欠落している。
     Move toMove(const string& str)
     {
-        static const std::string piece_to_char(".BRPLNSGK........brplnsgk");
+        const std::string piece_to_char(".BRPLNSGK........brplnsgk");
 
         if (str.length() <= 3)
             return MOVE_NONE;
 
         Square to = sqOf(str[2], str[3]);
+
         if (!isOK(to))
             return MOVE_NONE;
 
@@ -73,6 +77,7 @@ namespace USI
         if (!drop)
         {
             Square from = sqOf(str[0], str[1]);
+
             if (isOK(from))
                 move = makeMove(from, to, EMPTY, EMPTY, promote);
         }
@@ -90,153 +95,169 @@ namespace USI
     }
 }
 
-namespace Book
+// 手動で定跡手を登録するモード
+void MemoryBook::make(const Board& b, const std::string filename)
 {
-    // 本当に手動で定跡手を登録するモード
-    void makeBook(Board& b, std::string filename)
+    std::string y;
+
+    if (read(filename))
     {
-        MemoryBook book;
-        std::string y;
+        std::cout << "ファイルが開けません" << std::endl;
+        return;
+    }
 
-        if (readBook(filename, book))
+    std::cout << b << "検索中...\n";
+
+    auto it = book.find(b.sfen());
+
+    if (it != book.end())
+    {
+        // 定跡にヒット
+        Move m = it->second;
+
+        // 指し手に欠落している情報があるかもしれないので補う
+        if (!isDrop(m))
+            m = makeMove(fromSq(m), toSq(m), b.piece(fromSq(m)), b.piece(toSq(m)), isPromote(m));
+
+        std::cout << "今登録されてる手は" << pretty(m) << " " << toUSI(m) << "です。どうしますか？\n";
+    }
+    else
+        std::cout << "登録されている手はありません。どうしますか？";
+
+    do {
+        std::cout << "<登録:y やめる:n>:";
+        std::cin >> y;
+    } while (y != "y" && y != "n");
+
+    if (y == "y")
+    {
+        std::cout << "登録開始です\n手をUSI形式で入力:";
+
+        std::string str;
+        std::cin >> str;
+        Move m = USI::toMove(b, str);
+
+        if (m != MOVE_NONE)
         {
-            std::cout << "ファイルが開けません" << std::endl;
-            return;
-        }
+            std::cout << "登録していいですか?(y/n)";
+            std::cin >> y;
 
-        std::cout << b << "検索中...\n";
-        
-        auto it = book.find(b.sfen());
-
-        if (it != book.end())
-        {
-            // 定跡にヒット
-            Move m = it->second.best_move;
-
-            // 指し手に欠落している情報があるかもしれないので補う
-            if (!isDrop(m))
-                m = makeMove(fromSq(m), toSq(m), b.piece(fromSq(m)), b.piece(toSq(m)), isPromote(m));
-
-            std::cout << "今登録されてる手は" << pretty(m) << " " << toUSI(m) << "です。どうしますか？\n";
+            if (y == "y")
+            {
+                std::cout << pretty(m) << "を登録します" << std::endl;
+                store(filename, b.sfen(), m);
+            }
+            else
+                std::cout << "やめときます" << std::endl;
         }
         else
-            std::cout << "登録されている手はありません。どうしますか？";
-
-        do {
-            std::cout << "<登録:y やめる:n>:";
-            std::cin >> y;
-        } while (y != "y" && y != "n");
-
-        if (y == "y")
-        {
-            std::cout << "登録開始です\n手をUSI形式で入力:";
-
-            std::string str;
-            std::cin >> str;
-            Move m = USI::toMove(b, str);
-
-            if (m != MOVE_NONE)
-            {
-                std::cout << "登録していいですか?(y/n)";
-                std::cin >> y;
-
-                if (y == "y")
-                {
-                    std::cout << pretty(m) << "を登録します" << std::endl;
-                    store(book, BOOK_STR, b.sfen(), m);
-                }
-                else
-                    std::cout << "やめときます" << std::endl;
-            }
-            else
-                std::cout << "そんな手はありません\n";
-        } 
-
-        std::cout << "登録終わり" << std::endl;
-
-        // std::cinの後に改行コードが残ってるみたいなので。
-        char temp[100];
-        cin.getline(temp, sizeof(temp));
+            std::cout << "そんな手はありません\n";
     }
 
+    std::cout << "登録終わり" << std::endl;
 
-    void store(MemoryBook& memory_book, std::string book, std::string sfen, Move best_move)
+    // std::cinの後に改行コードが残ってるみたいなので。
+    char temp[100];
+    cin.getline(temp, sizeof(temp));
+}
+
+// bookに指し手を加えてファイルに書き出す。
+void MemoryBook::store(const std::string filename, const std::string sfen, const Move m)
+{
+    insert(sfen, m);
+    write(filename);
+}
+
+// 定跡ファイルの読み込み(book.db)など。MemoryBookに読み出す
+int MemoryBook::read(const std::string filename)
+{
+    vector<string> lines;
+
+    if (readAllLines(filename, lines))
+        return 1; // 読み込み失敗
+
+    uint64_t num_sum = 0;
+    string sfen;
+
+    for (auto line : lines)
     {
-        memory_book[sfen] = best_move;
-        writeBook(book, memory_book);
-    }
+        // バージョン識別文字列(とりあえず読み飛ばす)
+        if (line.length() >= 1 && line[0] == '#')
+            continue;
 
-    // 定跡ファイルの読み込み(book.db)など。MemoryBookに読み出す
-    int readBook(const std::string& filename, MemoryBook& book)
-    {
-        vector<string> lines;
+        // コメント行(とりあえず読み飛ばす)
+        if (line.length() >= 2 && line.substr(0, 2) == "//")
+            continue;
 
-        if (readAllLines(filename, lines))
-            return 1; // 読み込み失敗
-
-        uint64_t num_sum = 0;
-        string sfen;
-
-        for (auto line : lines)
+        // "sfen "で始まる行は局面のデータであり、sfen文字列が格納されている。
+        if (line.length() >= 5 && line.substr(0, 5) == "sfen ")
         {
-            // バージョン識別文字列(とりあえず読み飛ばす)
-            if (line.length() >= 1 && line[0] == '#')
-                continue;
-
-            // コメント行(とりあえず読み飛ばす)
-            if (line.length() >= 2 && line.substr(0, 2) == "//")
-                continue;
-
-            // "sfen "で始まる行は局面のデータであり、sfen文字列が格納されている。
-            if (line.length() >= 5 && line.substr(0, 5) == "sfen ")
-            {
-                sfen = line.substr(5, line.length() - 5); // 新しいsfen文字列を"sfen "を除去して格納
-                continue;
-            }
-
-            Move best;
-
-            istringstream is(line);
-            string best_move;
-            is >> best_move;
-
-            // 起動時なので変換に要するオーバーヘッドは最小化したいので合法かのチェックはしない。
-            if (best_move == "none" || best_move == "resign")
-                best = MOVE_NONE;
-            else
-                best = USI::toMove(best_move);
-
-            BookPos bp(best);
-            insertBookPos(book, sfen, bp);
+            sfen = line.substr(5, line.length() - 5); // 新しいsfen文字列を"sfen "を除去して格納
+            continue;
         }
 
-        return 0;
+        Move best;
+
+        istringstream is(line);
+        string best_move;
+        is >> best_move;
+
+        // 起動時なので変換に要するオーバーヘッドは最小化したいので合法かのチェックはしない。
+        if (best_move == "none" || best_move == "resign")
+            best = MOVE_NONE;
+        else
+            best = USI::toMove(best_move);
+
+        insert(sfen, best);
     }
 
-    // MemoryBookの内容をfilenameに書き出す
-    int writeBook(const std::string& filename, const MemoryBook& book)
+    return 0;
+}
+
+// MemoryBookの内容をfilenameに書き出す
+int MemoryBook::write(const std::string filename)
+{
+    fstream fs(filename, ios::out);
+
+    // バージョン識別用文字列
+    fs << "#YANEURAOU-DB2016 1.00" << endl;
+
+    for (auto it = book.begin(); it != book.end(); ++it)
+        fs << "sfen " << it->first << endl << it->second << endl; // sfenと指し手を出力
+
+    fs.close();
+
+    return 0;
+}
+
+// bookに指し手を加える。
+void MemoryBook::insert(const std::string sfen, const Move m)
+{
+    auto it = book.find(sfen);
+
+    if (it == book.end()) // 存在しないので追加。
+        book[sfen] = m;
+    else
+        it->second = m;
+}
+
+Move MemoryBook::probe(const Board& b) const
+{
+    auto it = book.find(b.sfen());
+
+    if (it != book.end() && it->second != MOVE_NONE)
     {
-        fstream fs;
-        fs.open(filename, ios::out);
+        // 定跡にヒット
+        Move m = it->second;
 
-        // バージョン識別用文字列
-        fs << "#YANEURAOU-DB2016 1.00" << endl;
+        // 指し手に欠落している情報があるかもしれないので補う
+        if (!isDrop(m))
+            m = makeMove(fromSq(m), toSq(m), b.piece(fromSq(m)), b.piece(toSq(m)), isPromote(m));
+        else
+            m = makeDrop(toPiece(movedPieceType(m), b.turn()), toSq(m));
 
-        for (auto it = book.begin(); it != book.end(); ++it)
-            fs << "sfen " << it->first << endl << it->second.best_move << endl; // sfenと指し手を出力
-
-        fs.close();
-
-        return 0;
+        return m;
     }
 
-    void insertBookPos(MemoryBook& book, const std::string sfen, const BookPos& bp)
-    {
-        auto it = book.find(sfen);
-
-        if (it == book.end()) // 存在しないので追加。
-            book[sfen] = bp;
-        else	
-            it->second = bp;
-    }
-} // namespace Book
+    return MOVE_NONE;
+}

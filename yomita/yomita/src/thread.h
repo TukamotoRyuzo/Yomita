@@ -67,7 +67,7 @@ struct Thread
     void join() { waitWhile(searching); }
 
     Board root_board;
-    std::vector<Search::RootMove> root_moves;
+    Search::RootMoves root_moves;
     Depth root_depth, completed_depth;
     size_t pv_idx;
 
@@ -89,6 +89,9 @@ struct Thread
 
     // fromからtoへの移動と手番に対する点数を保存しておく配列
     FromToStats from_to_history;
+
+    // pv
+    Move pv[MAX_PLY][MAX_PLY];
 
     // 学習で使うフラグ
 #ifdef LEARN

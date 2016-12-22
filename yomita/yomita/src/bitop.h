@@ -29,9 +29,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // C++11では、std::stack<StateInfo>がalignasを無視するために、代わりにstack相当のものを自作。
 template <typename T> struct aligned_stack 
 {
-    void push(const T& t) { auto ptr = (T*)_mm_malloc(sizeof(T), alignof(T)); *ptr = t; container.push_back(ptr); }
+    void push(const T& t) 
+    { 
+#if defined HAVE_SSE2 || defined HAVE_SSE4
+        auto ptr = (T*)_mm_malloc(sizeof(T), alignof(T)); 
+#else
+        auto ptr = new T;
+#endif
+        *ptr = t; 
+        container.push_back(ptr); 
+    }
+
     T& top() const { return **container.rbegin(); }
-    void clear() { for (auto ptr : container) _mm_free(ptr); container.clear(); }
+    void clear() 
+    { 
+        for (auto ptr : container)
+#if defined HAVE_SSE2 || defined HAVE_SSE4
+            _mm_free(ptr);
+#else
+            delete ptr;
+#endif
+        container.clear(); 
+    }
     ~aligned_stack() { clear(); }
 private:
     std::vector<T*> container;

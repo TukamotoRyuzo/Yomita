@@ -28,7 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "score.h"
 #include "search.h"
 
-struct TTEntry
+struct
+#if defined HAVE_SSE2 || defined HAVE_SSE42
+    alignas(16) 
+#endif
+    TTEntry
 {
     Key     key()        const { return (Key  )  key32; }
     Move    move()       const { return (Move ) move32; }
@@ -38,26 +42,34 @@ struct TTEntry
     Bound   bound()      const { return (Bound) bound8; }
     uint8_t generation() const { return    generation8; }
 
-    // 書き込みはアトミックに行いたい。
     void save(Key k, Score s, Bound b, Depth d, Move m, Score ev, uint8_t g)
     {
+        TTEntry c = *this;
+
         // 何も考えずに指し手を上書き(新しいデータのほうが価値があるので)
         if (m || (k >> 32) != key32)
-            move32 = m;
+            c.move32 = m;
 
         // このエントリーの現在の内容のほうが価値があるなら上書きしない。
         if ((k >> 32) != key32
             || d > depth16 - 4 * ONE_PLY 
             || b == BOUND_EXACT)
         {
-            key32       = (uint32_t)(k >> 32);
-            score16     = (int16_t)s;
-            eval16      = (int16_t)ev;
-            generation8 = (uint8_t)g;
-            bound8      = (uint8_t)b;
-            depth16     = (int16_t)d;
+            c.key32       = (uint32_t)(k >> 32);
+            c.score16     = (int16_t)s;
+            c.eval16      = (int16_t)ev;
+            c.generation8 = (uint8_t)g;
+            c.bound8      = (uint8_t)b;
+            c.depth16     = (int16_t)d;
         }
+
+        *this = c;
     }
+
+#if defined HAVE_SSE2 || defined HAVE_SSE4
+    // atomicなR/Wを実現するためのoperator
+    void operator = (const TTEntry& t) { _mm_store_si128((__m128i*)this, _mm_load_si128((__m128i*)&t)); }
+#endif
 
 private:
     friend class TranspositionTable;
@@ -97,7 +109,7 @@ public:
     ~TranspositionTable() { free(mem_); }
     void newSearch() { generation8_++; }
     uint8_t generation() const { return generation8_; }
-    bool probe(const Key key, TTEntry* &ptt) const;
+    bool probe(const Key key, TTEntry* &ptt, TTEntry* copy) const;
     int hashfull() const;
     void resize(size_t mb_size);
     void clear() { memset(table_, 0, cluster_count_ * sizeof(Cluster)); generation8_ = 0; }
@@ -107,7 +119,7 @@ private:
     void* mem_;
     Cluster* table_;
     uint8_t generation8_;
-    size_t cluster_count_;	
+    size_t cluster_count_;
 };
 
 extern TranspositionTable TT;
