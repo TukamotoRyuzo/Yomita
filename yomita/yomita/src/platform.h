@@ -67,7 +67,7 @@ typedef unsigned __int64 uint64_t;
 #define USE_POPCNT
 #define HAVE_SSE42
 #define HAVE_SSE4
-//#define HAVE_BMI2
+#define HAVE_BMI2
 #endif
 
 #if !defined(IS_64BIT)
