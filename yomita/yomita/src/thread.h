@@ -91,7 +91,7 @@ struct Thread
     FromToStats from_to_history;
 
     // pv
-    Move pv[MAX_PLY][MAX_PLY];
+    Move pv[MAX_PLY][MAX_PLY + 1];
 
     // 学習で使うフラグ
 #ifdef LEARN

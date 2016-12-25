@@ -28,48 +28,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "genmove.h"
 #include "sfen_rw.h"
 
+bool cantMove(Piece p, Square to)
+{
+    switch (p)
+    {
+    case B_PAWN: case B_LANCE:
+        return mask(to) & mask(RANK_1);
+    case W_PAWN: case W_LANCE:
+        return mask(to) & mask(RANK_9);
+    case B_KNIGHT:
+        return mask(to) & frontMask(BLACK, RANK_3);
+    case W_KNIGHT:
+        return mask(to) & frontMask(WHITE, RANK_7);
+    default:
+        return false;
+    }
+
+    return false;
+}
+
+
 // 引数で与えられるbはランダムな配置なのでさまざまなテストができる。
 void testOnRandomPosition(Board& b)
 {
-    if (!b.inCheck())
+    MoveList<LEGAL_ALL> ml(b);
+
+    auto check = [&](Move m)
     {
-        MoveStack mlist[MAX_MOVES];
-        auto p = generate<QUIETS>(mlist, b);
+        if (!ml.contains(m))
+            if (b.pseudoLegal(m) && b.legal(m))
+            {
+                auto c = capturePiece(m);
+                std::cout << b << pretty(m) << " capture = " << capturePiece(m) << b.key() << " " << std::hex << (uint32_t)m << std::endl;
 
-        MoveStack clist[MAX_MOVES];
-        auto c = generate<QUIET_CHECKS>(clist, b);
+                MoveList<LEGAL_ALL> mll(b);
+                if (!mll.contains(m))
+                    if (b.pseudoLegal(m) && b.legal(m))
+                    {
+                        std::cout << b << pretty(m) << " " << b.key() << " " << std::hex << (uint32_t)m << std::endl;
 
-        MoveStack* curr = mlist;
+                    }
+            }
+    };
 
-        while (curr != p)
-        {
-            if (!b.givesCheck(curr->move) || isCaptureOrPawnPromote(curr->move))
-                *curr = *(--p);
-            else
-                ++curr;
-        }
+    Move m;
+    Turn t = b.turn();
+    for (auto from : Squares)
+        for (auto to : Squares)
+            for (PieceType pt = BISHOP; pt < PIECETYPE_MAX; pt++)
+            {
+                Piece p = toPiece(pt, t);
 
-        curr = mlist;
-        auto legal_checks = p - curr;
-        auto speed_checks = c - clist;
+                if (pt >= BISHOP && pt < KING && !cantMove(p, to))
+                {
+                    m = makeDrop(p, to);
+                    check(m);
+                }
 
-        if (legal_checks != speed_checks)
-        {
-            std::cout << b << "legals :";
 
-            while (curr != p)
-                std::cout << pretty((curr++)->move) << " ";
+                // 指し手生成で生成されるはずのない手は除外する。
+                if ((attackAll(p, from, allZeroMask()) & to))
+                {
+                    for (Piece c = EMPTY; c < PIECE_MAX; c++)
+                    {
+                        if (typeOf(c) == KING || c == SIGN_WHITE)
+                            continue;
 
-            curr = clist;
+                        if (!cantMove(p, to))
+                        {
+                            m = makeMove(from, to, p, c, false);
+                            check(m);
+                        }
 
-            std::cout << "\nspeeds: ";
-
-            while (curr != c)
-                std::cout << pretty((curr++)->move) << " ";
-
-            std::cout << std::endl;
-        }
-    }
+                        if (!isNoPromotable(pt) && canPromote(t, from) && canPromote(t, to))
+                        {
+                            m = makeMove(from, to, p, c, true);
+                            check(m);
+                        }
+                        
+                    }
+                }
+            }
 }
 
 void randomPlayer(Board& b, uint64_t loop_max)
@@ -101,13 +140,6 @@ void randomPlayer(Board& b, uint64_t loop_max)
             do {
                 m = ml.begin()[rng.rand<int>() % ml.size()].move;
             } while (cc++ < 3 && isDrop(m));
-
-            if (b.seeGe(m, Score(1)) != (b.see(m) >= 1))
-            {
-                std::cout << b << pretty(m) << "see = " << b.see(m) << std::endl;
-
-                b.seeGe(m, Score(1));
-            }
 
             b.doMove(m, state[ply], b.givesCheck(m));
             moves[ply] = m;

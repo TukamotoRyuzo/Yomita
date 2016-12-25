@@ -52,8 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // 読み込み方が対応するだけで、生成には対応しない。
 //#define GENERATED_SFEN_BY_FILESQ
 
+// なんらかの評価関数バイナリを使う場合のdefine。
+#if defined EVAL_KPP || defined EVAL_KPPT || defined EVAL_PPT
+#define USE_EVAL
+#endif
+
 // 進行度を使うときに定義する。
+#ifdef USE_EVAL
 #define USE_PROGRESS
+#endif
 
 // 評価関数バイナリが入っているディレクトリと、学習時に生成したバイナリを保存するディレクトリ
 #ifdef EVAL_KPP
@@ -72,11 +79,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define EVAL_TYPE "ppt"
 #else
 #define EVAL_TYPE "komadoku_only"
-#endif
-
-// なんらかの評価関数バイナリを使う場合のdefine。
-#if defined EVAL_KPP || defined EVAL_KPPT || defined EVAL_PPT
-#define USE_EVAL
 #endif
 
 // 評価関数で手番を考慮しているときとそうでないときのdefine。

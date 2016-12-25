@@ -412,7 +412,7 @@ bool Board::pseudoLegal(const Move move) const
             // 両王手に対して持ち駒を打つ手を生成することはできない。
             if (checkers)
             {
-                std::cout << "pseudoLegal 2" << std::endl;
+                //std::cout << "pseudoLegal 2" << std::endl;
                 COUNT(2);
                 return false;
             }
@@ -420,7 +420,7 @@ bool Board::pseudoLegal(const Move move) const
             // 玉と、王手した駒との間に駒を打っていない。
             if (!(mask(to) & bbBetween(check_square, kingSquare(self))))
             {
-                std::cout << "pseudoLegal 3" << std::endl;
+                //std::cout << "pseudoLegal 3" << std::endl;
                 COUNT(3);
                 return false;
             }
@@ -438,7 +438,7 @@ bool Board::pseudoLegal(const Move move) const
         // 取った駒がtoにある駒である
         // ※レアケース。ハッシュミスが起こるとこの条件に引っかかることもありえる。
         // 置換表のサイズをケチると結構簡単に起こりえる。
-        if (isCapture(move) && capturePiece(move) != piece(to))
+        if (capturePiece(move) != piece(to))
         {
             COUNT(24);
             return false;
@@ -513,7 +513,7 @@ bool Board::pseudoLegal(const Move move) const
                 // 両王手なので玉が動かなければならない。
                 if (target)
                 {
-                    std::cout << "pseudoLegal 10" << std::endl;
+                    //std::cout << "pseudoLegal 10" << std::endl;
                     COUNT(10);
                     return false;
                 }
@@ -523,7 +523,7 @@ bool Board::pseudoLegal(const Move move) const
                 // 移動合いもしくは王手駒を取る手以外はだめ。
                 if (!(target & to))
                 {
-                    std::cout << "pseudoLegal 11" << std::endl;
+                    //std::cout << "pseudoLegal 11" << std::endl;
                     COUNT(11);
                     return false;
                 }

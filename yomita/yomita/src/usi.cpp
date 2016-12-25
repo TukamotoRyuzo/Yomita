@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timeman.h" // for ponderhit 
 
 const std::string engine_name = "Yomita_";
-const std::string version = "2.02";
+const std::string version = "2.03";
 
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI
@@ -439,6 +439,14 @@ void USI::loop(int argc, char** argv)
                 Signals.stop = true;
         }
 
+        else if (token == "resign")
+        {
+            SYNC_COUT << "bestmove resign" << SYNC_ENDL;
+
+            if (!Limits.ponder)
+                Signals.stop = true;
+        }
+
         // 手動で定跡手を追加。これで一手ずつ定跡を登録するのはつらすぎるが、定跡を読み込めてるかチェックするときには便利。
         else if (token == "mb") { Book.make(board, Options["BookDir"]); }
 
@@ -448,9 +456,12 @@ void USI::loop(int argc, char** argv)
         // 入玉宣言勝ちかどうか
         else if (token == "nyu") { std::cout << board.isDeclareWin() << std::endl; }
 
+#ifdef USE_PROGRESS
         // 進行度を表示
         else if (token == "prog") { std::cout << board.state()->progress.rate() * 100 << "%" << std::endl; }
-#if defined CONVERT_EVAL
+#endif
+
+#ifdef CONVERT_EVAL
         // 縦型Square用に作られたevalファイルを横型用に変換する。
         else if (token == "convert_eval_f2r") { Eval::convertEvalFileToRank(); }
 

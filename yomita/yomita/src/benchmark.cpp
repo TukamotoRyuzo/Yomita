@@ -71,6 +71,7 @@ void benchmark(Board& b)
             //"startpos moves 7g7f 8c8d 2g2f 8d8e 8h7g 3c3d 7i8h 4a3b 6i7h 2b7g+ 8h7g 3a2b 3i3h 7a6b 4g4f 5a4b 4i5h 7c7d 3h4g 2b3c 5i6h 6b7c 4g5f 7c6d 6g6f 7d7e 6f6e 7e7f 7g7f 6d7c 5h6g 6c6d 6e6d 7c6d P*6e 6d7c",
             //"startpos moves 7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d3d 2b3c 3d3f 8f8d 3f2f 3a2b P*8g 5a5b 5i5h 7c7d 3i3h 7a7b 3g3f",
             //"startpos moves 2g2f 3c3d 2f2e 2b3c 9g9f 8c8d 3i4h 7a6b 3g3f 4a3b 4h3g 8d8e 6i7h 3a2b 3g4f 7c7d 5i6h 3c4b 7g7f 5c5d 6h6i 6b5c 5g5f 5a4a 3f3e 3d3e 4f3e 8e8f 8g8f 4c4d 2h3h 8b8f P*8g",
+            //"startpos moves 7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d3d 2b3c 5i5h 5a5b 3g3f 8f7f 8h7g 3c7g+ 8i7g B*5e P*2b 2a3c 2b2a+ 3a4b P*2c 3b2c 3d8d 3c4e 7i6h",
             "startpos moves 2g2f 3c3d 2f2e 2b3c 7g7f 3a2b 5g5f 3c8h+ 7i8h B*5g 3g3f 1c1d 3i4h 5g1c+ B*7i 1c1b 5i6h 2b1c 6h7h 1b2b 7i4f 4c4d 4f5e 8b4b 8g8f 2b3b 8h8g 3b5d 4h3g 5d4e 5e7g 4e5f 4i5h 5c5d 3g4f 5f7d 3f3e 3d3e 4f3e 7d6d 4g4f 5d5e 2e2d 2c2d 3e2d 6d5d 2d1c+ P*2g 2h3h 1a1c P*3d 2g2h+ 3h2h S*2g S*6e 5d3f 2h4h P*2h P*5d 2h2i+ 5d5c+", // 250付近ｎ
             //"startpos moves 7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d3d 2b3c 5i6h 3a2b 3g3f 8f8b 2i3g 3c8h+ 7i8h 2b3c P*8c 8b8c P*8d 8c8b 3d3e 8b8d B*6f 8d8b P*8c",
 
@@ -83,6 +84,7 @@ void benchmark(Board& b)
 
         // ここに探索時の持ち時間など　探索深さでもいい
         string str_go =
+            //"go infinite";
             " depth 20";
         //" btime 0 wtime 0 byoyomi 10000";
 
@@ -100,7 +102,7 @@ void benchmark(Board& b)
         {
             istringstream is(positions[i]);
             USI::position(b, is);
-            //cout << b << endl;
+            cout << b << endl;
             is.clear(stringstream::goodbit);
             is.str(str_go);
             USI::go(b, is);

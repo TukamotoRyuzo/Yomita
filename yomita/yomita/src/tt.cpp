@@ -53,27 +53,22 @@ void TranspositionTable::resize(size_t mb_size)
 }
 
 // TTEのポインタ、見つからなかったらreplaceできるTTEのポインタがpttに代入される
-bool TranspositionTable::probe(const Key key, TTEntry* &ptt, TTEntry* copy) const
+bool TranspositionTable::probe(const Key key, TTEntry* &ptt) const
 {
     TTEntry* const tte = firstEntry(key);
     const uint32_t key32 = key >> 32;
 
     for (int i = 0; i < CLUSTER_SIZE; ++i)
-    {
-        // コピーしてから比較する。
-        *copy = tte[i];
-
-        if (!copy->key32 || copy->key32 == key32) // 空か、同じ局面が見つかった
+        if (!tte[i].key32 || tte[i].key32 == key32) // 空か、同じ局面が見つかった
         {
-            if (copy->generation8 != generation8_ && copy->key32)
+            if (tte[i].generation8 != generation8_ && tte[i].key32)
                 tte[i].generation8 = generation8_; // Refresh
 
             // 空だったら見つかってないのでfalse ※Clusterは先頭から順番に埋まっていく
             ptt = &tte[i];
-            return (bool)copy->key32;
+            return (bool)tte[i].key32;
         }
-    }
-
+    
     // 見つからなかったら、replaceできるポインタを返す。
     TTEntry* replace = tte;
 

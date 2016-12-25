@@ -38,7 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 #ifdef USE_GATHER
-static const __m256i MASK[9] = {
+static const __m256i MASK[9] = 
+{
     _mm256_setzero_si256(),
     _mm256_set_epi32(0, 0, 0, 0, 0, 0, 0, -1),
     _mm256_set_epi32(0, 0, 0, 0, 0, 0, -1, -1),
@@ -69,7 +70,7 @@ namespace Eval
         }
 
 #ifdef USE_FILE_SQUARE_EVAL
-        // 縦型Square用の評価関数バイナリを使うときは横型に変換して読み込む。
+        // BonaPieceの横→縦変換テーブル
         int y2b[fe_end];
 
         for (BonaPiece p = BONA_PIECE_ZERO; p < fe_end; p++)
@@ -88,9 +89,80 @@ namespace Eval
             }
         }
 
+
+#ifndef IS_64BIT
+
+        // 縦→横
+        int f2r[fe_end];
+
+        for (BonaPiece p = BONA_PIECE_ZERO; p < fe_end; p++)
+        {
+            if (p < fe_hand_end)
+            {
+                f2r[p] = p;
+            }
+            else
+            {
+                auto wp = p - fe_hand_end;
+                Square sq = Square(wp % 81);
+                Square rsq = fileSq(sq);
+                auto np = p - sq + rsq;
+                f2r[p] = np;
+            }
+        }
+
         // x86環境ではKPPT二つ分のメモリを確保しようとするとbad_allocを起こすことがある。
         // 一時バッファ無しで縦型→横型変換するコードが理想だが今のところ思いつかない。
+        const size_t size_kk = SQ_MAX * SQ_MAX;
+        const size_t size_kkp = SQ_MAX * (int)SQ_MAX * (int)fe_end;
+        const size_t size_kpp = SQ_MAX * (int)fe_end * (int)fe_end;
+        ValueKk* kk2 = new ValueKk[size_kk];
+        ValueKkp* kkp2 = new ValueKkp[size_kkp];
+        const int sm = SQ_MAX, fe = fe_end;
+        ifsKK.read(reinterpret_cast<char*>(kk2), size_kk * sizeof(ValueKk));
+        ifsKKP.read(reinterpret_cast<char*>(kkp2), size_kkp * sizeof(ValueKkp));
 
+        // 元の重みをコピー
+        for (auto k1 : Squares)
+            for (auto k2 : Squares)
+                kk[k1][k2] = kk2[toEvalSq(k1) * sm + toEvalSq(k2)];
+
+        for (auto k1 : Squares)
+            for (auto k2 : Squares)
+                for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
+                    kkp[k1][k2][p] = kkp2[toEvalSq(k1) * sm * fe + toEvalSq(k2) * fe + y2b[p]];
+
+        // せめてkk, kkpだけでも先に解放してやる。
+        delete[] kk2;
+        delete[] kkp2;
+
+        // 3回に分けて読み込んでやるか...
+        const size_t r = size_kpp / 3;
+        ValueKpp* kpp2 = new ValueKpp[r];
+        ifsKPP.read(reinterpret_cast<char*>(kpp2), r * sizeof(ValueKpp));
+
+        for (Square k = SQ_ZERO; k <= SQ_13; k++)
+            for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
+                for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
+                    kpp[fileSq(k)][f2r[p1]][f2r[p2]] = kpp2[(int)k * fe * fe + p1 * fe + p2];
+
+        ifsKPP.read(reinterpret_cast<char*>(kpp2), r * sizeof(ValueKpp));
+
+        for (Square k = SQ_94; k <= SQ_16; k++)
+            for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
+                for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
+                    kpp[fileSq(k)][f2r[p1]][f2r[p2]] = kpp2[(int)(k - SQ_94) * fe * fe + p1 * fe + p2];
+
+        ifsKPP.read(reinterpret_cast<char*>(kpp2), r * sizeof(ValueKpp));
+
+        for (Square k = SQ_97; k <= SQ_19; k++)
+            for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
+                for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
+                    kpp[fileSq(k)][f2r[p1]][f2r[p2]] = kpp2[(int)(k - SQ_97) * fe * fe + p1 * fe + p2];
+
+
+        delete[] kpp2;
+#else
         EvalTable et2;
         auto tempeval = new SharedEval();
         et2.set(tempeval);
@@ -115,6 +187,7 @@ namespace Eval
                     kkp[k1][k2][p] = (*et2.kkp_)[toEvalSq(k1)][toEvalSq(k2)][y2b[p]];
 
         delete tempeval;
+#endif
 #else
         ifsKK.read(reinterpret_cast<char*>(kk), sizeof(kk));
         ifsKKP.read(reinterpret_cast<char*>(kkp), sizeof(kkp));

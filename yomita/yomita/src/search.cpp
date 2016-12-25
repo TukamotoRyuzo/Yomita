@@ -222,62 +222,65 @@ void Search::clear()
 
 void MainThread::search()
 {
+    bool declare_win = false, book_hit = false;
     Turn t = RootTurn = root_board.turn();
     Time.init(Limits, t, root_board.ply());
 
     // 合法手がない == 詰んでいる局面もしくはステイルメイト。将棋は両方負けである。
     if (root_moves.empty())
     {
-        SYNC_COUT << "info depth 0 score " << USI::score(-SCORE_MATE) << std::endl
-                  << "bestmove resign" << SYNC_ENDL;
-        return;
+        root_moves.push_back(RootMove(MOVE_NONE));
+        SYNC_COUT << "info depth 0 score " << USI::score(-SCORE_MATE) << SYNC_ENDL;
     }
 
     // 宣言勝ち
     else if (root_board.isDeclareWin())
     {
-        SYNC_COUT << "info depth 0 score " << USI::score(SCORE_MATE) << std::endl
-                  << "bestmove win" << SYNC_ENDL;
-        return;
+        declare_win = true;
+        SYNC_COUT << "info depth 0 score " << USI::score(SCORE_MATE) << SYNC_ENDL;
     }
 
-    // 定跡手
-    else if (Options["UseBook"] && !Limits.infinite)
+    else 
     {
-        // 定跡手を取得
-        const Move m = Book.probe(root_board);
-
-        // 定跡にヒット
-        if (m != MOVE_NONE)
+        // 定跡手
+        if (Options["UseBook"] && !Limits.infinite)
         {
-            auto it_move = std::find(root_moves.begin(), root_moves.end(), m);
+            // 定跡手を取得
+            const Move m = Book.probe(root_board);
 
-            if (it_move != root_moves.end())
+            // 定跡にヒット
+            if (m != MOVE_NONE)
             {
-                SYNC_COUT << "bestmove " << toUSI(m) << SYNC_ENDL;
-                return;
+                auto it_move = std::find(root_moves.begin(), root_moves.end(), m);
+
+                if (it_move != root_moves.end())
+                {
+                    std::swap(root_moves[0], *it_move);
+                    book_hit = true;
+                }
+            }
+        }
+
+        if (!book_hit)
+        {
+            // 検討モード時や秒読み時は合法手が1手しかなくても思考する
+            if (!Limits.infinite
+                && root_moves.size() == 1
+                && !Limits.move_time)
+            {
+                completed_depth = DEPTH_MAX;
+                root_moves[0].score = SCORE_INFINITE; // 絶対この手が選ばれるように
             }
             else
-                SYNC_COUT << "info string book move is illegal, move is " << toUSI(m) << SYNC_ENDL;
+            {
+                // slaveスレッドの探索を開始させる
+                for (auto th : Threads.slaves)
+                    th->startSearching();
+
+                // 探索開始
+                Thread::search();
+            }
         }
-    }
-
-    // 検討モード時や秒読み時は合法手が1手しかなくても思考する
-    if (!Limits.infinite
-        && root_moves.size() == 1
-        && !Limits.move_time)
-    {
-        completed_depth = DEPTH_MAX;
-        root_moves[0].score = SCORE_INFINITE; // 絶対この手が選ばれるように
-    }
-    else
-    {
-        // slaveスレッドの探索を開始させる
-        for (auto th : Threads.slaves)
-            th->startSearching();
-
-        // 探索開始
-        Thread::search();
     }
 
     if (!Signals.stop && (Limits.ponder || Limits.infinite))
@@ -295,6 +298,7 @@ void MainThread::search()
     Thread* best_thread = this;
 
     if (!easy_move_played
+        && !book_hit
         && Options["MultiPV"] == 1
         && root_moves[0].pv[0] != MOVE_NONE)
     {
@@ -310,17 +314,24 @@ void MainThread::search()
     if (best_thread != this)
         SYNC_COUT << USI::pv(best_thread->root_board, best_thread->completed_depth, -SCORE_INFINITE, SCORE_INFINITE) << SYNC_ENDL;
 
-    const Move best_move = best_thread->root_moves[0].pv[0];
+    // 宣言勝ちできるなら勝ち
+    if (declare_win)
+        SYNC_COUT << "bestmove win" << SYNC_ENDL;
 
-    SYNC_COUT << "bestmove " << toUSI(best_move);
+    else
+    {
+        const Move best_move = best_thread->root_moves[0].pv[0];
 
-    if (Options["USI_Ponder"]
-        && best_thread->root_moves[0].pv.size() > 1
-        || (best_thread->root_moves[0].pv[0] != MOVE_NONE 
-            && best_thread->root_moves[0].extractPonderFromTT(root_board, WeakPonder)))
-        std::cout << " ponder " << toUSI(best_thread->root_moves[0].pv[1]);
+        SYNC_COUT << "bestmove " << toUSI(best_move);
 
-    std::cout << SYNC_ENDL;
+        if (Options["USI_Ponder"]
+            && best_thread->root_moves[0].pv.size() > 1
+            || (best_thread->root_moves[0].pv[0] != MOVE_NONE
+                && best_thread->root_moves[0].extractPonderFromTT(root_board, WeakPonder)))
+            std::cout << " ponder " << toUSI(best_thread->root_moves[0].pv[1]);
+
+        std::cout << SYNC_ENDL;
+    }
 }
 
 void Thread::search()
@@ -383,7 +394,7 @@ void Thread::search()
 
             while (true)
             {
-                best_score = ::search<PV>(root_board, ss, alpha, beta, root_depth, false, false);
+                best_score = ::search<PV>(root_board, ss, alpha, beta, root_depth, false);
 
                 std::stable_sort(root_moves.begin() + pv_idx, root_moves.end());
 
@@ -595,7 +606,7 @@ namespace
         const Move excluded_move = ss->excluded_move;
 
 #ifdef ENABLE_TT
-        TTEntry te, *tte;
+        TTEntry *tte;
         Move tt_move;
         Score tt_score;
         Depth tt_depth;
@@ -603,15 +614,15 @@ namespace
         Score tt_eval;
 
         const Key key = b.key() ^ (Key(excluded_move) << 1);
-        bool tt_hit = TT.probe(key, tte, &te);
+        bool tt_hit = TT.probe(key, tte);
 
         if (tt_hit)
         {
-            tt_move = rootNode ? this_thread->root_moves[this_thread->pv_idx].pv[0] : te.move();
-            tt_score = scoreFromTT(te.score(), ss->ply);
-            tt_depth = te.depth();
-            tt_bound = te.bound();
-            tt_eval = te.eval();
+            tt_move = rootNode ? this_thread->root_moves[this_thread->pv_idx].pv[0] : tte->move();
+            tt_score = scoreFromTT(tte->score(), ss->ply);
+            tt_depth = tte->depth();
+            tt_bound = tte->bound();
+            tt_eval = tte->eval();
         }
         else
         {
@@ -831,8 +842,8 @@ namespace
 
             // TODO:IIDの結果得られたスコアを何かに利用できないだろうか。
             Score s = search<NT>(b, ss, alpha, beta, d, true, true);
-            tt_hit = TT.probe(key, tte, &te);
-            tt_move = tt_hit ? te.move() : MOVE_NONE;
+            tt_hit = TT.probe(key, tte);
+            tt_move = tt_hit ? tte->move() : MOVE_NONE;
 
             if (tt_hit && (key >> 32) != tte->key())
                 tt_move = MOVE_NONE;
@@ -1187,7 +1198,7 @@ namespace
         Depth qdepth = (InCheck || depth >= DEPTH_QS_CHECKS) ? DEPTH_QS_CHECKS : DEPTH_QS_NO_CHECKS;
 
 #ifdef ENABLE_TT
-        TTEntry* tte, te;
+        TTEntry* tte;
         Move tt_move;
         Score tt_score;
         Depth tt_depth;
@@ -1195,15 +1206,15 @@ namespace
         Score tt_eval;
 
         const Key key = b.key();
-        bool tt_hit = TT.probe(key, tte, &te);
+        bool tt_hit = TT.probe(key, tte);
 
         if (tt_hit)
         {
-            tt_move = te.move();
-            tt_score = scoreFromTT(te.score(), ss->ply);
-            tt_depth = te.depth();
-            tt_bound = te.bound();
-            tt_eval = te.eval();
+            tt_move = tte->move();
+            tt_score = scoreFromTT(tte->score(), ss->ply);
+            tt_depth = tte->depth();
+            tt_bound = tte->bound();
+            tt_eval = tte->eval();
         }
         else
         {
@@ -1547,12 +1558,12 @@ namespace
 bool Search::RootMove::extractPonderFromTT(Board & b, Move weak_ponder)
 {
     StateInfo st;
-    TTEntry* tte, te;
+    TTEntry* tte;
     assert(pv.size() == 1);
 
     b.doMove(pv[0], st);
 
-    Move m = TT.probe(b.key(), tte, &te) ? te.move() : weak_ponder;
+    Move m = TT.probe(b.key(), tte) ? tte->move() : weak_ponder;
     const bool contains = MoveList<LEGAL>(b).contains(m);
 
     b.undoMove(pv[0]);

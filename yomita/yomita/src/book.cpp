@@ -171,10 +171,17 @@ void MemoryBook::store(const std::string filename, const std::string sfen, const
 // 定跡ファイルの読み込み(book.db)など。MemoryBookに読み出す
 int MemoryBook::read(const std::string filename)
 {
+    static bool allready = false;
+
+    if (allready)
+        return 0;
+
     vector<string> lines;
 
     if (readAllLines(filename, lines))
         return 1; // 読み込み失敗
+
+    allready = true;
 
     uint64_t num_sum = 0;
     string sfen;
