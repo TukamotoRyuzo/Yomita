@@ -6,7 +6,7 @@
 また、一部の処理はAperyを参考にしています。  
   
 実行ファイル、評価関数バイナリはこちらからダウンロードできます。
-https://github.com/TukamotoRyuzo/Yomita/releases/tag/2.03
+https://github.com/TukamotoRyuzo/Yomita/releases/tag/wcsc27
 
 やねうら王、Aperyの評価関数バイナリは、読み太でも使うことができます。
 付属している評価関数バイナリは、やねうら王、Aperyでも使うことができます。
