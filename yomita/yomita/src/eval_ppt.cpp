@@ -39,20 +39,17 @@ namespace Eval
     // 評価関数ファイルを読み込む
     void loadSub()
     {
-        std::ifstream ifsPP(path((std::string)USI::Options["EvalDir"], PP_BIN), std::ios::binary);
+        std::ifstream ifs(path((std::string)USI::Options["EvalDir"], PP_BIN), std::ios::binary);
         
-        if (ifsPP)
-            ifsPP.read(reinterpret_cast<char*>(ppt), sizeof(ppt));
-        else
-            goto Error;
-
+        if (ifs)
+        {
+            ifs.read(reinterpret_cast<char*>(ppt), sizeof(ppt));
 #ifdef LEARN
-        evalLearnInit();
+            evalLearnInit();
 #endif
-        return;
-
-    Error:;
-        std::cout << "\ninfo string open evaluation file failed.\n";
+        }
+        else
+            std::cout << "\ninfo string open evaluation file failed.\n";
     }
 
     // PPのスケール

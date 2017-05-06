@@ -97,38 +97,6 @@ namespace Eval
         // 値が小さいうちはskipする
         if (abs(g2[0]) >= 0.1f && !skip_update)
             w = WeightValue{ w[0] - eta * g[0] / sqrt(g2[0]) ,w[1] - eta2 * g[1] / sqrt(g2[1]) };
-
-#elif defined USE_YANE_GRAD_UPDATE
-        if (g[0] == 0 && g[1] == 0)
-            return false;
-
-        g2 = WeightValue{ alpha * g2[0] + g[0] * g[0] , alpha * g2[1] + g[1] * g[1] };
-
-        // skip_updateのときはg2の更新に留める。
-        if (!skip_update)
-            w = WeightValue{ w[0] - eta * g[0] / sqrt(g2[0] + epsilon) ,w[1] - eta2 * g[1] / sqrt(g2[1] + epsilon) };
-
-#elif defined USE_ADAM_UPDATE
-        // Adamのときは勾配がゼロのときでもwの更新は行なう。
-        //if (g[0] == 0 && g[1] == 0)
-        //	return false;
-
-        // v = βv + (1-β)g
-        // r = γr + (1-γ)g^2
-        // w = w - α*v / (sqrt(r/(1-γ^t))+e) * (1-β^t)
-        // rt = 1-γ^t , bt = 1-β^tとして、これは事前に計算しておくとすると、
-        // w = w - α*v / (sqrt(r/rt) + e) * (bt)
-
-        v = WeightValue{ beta * v[0] + (1 - beta)*g[0] , beta * v[1] + (1 - beta) * g[1] };
-        r = WeightValue{ gamma * r[0] + (1 - gamma)*g[0] * g[0] , gamma * r[1] + (1 - gamma)*g[1] * g[1] };
-
-        // sqrt()の中身がゼロになりうるので、1回目の割り算を先にしないとアンダーフローしてしまう。
-        // 例) epsilon * bt = 0
-        // あと、doubleでないと計算精度が足りなくて死亡する。
-        if (!skip_update)
-            w = WeightValue{ w[0] - LearnFloatType(eta / (sqrt((double)r[0] / rt) + epsilon) * v[0] / bt) ,
-            w[1] - LearnFloatType(eta2 / (sqrt((double)r[1] / rt) + epsilon) * v[1] / bt)
-        };
 #endif
 
         g = { 0, 0 };
@@ -136,12 +104,7 @@ namespace Eval
         return !skip_update;
     }
 
-#ifdef USE_ADAM_UPDATE
-    double Weight::bt;
-    double Weight::rt;
-#else
     LearnFloatType Weight::eta;
-#endif
     LearnFloatType Weight::eta2;
 
     Weight(*pp_w_)[fe_end2][fe_end2];
@@ -208,18 +171,8 @@ namespace Eval
 #endif
 #elif defined USE_ADA_GRAD_UPDATE
         Weight::eta = 5.0f / float(mini_batch_size / 1000000);
-#elif defined USE_YANE_GRAD_UPDATE
-#if defined (LOSS_FUNCTION_IS_CROSS_ENTOROPY)
-        Weight::eta = 5.0f / float(mini_batch_size / 1000000);
-#elif defined (LOSS_FUNCTION_IS_WINNING_PERCENTAGE)
-        Weight::eta = 20.0f / float(mini_batch_size / 1000000);
-#endif
 #endif
         
-#if defined USE_ADAM_UPDATE
-        Weight::bt = 1.0 - pow((double)Weight::beta, (double)epoch);
-        Weight::rt = 1.0 - pow((double)Weight::gamma, (double)epoch);
-#endif
         Weight::eta2 = Weight::eta / 4;
 
         for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end2; ++p1)

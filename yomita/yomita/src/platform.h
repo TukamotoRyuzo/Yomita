@@ -53,7 +53,8 @@ typedef unsigned __int64 uint64_t;
 #endif
 #endif
 
-#define STATIC_ASSERT(x) static_assert(x, "static assertion error!")
+// いらない関数をすべて無効にして実行ファイルを小さくする。
+#define HELPER
 
 // bsfq命令(_Bitscanforword)を使うか
 #if defined(_WIN64) && !defined(IS_64BIT)

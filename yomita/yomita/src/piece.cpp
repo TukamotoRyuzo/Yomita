@@ -56,6 +56,7 @@ const Score PROMOTE_SCORE[] =
     SCORE_ZERO, SCORE_ZERO, SCORE_ZERO, SCORE_ZERO, SCORE_ZERO, SCORE_ZERO, SCORE_ZERO, SCORE_ZERO
 };
 
+#ifdef HELPER
 std::string pretty(const PieceType pt)
 {
     assert(isOK(pt));
@@ -71,7 +72,7 @@ std::ostream& operator << (std::ostream &os, const Piece p)
     os << str[p];
     return os;
 }
-
+#endif
 std::string toUSI(Piece pc) 
 { 
     auto s = std::string(". B R P L N S G K +B+R+P+L+N+S+G+.b r p l n s g k +b+r+p+l+n+s+g+k").substr(pc * 2, 2); 

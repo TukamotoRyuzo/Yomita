@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -29,8 +29,10 @@
     <ClInclude Include="src\enumoperator.h" />
     <ClInclude Include="src\evalsum.h" />
     <ClInclude Include="src\evaluate.h" />
+    <ClInclude Include="src\eval_kpptp.h" />
     <ClInclude Include="src\eval_ppt.h" />
     <ClInclude Include="src\eval_kppt.h" />
+    <ClInclude Include="src\eval_pptp.h" />
     <ClInclude Include="src\genmove.h" />
     <ClInclude Include="src\gensfen.h" />
     <ClInclude Include="src\hand.h" />
@@ -62,15 +64,19 @@
     <ClCompile Include="src\book.cpp" />
     <ClCompile Include="src\common.cpp" />
     <ClCompile Include="src\eval_kpp.cpp" />
+    <ClCompile Include="src\eval_kpptp.cpp" />
     <ClCompile Include="src\eval_ppt.cpp" />
     <ClCompile Include="src\eval_kppt.cpp" />
+    <ClCompile Include="src\eval_pptp.cpp" />
     <ClCompile Include="src\genmove.cpp" />
     <ClCompile Include="src\gensfen.cpp" />
     <ClCompile Include="src\haffman.cpp" />
     <ClCompile Include="src\hand.cpp" />
     <ClCompile Include="src\learn.cpp" />
     <ClCompile Include="src\learn_kppt.cpp" />
+    <ClCompile Include="src\learn_kpptp.cpp" />
     <ClCompile Include="src\learn_ppt.cpp" />
+    <ClCompile Include="src\learn_pptp.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\move.cpp" />
     <ClCompile Include="src\movepick.cpp" />
@@ -154,12 +160,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>../../yomita_engine/</OutDir>
-    <TargetName>$(ProjectName)_kppt2.03_x86_nosse</TargetName>
+    <TargetName>$(ProjectName)_kppt4.0_x86_nosse</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>../../yomita_engine/</OutDir>
-    <TargetName>$(ProjectName)_kppt2.03_avx2</TargetName>
+    <TargetName>$(ProjectName)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

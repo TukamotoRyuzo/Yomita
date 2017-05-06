@@ -31,14 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 enum Depth : int16_t
 {
-    ONE_PLY = 1,
+    ONE_PLY = 2,
 
     DEPTH_ZERO = 0 * ONE_PLY,
     DEPTH_QS_CHECKS = 0 * ONE_PLY,
     DEPTH_QS_NO_CHECKS = -1 * ONE_PLY,
     DEPTH_QS_RECAPTURES = -5 * ONE_PLY,
 
-    DEPTH_NONE = -6 * ONE_PLY,
+    DEPTH_NONE = -128 * ONE_PLY,
     DEPTH_MAX = MAX_PLY * ONE_PLY,
 };
 
@@ -47,8 +47,8 @@ static_assert(!(ONE_PLY & (ONE_PLY - 1)), "ONE_PLY is not a power of 2");
 ENABLE_OPERATORS_ON(Depth);
 
 typedef std::unique_ptr<aligned_stack<StateInfo>>  StateStackPtr;
-template<typename T, bool CM> struct Stats;
-typedef Stats<Score, true> CounterMoveStats;
+template<typename T> struct Stats;
+typedef Stats<int> CounterMoveStats;
 struct TTEntry;
 
 namespace Search
@@ -61,16 +61,9 @@ namespace Search
         Move excluded_move;
         Move killers[2];
         Score static_eval; // 現局面で評価関数を呼び出した時のスコア
-        Score history;
+        int history;
         int move_count;
         CounterMoveStats* counter_moves;
-
-        Stack() {};
-        Stack(const Stack& s)
-        {
-            killers[0] = s.killers[0];
-            killers[1] = s.killers[1];
-        }
     };
 
     struct RootMove
@@ -100,6 +93,6 @@ namespace Search
 namespace Learn
 {
     std::pair<Score, std::vector<Move>> qsearch(Board& b, Score alpha, Score beta);
-    std::pair<Score, std::vector<Move>>  search(Board& b, Score alpha, Score beta, int depth);
+    std::pair<Score, std::vector<Move>>  search(Board& b, Score alpha, Score beta, Depth depth);
 } // namespace Learn
 #endif

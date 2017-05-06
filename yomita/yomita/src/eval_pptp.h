@@ -1,5 +1,5 @@
-﻿/*
-読み太（yomita）, a USI shogi (Japanese chess) playing engine derived from
+/*
+�ǂݑ��iyomita�j, a USI shogi (Japanese chess) playing engine derived from
 Stockfish 7 & YaneuraOu mid 2016 V3.57
 Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
@@ -23,32 +23,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-#include <unordered_map>
-#include "move.h"
-#include "board.h"
+#include "evaluate.h"
 
-// 定跡処理関係
-struct MemoryBook
+#ifdef EVAL_PPTP
+
+#include "evalsum.h"
+
+#define PPTP_BIN "PPTP.bin"
+
+namespace Eval
 {
-    // 定跡ファイルの読み込み、書き込み
-    int read(const std::string filename);
-    int write(const std::string filename);
-#ifdef HELPER
-    // 手動登録
-    void make(const Board& b, const std::string filename);
+    // [0] ���̔z�u�̓_��
+    // [1] ��ԃ{�[�i�X
+    // [2]~[15] �i�s�x�{�[�i�X
+    union ValuePptp
+    {
+        ValuePptp& operator = (ValuePptp& b) { _mm256_store_si256(&this->m, b.m); return *this; }
+
+        std::array<int16_t, 16> p;
+        __m256i m;
+    };
+
+    
+    // memory mapped file�p
+    struct SharedEval
+    {
+        ValuePptp pptp_[fe_end2][fe_end2];
+    };
+
+    struct EvalTable
+    {
+        ValuePptp(*pptp_)[fe_end2][fe_end2];
+
+        void set(SharedEval* se)
+        {
+            pptp_ = &se->pptp_;
+        }
+    };
+
+    extern EvalTable et;
+
+} // namespace Eval
 #endif
-    // bookに指し手を加えてファイルに書き出す。
-    void store(const std::string filename, const std::string sfen, const Move m);
-
-    // bookに指し手を加える。
-    void insert(const std::string sfen, const Move m);
-
-    // 局面のsfenをkeyとして定跡登録されていればmoveを返す。
-    // 登録されていなければMOVE_NONEを返す。
-    Move probe(const Board& b) const;
-
-private:
-    std::unordered_map<std::string, Move> book;
-};
-
-extern MemoryBook Book;

@@ -104,10 +104,10 @@ public:
     // range based forのためのoperator
     Square operator * () { return firstOne(); }
     void operator ++ () {};
-
+#ifdef HELPER
     // デバッグ用。ビットボードのレイアウトを見たいときに使う
     friend std::ostream& operator << (std::ostream& ofs, const Bitboard& b);
-
+#endif
 private:
 #if defined (HAVE_SSE2) || defined (HAVE_SSE4)
     union
@@ -149,7 +149,7 @@ extern __m256i YMM_TO[SQ_MAX];
 #endif
 extern const Bitboard FILE_MASK[FILE_MAX];
 extern const Bitboard RANK_MASK[RANK_MAX];
-extern const Bitboard SQUARE_MASK[SQ_MAX];
+extern const Bitboard SQUARE_MASK[SQ_MAX + 1];
 extern const Bitboard FRONT_MASK[TURN_MAX][RANK_MAX];
 
 inline Bitboard mask(const File f) { return FILE_MASK[f]; }
@@ -214,39 +214,6 @@ extern const Bitboard BB_ENEMY_MASK[TURN_MAX];
 // turn側から見て敵の陣地 + 1段を取り出すマスク定数
 extern const Bitboard BB_PROMOTE_MASK[TURN_MAX];
 
-#if 0
-const size_t bbtable_size = sizeof(FILE_MASK)
-+ sizeof(RANK_MASK)
-+ sizeof(SQUARE_MASK)
-+ sizeof(FRONT_MASK)
-+ sizeof(BB_PAWN_ATTACKS)
-+ sizeof(BB_KNIGHT_ATTACKS)
-+ sizeof(BB_SILVER_ATTACKS)
-+ sizeof(BB_GOLD_ATTACKS)
-+ sizeof(BB_KING_ATTACKS)
-+ sizeof(BB_FILE_ATTACKS)
-+ sizeof(BB_RANK_ATTACKS)
-+ sizeof(BISHOP_ATTACK)
-+ sizeof(BISHOP_ATTACK_INDEX)
-+ sizeof(BB_OBSTACLE)
-+ sizeof(PEXT_MASK_FILE)
-+ sizeof(PEXT_MASK_DIAG)
-+ sizeof(BB_LANCE_ATTACKS)
-+ sizeof(BB_ROOK_ATTACKS)
-+ sizeof(BB_EXCEPT_PAWN_FILE_MASK)
-+ sizeof(ROOK_STEP_ATTACK)
-+ sizeof(BISHOP_STEP_ATTACK)
-+ sizeof(BB_LANCE_CHECKS)
-+ sizeof(BB_KNIGHT_CHECKS)
-+ sizeof(BB_SILVER_CHECKS)
-+ sizeof(BB_GOLD_CHECKS)
-+ sizeof(BB_LINE)
-+ sizeof(BB_ENEMY_MASK)
-+ sizeof(BB_PROMOTE_MASK);
-
-const size_t kb_size = bbtable_size >> 10;
-#endif
-
 // turn側から見て敵の陣地だけを取り出すマスク
 inline Bitboard enemyMask(const Turn t) { return BB_ENEMY_MASK[t]; }
 
@@ -293,7 +260,7 @@ inline Bitboard   goldCheck(const Turn t, const Square sq) { return BB_GOLD_CHEC
 // 縦横斜めの利きを求める。
 template <RelationType RT> inline Bitboard attacks(const Square from, const Bitboard& occupied)
 {
-    STATIC_ASSERT(RT == DIRECT_RANK || RT == DIRECT_FILE);
+    static_assert(RT == DIRECT_RANK || RT == DIRECT_FILE, "");
 
     // Rankの場合だけ、pextを使わずにマスクと右シフトで求める。
     if (RT == DIRECT_RANK)

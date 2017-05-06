@@ -142,21 +142,21 @@ namespace Eval
     };
 
     ENABLE_OPERATORS_ON(BonaPiece);
-
+#ifdef HELPER
     inline bool isOK(const BonaPiece bp) { return bp > BONA_PIECE_ZERO && bp < fe_end2; }
     inline bool isOK2(const BonaPiece bp) { return bp > BONA_PIECE_ZERO && bp < fe_end; }
     inline bool isOK3(const BonaPiece bp) { return bp > BONA_PIECE_ZERO && bp < fe_gold_end; }
 
     // BonaPieceの内容を表示する。手駒ならH,盤上の駒なら升目。例) HP3 (3枚目の手駒の歩)
     std::ostream& operator << (std::ostream& os, BonaPiece bp);
-
+#endif
     // BonaPieceを後手から見たとき(先手の39の歩を後手から見ると後手の71の歩)の番号とを
     // ペアにしたものをExtBonaPiece型と呼ぶことにする。
     struct ExtBonaPiece { BonaPiece fb, fw;	};
-
+#ifdef HELPER
     // BonaPiece、fb側だけを表示する。
     inline std::ostream& operator << (std::ostream& os, ExtBonaPiece bp) { os << bp.fb; return os; }
-
+#endif
     // KPPテーブルの盤上の駒pcに対応するBonaPieceを求めるための配列。
     // 例)
     // BonaPiece fb = BP_BOARD_ID[pc].fb + sq; // 先手から見たsqにあるpcに対応するBonaPiece
@@ -226,8 +226,8 @@ namespace Eval
         }
 
         // 駒リスト。駒番号(PieceNo)いくつの駒がどこにあるのか(BonaPiece)を示す。FV38などで用いる。
-        BonaPiece piece_list_fb_[PIECE_NO_NB];
-        BonaPiece piece_list_fw_[PIECE_NO_NB];
+        ALIGNAS(32) BonaPiece piece_list_fb_[PIECE_NO_NB];
+        ALIGNAS(32) BonaPiece piece_list_fw_[PIECE_NO_NB];
 
         // あるBonaPieceに対して、その駒番号(PieceNo)を保持している配列
         PieceNo piece_no_list_[fe_end2];

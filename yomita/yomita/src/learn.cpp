@@ -72,7 +72,7 @@ namespace Learn
     }
 
     // 学習に対応している評価関数のときだけ定義。
-#if defined EVAL_KPPT || defined EVAL_PPT
+#if defined EVAL_KPPT || defined EVAL_PPT || defined EVAL_PPTP || defined EVAL_KPPTP
 
     // 複数スレッドで学習するためのクラス
     struct LearnerThink : public MultiThink
@@ -131,9 +131,7 @@ namespace Learn
                     std::cout << '.';
 
                 // このタイミングで勾配をweight配列に反映。勾配の計算も1M局面ごとでmini-batch的にはちょうどいいのでは。
-
 #ifdef SYNC_UPDATE_WEIGHT
-
                 updating = true;
 
                 // 他のスレッドがすべてaddGradし終えるのを待つ。
@@ -147,7 +145,6 @@ namespace Learn
                 Eval::updateWeights(mini_batch_size, ++epoch);
 
 #ifdef SYNC_UPDATE_WEIGHT
-
                 updating = false;
 
                 for (auto t : Threads.slaves)
@@ -195,9 +192,10 @@ namespace Learn
 #else
             auto shallow_value = Eval::evaluate(b);
 #endif
+            
             // 深い探索の評価値
             auto deep_value = (Score)*(int16_t*)&ps.data[32];
-
+            //SYNC_COUT << b << "shallow = " << shallow_value << "deep = " << deep_value << SYNC_ENDL;
             // 勾配
             double dj_dw = calcGrad(deep_value, shallow_value);
 
@@ -212,6 +210,9 @@ namespace Learn
             for (auto m : pv)
             {
                 b.doMove(m, state[ply++]);
+#ifdef USE_PROGRESS
+                Prog::evaluateProgress(b);
+#endif
             }
 #endif
 
@@ -284,7 +285,7 @@ namespace Learn
 #endif
             // 深い探索の評価値
             auto deep_value = (Score)*(int16_t*)&ps.data[32];
-#if 1
+#if 0
             if ((i++ % 1000) == 0)
                 SYNC_COUT << "shallow = " << std::setw(5) << shallow_value
                           << " deep = "   << std::setw(5) << deep_value << SYNC_ENDL;

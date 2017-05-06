@@ -78,9 +78,6 @@ struct Thread
     // checkTime()を呼び出すのをやめるかどうかのフラグ
     std::atomic_bool reset_calls;
 
-    // beta cutoffした指し手に加点して、それ以外のQuietな手には減点したもの
-    HistoryStats history;
-
     // ある指し手に対する指し手を保存しておく配列
     MoveStats counter_moves;
 
@@ -88,7 +85,7 @@ struct Thread
     CounterMoveHistoryStats counter_move_history;
 
     // fromからtoへの移動と手番に対する点数を保存しておく配列
-    FromToStats from_to_history;
+    HistoryStats history;
 
     // pv
     Move pv[MAX_PLY][MAX_PLY + 1];

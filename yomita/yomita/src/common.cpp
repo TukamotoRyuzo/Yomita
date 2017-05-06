@@ -133,7 +133,7 @@ namespace WinProcGroup {
     }
 #endif
 } // namespace WinProcGroup
-
+#ifdef HELPER
 // logging用のhack。streambufをこれでhookしてしまえば追加コードなしで普通に
 // cinからの入力とcoutへの出力をファイルにリダイレクトできる。
 // cf. http://groups.google.com/group/comp.lang.c++/msg/1d941c0f26ea0d81
@@ -186,8 +186,8 @@ private:
     ~Logger() { start(false); }
 
 };
-
 void startLogger(bool b) { Logger::start(b); }
+#endif
 
 // ファイルを丸読みする。ファイルが存在しなくともエラーにはならない。空行はスキップする。
 int readAllLines(std::string filename, std::vector<std::string>& lines)

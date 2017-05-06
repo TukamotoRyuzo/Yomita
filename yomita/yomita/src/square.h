@@ -83,7 +83,7 @@ inline Square inverse(const Square sq) { return Square(SQ_MAX - 1 - sq); }
 // 左右でミラーした位置を返す。
 inline Square mirror(const Square sq) { return sqOf(inverse(fileOf(sq)), rankOf(sq)); }
 
-// 先手から見たRankを返す。
+// 手番側から見たRankを返す。
 inline Rank relativeRank(const Rank r, const Turn t) { return t == BLACK ? r : inverse(r); }
 
 // やねうら王やAperyのevalファイルは右上開始の縦型Square用だが読み太は横型Squareなので、
@@ -113,7 +113,7 @@ typedef Square EvalSquare;
 #define toEvalSq(sq) (sq)
 #endif
 
-#ifdef GENERATED_SFEN_BY_FILESQ
+#if defined GENERATED_SFEN_BY_FILESQ || !defined IS_64BIT
 extern const Square NEXT_SQ[SQ_MAX];
 extern const Square FILE_SQ[SQ_MAX];
 
@@ -123,7 +123,7 @@ inline Square nextSq(const Square sq) { return NEXT_SQ[sq]; }
 // 縦型Squareから横型Squareに変換する。
 inline Square fileSq(const Square sq) {	return FILE_SQ[sq]; }
 #endif
-
+#ifdef HELPER
 // 画面出力用
 std::ostream& operator << (std::ostream& os, const File f);
 std::ostream& operator << (std::ostream& os, const Rank r);
@@ -135,15 +135,16 @@ std::string pretty(const Rank r);
 std::string pretty(const Square sq);
 std::string fromPretty(const Square sq);
 
-// USI形式で出力
-std::string toUSI(const Rank r);
-std::string toUSI(const File f);
-std::string toUSI(const Square sq);
-
 // CSA形式で出力
 std::string toCSA(const Rank r);
 std::string toCSA(const File f);
 std::string toCSA(const Square sq);
+#endif
+
+// USI形式で出力
+std::string toUSI(const Rank r);
+std::string toUSI(const File f);
+std::string toUSI(const Square sq);
 
 // Squareが手番側から見て成れるかどうかを返す。
 inline bool canPromote(const Turn t, const Square sq) { return t == BLACK ? sq <= SQ_13 : sq >= SQ_97; }

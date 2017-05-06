@@ -49,7 +49,6 @@ void TranspositionTable::resize(size_t mb_size)
 
     // mem_から64バイトでアラインされたアドレスを得て、それをtableとして使う。
     table_ = (Cluster*)((uintptr_t(mem_) + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1));
-
 }
 
 // TTEのポインタ、見つからなかったらreplaceできるTTEのポインタがpttに代入される

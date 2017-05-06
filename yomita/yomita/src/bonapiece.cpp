@@ -92,7 +92,7 @@ namespace Eval
             { e_hand_gold, f_hand_gold },
         },
     };
-
+#ifdef HELPER
     // BonaPieceの内容を表示する。手駒ならH,盤上の駒なら升目。例) HP3 (3枚目の手駒の歩)
     std::ostream& operator << (std::ostream& os, BonaPiece bp)
     {
@@ -127,6 +127,7 @@ namespace Eval
     End:;
         return os;
     }
+#endif
 }
 
 #endif

@@ -32,6 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "usi.h"
 #include "eval_kppt.h"
 #include "eval_ppt.h"
+#include "eval_pptp.h"
+#include "eval_kpptp.h"
 
 // memory mapped fileに必要。
 namespace Eval
@@ -40,15 +42,28 @@ namespace Eval
 
     void load()
     {
+#ifdef IS_64BIT
         if (!(bool)USI::Options["EvalShare"])
         {
-            auto shared = new SharedEval();
+#endif
+#ifdef EVAL_KPPTP
+            SharedEval s, *shared = &s;
+            shared->malloc();
+#else
+#ifndef IS_64BIT
+            SharedEval* shared = new SharedEval;
+#else
+            SharedEval* shared = (SharedEval*)_aligned_malloc(sizeof(SharedEval), 32);
+#endif
+#endif
             et.set(shared);
             loadSub();
             SYNC_COUT << "info string use non-shared eval memory" << SYNC_ENDL;
             return;
+#ifdef IS_64BIT
         }
-
+#endif
+#ifdef IS_64BIT
         std::string dir_name = USI::Options["EvalDir"];
         replace(dir_name.begin(), dir_name.end(), '\\', '_');
         replace(dir_name.begin(), dir_name.end(), '/', '_');
@@ -59,18 +74,34 @@ namespace Eval
         auto mutex = TEXT("YOMITA_KPPT_MUTEX") + cv.from_bytes(dir_name);
         auto h_mutex = CreateMutex(NULL, FALSE, mutex.c_str());
 
+#ifdef EVAL_KPPTP
+            const auto sizekk = uint64_t(SQ_MAX) * uint64_t(SQ_MAX) * sizeof(Value);
+            const auto sizekpp = uint64_t(SQ_MAX) * uint64_t(fe_end) * uint64_t(fe_end) * sizeof(Value);
+            const auto sizekkp = uint64_t(SQ_MAX) * uint64_t(SQ_MAX) * uint64_t(fe_end) * sizeof(Value);
+            const size_t size = sizekk + sizekpp + sizekkp;
+#else
+            const size_t size = sizeof(SharedEval);
+#endif
+
         WaitForSingleObject(h_mutex, INFINITE);
         {
             auto h_map = CreateFileMapping(INVALID_HANDLE_VALUE,
                 NULL,
                 PAGE_READWRITE,
-                0, sizeof(SharedEval),
+                DWORD(size >> 32), DWORD(size & 0xffffffffULL),
                 mapped.c_str());
 
             bool exists = GetLastError() == ERROR_ALREADY_EXISTS;
-            auto shared = (SharedEval*)MapViewOfFile(h_map, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(SharedEval));
-            et.set(shared);
+#ifdef EVAL_KPPTP
+            auto shared = (char*)MapViewOfFile(h_map, FILE_MAP_ALL_ACCESS, 0, 0, size);
 
+            et.kk_ = (Value(*)[SQ_MAX][SQ_MAX])shared;
+            et.kpp_ = (Value(*)[SQ_MAX][fe_end][fe_end])(shared + sizekk);
+            et.kkp_ = (Value(*)[SQ_MAX][SQ_MAX][fe_end])(shared + sizekk + sizekpp);
+#else
+            auto shared = (SharedEval*)MapViewOfFile(h_map, FILE_MAP_ALL_ACCESS, 0, 0, size);
+            et.set(shared);
+#endif
             if (!exists)
             {
                 loadSub();
@@ -81,6 +112,7 @@ namespace Eval
 
             ReleaseMutex(h_mutex);
         }
+#endif
     }
 } // namespace Eval;
 

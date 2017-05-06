@@ -31,16 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // 重みの更新式。
 // やねうら王より。
-//#define USE_SGD_UPDATE
-#define USE_ADA_GRAD_UPDATE
-//#define USE_YANE_GRAD_UPDATE
-//#define USE_ADAM_UPDATE
+#define USE_SGD_UPDATE
+// #define USE_ADA_GRAD_UPDATE
 
 // 目的関数が勝率の差の二乗和
-//#define LOSS_FUNCTION_IS_WINNING_PERCENTAGE
+#define LOSS_FUNCTION_IS_WINNING_PERCENTAGE
 
 // 目的関数が交差エントロピー
-#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
+//#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
 
 // タイムスタンプの出力をこの回数に一回に抑制する。
 #define GEN_SFENS_TIMESTAMP_OUTPUT_INTERVAL 1
@@ -53,19 +51,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define USE_QSEARCH_FOR_SHALLOW_VALUE
 
 // 何局面ごとに勾配を重みに反映させるか。
-#define LEARN_MINI_BATCH_SIZE (1000 * 1000 * 1)
+#define LEARN_MINI_BATCH_SIZE (1 * 1000 * 1)
 
 // mini batch何回ごとにrmseを計算するか。
-#define LEARN_RMSE_OUTPUT_INTERVAL 10
+#define LEARN_RMSE_OUTPUT_INTERVAL 10000
 
 // mini batch何回ごとに学習局面数を出力するか。
-#define LEARN_TIMESTAMP_OUTPUT_INTERVAL 10
+#define LEARN_TIMESTAMP_OUTPUT_INTERVAL 10000
 
 // evalフォルダの名前を変える周期。
 #define EVAL_FILE_NAME_CHANGE_INTERVAL (1000 * 1000 * 1000)
 
 // ゼロベクトルからの学習を行うか。
-#define RESET_TO_ZERO_VECTOR
+//#define RESET_TO_ZERO_VECTOR
 
 // KPP以外をリセットするか。
 //#define RESET_TO_ZERO_EXCEPT_KPP
@@ -74,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //#define TEST_LEGAL_LEAF
 
 // 最大の値がついている重みを出力する。
-#define DISPLAY_STATS_IN_UPDATE_WEIGHTS
+//#define DISPLAY_STATS_IN_UPDATE_WEIGHTS
 
 // addGradとupdateWeightの同期を取るかどうか。評価項目が少ないときは絶対に定義するべき。
 #define SYNC_UPDATE_WEIGHT
@@ -84,10 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define LEARN_UPDATE "SGD"
 #elif defined(USE_ADA_GRAD_UPDATE)
 #define LEARN_UPDATE "AdaGrad"
-#elif defined(USE_YANE_GRAD_UPDATE)
-#define LEARN_UPDATE "YaneGrad"
-#elif defined(USE_ADAM_UPDATE)
-#define LEARN_UPDATE "Adam"
 #endif
 
 #if defined(LOSS_FUNCTION_IS_WINNING_PERCENTAGE)
@@ -96,12 +90,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define LOSS_FUNCTION "CROSS_ENTOROPY"
 #endif
 
-  // 重み配列の精度
+#define WEIGHTTYPE_FLOAT
+
+// 一度に学習させるパラメータの個数
+const int PARAMS_CNT = 16;
+
+// 重み配列の精度
+#ifdef WEIGHTTYPE_FLOAT
+typedef float LearnFloatType;
+const int M_CNT = PARAMS_CNT / 8;
+#define _mm256_store_p(a,b) _mm256_store_ps((a), (b));
+#define _mm256_add_p(a, b) _mm256_add_ps((a), (b))
+#define _mm256_sub_p(a, b) _mm256_sub_ps((a), (b))
+#define _mm256_mul_p(a, b) _mm256_mul_ps((a), (b))
+#define _mm256_div_p(a, b) _mm256_div_ps((a), (b))
+#define _mm256_set1_p(n) _mm256_set1_ps((n))
+#define _mm256_setzero_p _mm256_setzero_ps
+#else
 typedef double LearnFloatType;
+const int M_CNT = PARAMS_CNT / 4;
+#define _mm256_store_p(a, b) _mm256_store_pd((a), (b))
+#define _mm256_add_p(a, b) _mm256_add_pd((a), (b))
+#define _mm256_sub_p(a, b) _mm256_sub_pd((a), (b))
+#define _mm256_mul_p(a, b) _mm256_mul_pd((a), (b))
+#define _mm256_div_p(a, b) _mm256_div_pd((a), (b))
+#define _mm256_set1_p(n) _mm256_set1_pd((n))
+#define _mm256_setzero_p _mm256_setzero_pd
+#endif
+
+
+#ifdef HAVE_BMI2
+#define USE_AVX
+#endif
 
 namespace Eval
 {
-#if defined USE_EVAL_TURN
+#if defined EVAL_PPTP || defined EVAL_KPPTP
+    struct WeightValue
+    {
+        WeightValue& operator = (WeightValue& w)
+        {
+#ifdef USE_AVX
+            for (int i = 0; i < M_CNT; i++)
+                _mm256_store_p((LearnFloatType*)&m[i], w.m[i]);
+#else
+            for (int i = 0; i < PARAMS_CNT; i++)
+                p[i] = w.p[i];
+#endif
+            return *this;
+        }
+
+        WeightValue& operator += (WeightValue& w)
+        {
+#ifdef USE_AVX
+            for (int i = 0; i < M_CNT; i++)
+                _mm256_store_p((LearnFloatType*)&m[i], _mm256_add_p(w.m[i], m[i]));
+#else
+            for (int i = 0; i < PARAMS_CNT; i++)
+                p[i] += w.p[i];
+#endif
+            return *this;
+        }
+
+        WeightValue& operator -= (WeightValue& w)
+        {
+#ifdef USE_AVX
+            for (int i = 0; i < M_CNT; i++)
+                _mm256_store_p((LearnFloatType*)&m[i], _mm256_sub_p(m[i], w.m[i]));
+#else
+            for (int i = 0; i < PARAMS_CNT; i++)
+                p[i] -= w.p[i];
+#endif
+            return *this;
+        }
+
+        WeightValue& operator *= (LearnFloatType n)
+        {
+#ifdef USE_AVX
+            for (int i = 0; i < M_CNT; i++)
+                _mm256_store_p((LearnFloatType*)&m[i], _mm256_mul_p(m[i], _mm256_set1_p(n)));
+#else
+            for (int i = 0; i < PARAMS_CNT; i++)
+                p[i] *= n;
+#endif
+            return *this;
+        }
+
+        WeightValue& operator /= (LearnFloatType n)
+        {
+#ifdef USE_AVX
+            for (int i = 0; i < M_CNT; i++)
+                _mm256_store_p((LearnFloatType*)&m[i], _mm256_div_p(m[i], _mm256_set1_p(n)));
+#else
+            for (int i = 0; i < PARAMS_CNT; i++)
+                p[i] /= n;
+#endif
+            return *this;
+        }
+
+        operator bool() const
+        {
+            // 実数ymmに対して非ゼロを判定するうまい命令が見当たらない……
+            for (int i = 0; i < PARAMS_CNT; i++)
+                if (p[i])
+                    return true;
+
+            return false;
+        };
+
+        union
+        {
+            std::array<LearnFloatType, PARAMS_CNT> p;
+#ifdef WEIGHTTYPE_FLOAT
+            __m256 m[M_CNT];
+#else
+            __m256d m[M_CNT];
+#endif
+        };
+    };
+#elif defined USE_EVAL_TURN
     typedef std::array<LearnFloatType, 2> WeightValue;
 #elif defined USE_EVAL_NO_TURN
     typedef LearnFloatType WeightValue;
@@ -136,61 +243,8 @@ namespace Eval
 
         // AdaGradのg2
         WeightValue g2;
-
-#elif defined USE_YANE_GRAD_UPDATE
-
-        // YaneGradの更新式
-
-        // gを勾配、wを評価関数パラメーター、ηを学習率、εを微小値とする。
-        // ※　α = 0.99とかに設定しておき、v[i]が大きくなりすぎて他のパラメーターがあとから動いたときに、このv[i]が追随できないのを防ぐ。
-        //  ※　また比較的大きなεを加算しておき、vが小さいときに変な方向に行くことを抑制する。
-        // v = αv + g^2
-        // w = w - ηg/sqrt(v+ε)
-
-        // YaneGradのα値
-        LearnFloatType Weight::alpha = 0.99f;
-
-        // 学習率η
-        static LearnFloatType eta;
-
-        // 最初のほうの更新量を抑制する項を独自に追加しておく。
-        static constexpr LearnFloatType epsilon = LearnFloatType(1.0f);
-
-        // AdaGradのg2
-        WeightValue g2;
-
-#elif defined (USE_ADAM_UPDATE)
-
-        // 普通のAdam
-        // cf. http://qiita.com/skitaoka/items/e6afbe238cd69c899b2a
-
-        //		const LearnFloatType alpha = 0.001f;
-
-        // const double eta = 32.0/64.0;
-        // と書くとなぜかeta == 0。コンパイラ最適化のバグか？defineで書く。
-        // etaは学習率。FV_SCALE / 64
-
-        static constexpr LearnFloatType beta = LearnFloatType(0.9);
-        static constexpr LearnFloatType gamma = LearnFloatType(0.999);
-        static constexpr LearnFloatType epsilon = LearnFloatType(10e-8);
-        static LearnFloatType eta;
-        //static constexpr LearnFloatType  eta = LearnFloatType(1.0);
-
-        WeightValue v;
-        WeightValue r;
-
-        // これはupdate()呼び出し前に計算して代入されるものとする。
-        // bt = pow(β,epoch) , rt = pow(γ,epoch)
-        static double bt;
-        static double rt;
 #endif
-
-#if defined USE_EVAL_TURN
-        // 手番の学習率
-        static LearnFloatType eta2;
-#endif
-        void addGrad(WeightValue delta);
-
+        void addGrad(WeightValue& delta);
         bool update(bool skip_update);
     };
 } // namespace Eval

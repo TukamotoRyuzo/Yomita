@@ -30,6 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <thread>
 #include "platform.h"
 
+#ifdef IS_64BIT
+#define ALIGNAS(a) alignas(a)
+#else
+#define ALIGNAS(a)
+#endif
 // 64bit変数に対するforeach
 #define FOR64(mask, sq, id, xxx) \
 do{\
@@ -119,9 +124,10 @@ inline void prefetch(void* addr) {
 inline void prefetch(void*) {}
 #endif
 
+#ifdef HELPER
 // cin/coutへの入出力をファイルにリダイレクトを開始/終了する。
 extern void startLogger(bool b);
-
+#endif
 // ファイルを丸読みする。ファイルが存在しなくともエラーにはならない。空行はスキップする。
 extern int readAllLines(std::string filename, std::vector<std::string>& lines);
 

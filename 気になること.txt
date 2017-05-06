@@ -5,10 +5,23 @@
         FutilityMoveCounts[0][d] = int(2.4 + 0.773 * pow(d + 0.00, 1.8));
         FutilityMoveCounts[1][d] = int(2.9 + 1.045 * pow(d + 0.49, 1.8));
     }
+
+    FutilityMoveCountsが今の式っぽくなったコミット。議論はされていない。
+    https://github.com/official-stockfish/Stockfish/commit/3fd00798074485dfa56d283136d809b7c8bff35a
+    https://github.com/official-stockfish/Stockfish/commit/72f7282ad4da0584c87163aed85bd5ff4d633cd3
+    https://github.com/official-stockfish/Stockfish/commit/8a9b9ec96a3bf04366dbac710d7019d081922186
+    https://github.com/official-stockfish/Stockfish/commit/3edb15d18397a687c952a3841b29215b7ee90575
+
     この2.4, 2.9の部分を増やせば1秒~3秒程度の対局ではかなりのパフォーマンスを発揮してくれるが、
     10秒以上になるとそうでもなくなる。おそらく、残り深さが浅いときに試すべき手の数はstockfishの値だと少ないが、
     残り深さが深いときに試すべき手の数は今のstockfishの値でちょうどいいのではないかな。
     ここをうまく調整すればかなりの効果が見込めると思う。
+
+    move count based pruningのメリットは、fail lowするかもしれないノードにおいて、
+    より少ない指し手でfail lowを判断できること。move count pruningがないとすべての指し手を
+    試した上でfail lowを判断することになるため、探索時間が無駄になってしまう。
+    逆にデメリットは、fail highするかもしれないノードにおいて、実際にfail highを引き起こす指し手
+    を試すことなく探索を終えてしまう可能性があること。
 
 ・終盤で頓死する。
     枝刈りが多いと詰みをよく見逃す。つまり現状だと結構頓死する。
@@ -17,11 +30,47 @@
 
 ・進行度の使い道
     今のところfutilityMarginでしか使っていないので、他に使い道がないか。
+    →評価関数で使ってみたけど強くならない。64GBのメモリ買ったのに！
 
 ・評価関数の強化
     KPPTを今以上に強化するのはしんどそうだ。
+    →そんなことはなかった。３回目の雑巾絞りでR60も絞れた。まだ教師データの作り方次第で絞れるはず。
+
+・ScoreTurn?
+	手番ボーナスの疑問。例えば▲23歩△22角という配置は先手番の時なら角が取れる分のボーナスが与えられるのは
+	おかしくないが、後手番でも角が取れる分のボーナスが与えられるのはおかしい気がする。
+    →scoreboard = 500, scoreturn = 500とかならつじつまが合うのか。
+    つまり先手なら角が取れるボーナスで、後手なら角がとられないボーナスという具合？
 
 ・やね氏考案のPawnKey, NoPawnKeyによる評価関数の高速化
     ehashに比べるとヒット率は高そう。
 
+・雑巾絞りメソッドに疑問
+    教師に評価値しか含まれていないので、qsearchが教師に近づくように調整しても教師と同じ最善手を示せるように
+    なるとは限らないのでは？qsearchは探索部の実装次第でpvが変わるし、evaluateを教師に近づけるか、もしくは
+    ボナンザメソッドのように教師の指し手も調整に使うのが学習としては正しい気がする。例えば勾配は評価値ベースで計算して、
+    、教師の指し手で一手進めた局面に表れる特徴の重みを増やすとか、pvの途中で現れる局面すべてを対象に調整するとか。
+    →pvの指し手で進めた局面が教師に含まれているなら現状でいいのか……
+
+・stockfishのhistory
+    過去のコミットでの議論を見る限り、history更新時のマジックナンバーは値を0から急激に遠ざけることを抑制し、
+    ある一定の値で飽和させることを目的としているらしい。
+    https://github.com/official-stockfish/Stockfish/pull/407
+    https://github.com/IIvec/Stockfish/pull/20
+    https://github.com/official-stockfish/Stockfish/pull/588
+    https://github.com/official-stockfish/Stockfish/pull/1037
+    現在、このような式で統計が更新されている。
+    t = t - (t * ab（v）/ 324) + v * 32
+
+    値が324を超えない場合にのみ、32 * 324 = 10368で飽和する。
+    この10368を超えると、数式は期待した結果にならない。
+
+    例：
+    制限値324を削除し、t = 20000とする。
+    上記の式でv = 900として値を更新しようとすると t = -6755になる。
+
+
 ■戦法、定跡
+・まふ定跡v9forSM
+    定跡は早い段階で外れているので、普通に実力で負けてるだけに見える。
+    宿題。

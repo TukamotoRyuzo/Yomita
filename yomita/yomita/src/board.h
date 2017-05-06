@@ -125,6 +125,7 @@ struct StateInfo
     // 持ち駒のハッシュキー
     Key handKey() const { return hand_key; }
 
+#ifdef HELPER
 #if defined(IS_64BIT)
     bool operator == (const StateInfo st) const
     {
@@ -140,6 +141,7 @@ struct StateInfo
     }
 
     bool operator != (const StateInfo st) const { return !(*this == st); }
+#endif
 #endif
 };
 
@@ -170,10 +172,10 @@ public:
 
     // sqにpieceの駒を置くときに必要な情報のセットを行う。
     void setPiece(const Piece piece, const Square sq, PieceNo piece_no);
-
+#ifdef HELPER
     // validator
     bool verify() const;
-
+#endif
     // sqにある駒を返す。
     Piece piece(const Square sq) const { return board_[sq]; }
 
@@ -323,7 +325,6 @@ public:
     RepetitionType repetitionType(int max_ply) const;
     
     // 静止探索
-    Score see(const Move) const;
     bool seeGe(const Move, const Score) const;
 
     // ピンされている駒(return)、している駒(pinners)を返す。tはsniperのturn, sqはking_sq
@@ -366,8 +367,10 @@ public:
     void sfenPack(uint8_t data[32]) const;
     static std::string sfenUnPack(uint8_t data[32]);
 #endif
+#ifdef HELPER
     // 画面出力用
     friend std::ostream& operator << (std::ostream& os, const Board& b);
+#endif
 private:
     
     // 1手詰め判定のヘルパー関数。

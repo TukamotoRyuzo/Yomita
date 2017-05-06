@@ -192,11 +192,11 @@ namespace Eval
         ifsKK.read(reinterpret_cast<char*>(kk), sizeof(kk));
         ifsKKP.read(reinterpret_cast<char*>(kkp), sizeof(kkp));
         ifsKPP.read(reinterpret_cast<char*>(kpp), sizeof(kpp));
+
 #endif
 #ifdef LEARN
         evalLearnInit();
 #endif
-        return;
     }
 
     // KPP,KPのスケール
@@ -243,7 +243,7 @@ namespace Eval
 
             for (int j = 0; j < i; j += 8)
             {
-                auto pattern = _mm256_loadu_si256((const __m256i*)&list_fb[j]);
+                auto pattern = _mm256_load_si256((const __m256i*)&list_fb[j]);
                 auto mask = MASK[std::min(i - j, 8)];
 
                 // gatherで該当する重みを一気に取ってくる。
@@ -255,7 +255,7 @@ namespace Eval
                 sb = _mm256_add_epi32(sb, whi);
 
                 // 後手も計算
-                pattern = _mm256_loadu_si256((const __m256i*)&list_fw[j]);
+                pattern = _mm256_load_si256((const __m256i*)&list_fw[j]);
                 w = _mm256_mask_i32gather_epi32(zero, (const int*)kpp[sq_wk1][list_fw[i]], pattern, mask, 4);
                 wlo = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(w, 0));
                 sw = _mm256_add_epi32(sw, wlo);
@@ -372,7 +372,7 @@ namespace Eval
 
                         for (int j = 0; j < i; j += 8)
                         {
-                            auto pattern = _mm256_loadu_si256((const __m256i*)&list_fb[j]);
+                            auto pattern = _mm256_load_si256((const __m256i*)&list_fb[j]);
                             auto mask = MASK[std::min(i - j, 8)];
                             __m256i w = _mm256_mask_i32gather_epi32(zero, (const int*)kpp[sq_bk0][k0], pattern, mask, 4);
                             __m256i wlo = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(w, 0));
@@ -441,7 +441,7 @@ namespace Eval
 
                         for (int j = 0; j < i; j += 8)
                         {
-                            __m256i pattern = _mm256_loadu_si256((const __m256i*)&list_fw[j]);
+                            __m256i pattern = _mm256_load_si256((const __m256i*)&list_fw[j]);
                             auto mask = MASK[std::min(i - j, 8)];						
                             __m256i w = _mm256_mask_i32gather_epi32(zero, (const int*)kpp[sq_wk1][list_fw[i]], pattern, mask, 4);
                             __m256i wlo = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(w, 0));

@@ -48,28 +48,28 @@ namespace Prog
         std::ifstream ifs(p, std::ios::binary);
 
         if (!ifs)
-            goto Error;
+            std::cout << "info string can't open " << p << "." << std::endl;
 
-        ifs.read(reinterpret_cast<char*>(PROGRESS), sizeof(PROGRESS));
+        else
+        {
+            ifs.read(reinterpret_cast<char*>(PROGRESS), sizeof(PROGRESS));
 
 #if 0 // 実験的な初期化コード
-        {
-            PRNG rng(11);
-            for (auto sq : Squares)
-                for (int i = 0; i < Eval::fe_end; i++)
-                    PROGRESS[sq][i] = rng.rand<ValueProg>();
-        }
+            {
+                PRNG rng(11);
+                for (auto sq : Squares)
+                    for (int i = 0; i < Eval::fe_end; i++)
+                        PROGRESS[sq][i] = rng.rand<ValueProg>();
+            }
 #endif
-        return;
-
-    Error:
-        std::cout << "info string can't open " << p << "." << std::endl;
+            std::cout << "info string open success " << p << "." << std::endl;
+        }
     }
 
     // 進行度ファイルの保存
     void save(std::string dir_name)
     {
-        std::string prog_dir = path(USI::Options["ProgressDir"], path(SAVE_PROGRESS_DIR, dir_name));
+        std::string prog_dir = path(USI::Options["ProgressSaveDir"], dir_name);
         mkdir(prog_dir);
         std::ofstream ofs(path(prog_dir, PROGRESS_BIN), std::ios::binary);
 
@@ -277,10 +277,11 @@ namespace Learn
     void initGrad()
     {
         memset(prog_w, 0, sizeof(prog_w));
-
+#if 1
         for (auto k : Squares)
             for (auto p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1)
                 prog_w[k][p1].w = Prog::PROGRESS[k][p1];
+#endif
     }
 
     // 現在の局面で出現している特徴すべてに対して、勾配値を勾配配列に加算する。
@@ -317,8 +318,7 @@ namespace Learn
     // 勾配を計算する関数
     double calcGrad(double teacher, double now)
     {
-        //return now - teacher;
-        return (now - teacher) * dsigmoid(now);
+        return now - teacher;
     }
 
     // 誤差を計算する関数(rmseの計算用)
@@ -364,7 +364,7 @@ namespace Learn
 #ifdef _DEBUG
         const int interval = 5000;
 #else
-        const int interval = 10000;
+        const int interval = 10000000;
 #endif
 
         for (int loop = 0; loop < max_loop;)
@@ -397,8 +397,9 @@ namespace Learn
                         SYNC_COUT << b << "progress = " << p * 100.0 << "%\n"
                             << "teacher = " << t * 100.0 << "%" << SYNC_ENDL;
 #endif
-#if 0
-                        if (j % interval == 0)
+#if 1
+                        static int j = 0;
+                        if (++j % interval == 0)
                         {
                             SYNC_COUT << "now = " << std::setw(5) << std::setprecision(2) << p * 100 << "%"
                                 << " teacher = " << std::setw(5) << std::setprecision(2) << t * 100 << "%" << SYNC_ENDL;
@@ -491,13 +492,8 @@ namespace Learn
     void learnProgress(Board& b, std::istringstream& is)
     {
         std::string token,
-
-#ifdef _DEBUG
-            file_name = "records23.txt",
-#else
-            file_name = "records_2800.txt",
-#endif
-            dir = "";
+        file_name = "records_2800.txt",
+        dir = "";
 
         // 最初は10000くらいで。
         uint64_t loop_max = 100000;
@@ -618,9 +614,7 @@ namespace Learn
         // file_nameは技巧形式の棋譜
         std::vector<std::string> kifus;
         readAllLines(path(dir, file_name), kifus);
-
         std::ofstream ofs("futility.tsv");
-
         ofs << "progress\tdiff\n";
 
         // 手数

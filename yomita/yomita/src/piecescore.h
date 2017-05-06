@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "score.h"
 
-#if defined EVAL_KPPT || defined EVAL_PPT
+#if defined USE_EVAL_TURN
 // 駒の価値
 constexpr Score PAWN_SCORE = static_cast<Score>(100 * 9 / 10);
 constexpr Score LANCE_SCORE = static_cast<Score>(350 * 9 / 10);

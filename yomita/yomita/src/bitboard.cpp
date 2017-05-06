@@ -200,6 +200,7 @@ namespace
     }
 }
 
+#ifdef HELPER
 // デバッグ用。ビットボードのレイアウトを見たいときに使う
 std::ostream& operator << (std::ostream& os, const Bitboard& b)
 {
@@ -242,7 +243,7 @@ std::ostream& operator << (std::ostream& os, const Bitboard& b)
     os << "Bitboard(" << "0x" << std::hex << b.b(0) << "ULL, " << "0x" << std::hex << b.b(1) << "ULL),\n" << std::endl;
     return os;
 }
-
+#endif
 // pbbで渡されたBitboardに、rank, fileが示す位置のビットを立てる。
 // rank,fileの範囲チェックも行うので、rankやfileが9以上0未満のときは何も行わずにreturnする。
 void setAttacks(Rank rank, File file, Bitboard* pbb)

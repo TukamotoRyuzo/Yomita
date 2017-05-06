@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace
 {
-    enum Stages 
+    enum Stages
     {
         MAIN_SEARCH, CAPTURES_INIT, GOOD_CAPTURES, KILLERS, COUNTERMOVE, QUIET_INIT, QUIET, BAD_CAPTURES,
         EVASION, EVASIONS_INIT, ALL_EVASIONS,
@@ -36,18 +36,21 @@ namespace
         QSEARCH_RECAPTURES, QRECAPTURES
     };
 
-    // Our insertion sort, which is guaranteed to be stable, as it should be
-    void insertionSort(MoveStack* begin, MoveStack* end)
+    // An insertion sort, which sorts moves in descending order up to and including a given limit.
+    // The order of moves smaller than the limit is left unspecified.
+    // To keep the implementation simple, *begin is always included in the list of sorted moves.
+    void partial_insertion_sort(MoveStack* begin, MoveStack* end, int limit)
     {
-        MoveStack tmp, *p, *q;
-
-        for (p = begin + 1; p < end; ++p)
-        {
-            tmp = *p;
-            for (q = p; q != begin && *(q - 1) < tmp; --q)
-                *q = *(q - 1);
-            *q = tmp;
-        }
+        for (MoveStack *sortedEnd = begin + 1, *p = begin + 1; p < end; ++p)
+            if (p->score >= limit)
+            {
+                MoveStack tmp = *p, *q;
+                *p = *sortedEnd;
+                for (q = sortedEnd; q != begin && *(q - 1) < tmp; --q)
+                    *q = *(q - 1);
+                *q = tmp;
+                ++sortedEnd;
+            }
     }
 
     // pick_best() finds the best move in the range (begin, end) and moves it to
@@ -61,7 +64,7 @@ namespace
 
 } // namespace
 
-// 通常探索から呼び出されるとき用。
+  // 通常探索から呼び出されるとき用。
 MovePicker::MovePicker(const Board& b, Move ttm, Depth d, Search::Stack* s)
     : board(b), ss(s), depth(d)
 {
@@ -114,16 +117,16 @@ MovePicker::MovePicker(const Board& b, Move ttm, Score th)
 
     // ProbCutフェーズではSEEがthresholdより高い手を生成する。
     tt_move = ttm
-            && b.pseudoLegal(ttm)
-            && isCapture(ttm)
-            && b.seeGe(ttm, threshold + 1) ? ttm : MOVE_NONE;
+        && b.pseudoLegal(ttm)
+        && isCaptureOrPawnPromote(ttm)
+        && b.seeGe(ttm, threshold) ? ttm : MOVE_NONE;
 
     stage += (tt_move == MOVE_NONE);
 }
 
 const Score LVATable[PIECETYPE_MAX] =
 {
-    Score(0), Score(7), Score(8), Score(1), Score(2), Score(3), Score(4), Score(5), Score(10000),
+    Score(0), Score(7), Score(8), Score(1), Score(2), Score(3), Score(4), Score(5), Score(256),
     Score(9), Score(10), Score(5), Score(5), Score(5), Score(5)
 };
 
@@ -133,7 +136,7 @@ void MovePicker::scoreCaptures()
     for (auto& m : *this)
     {
         assert(isOK(m));
-        m.score = pieceScore(capturePieceType(m));
+        m.score = pieceScore(capturePieceType(m)) - LVATable[movedPieceType(m)];
         assert(capturePieceType(m) != KING);
 
         if (isPawnPromote(m))
@@ -148,11 +151,10 @@ void MovePicker::scoreCaptures()
 // 駒取りでも成りでもない手に点数をつける
 void MovePicker::scoreQuiets()
 {
-    const HistoryStats& history = board.thisThread()->history;
     const CounterMoveStats* cm = (ss - 1)->counter_moves;
     const CounterMoveStats* fm = (ss - 2)->counter_moves;
-    const FromToStats& from_to = board.thisThread()->from_to_history;
-
+    const CounterMoveStats* f2 = (ss - 4)->counter_moves;
+    const HistoryStats& history = board.thisThread()->history;
     Turn t = board.turn();
 
     for (auto& m : *this)
@@ -160,28 +162,23 @@ void MovePicker::scoreQuiets()
         assert(isOK(m));
 
         // cm2, fm2はスコアリングに使わないほうが強かった。
-        m.score = history.value(m)
-            + (cm ? cm->value(m) : SCORE_ZERO)
-            + (fm ? fm->value(m) : SCORE_ZERO)
-            + from_to.get(t, m);
+        m.score = cm->value(m)
+                + fm->value(m)
+                + f2->value(m)
+                + history.get(t, m);
     }
 }
 
 void MovePicker::scoreEvasions()
 {
     const HistoryStats& history = board.thisThread()->history;
-    const  FromToStats& from_to = board.thisThread()->from_to_history;
     Turn t = board.turn();
-    Score see;
 
     for (auto& m : *this)
     {
         assert(isOK(m));
 
-        if ((see = board.see(m)) < SCORE_ZERO)
-            m.score = see - HistoryStats::Max;
-
-        else if (isCapture(m))
+        if (isCapture(m))
         {
             m.score = captureScore(capturePieceType(m)) - LVATable[movedPieceType(m)] + HistoryStats::Max;
 
@@ -189,8 +186,10 @@ void MovePicker::scoreEvasions()
                 m.score += promoteScore(movedPieceType(m));
         }
 
-        else
-            m.score = history.value(m) + from_to.get(t, m);
+		else
+		{
+			m.score = history.get(t, m) - LVATable[movedPieceType(m)];
+		}
     }
 }
 
@@ -217,7 +216,7 @@ Move MovePicker::nextMove()
         while (cur < end_moves)
         {
             move = pickBest(cur++, end_moves);
-        
+
             if (move != tt_move)
             {
                 if (board.seeGe(move, SCORE_ZERO))
@@ -274,15 +273,7 @@ Move MovePicker::nextMove()
         cur = end_bad_captures;
         end_moves = generate<QUIETS>(cur, board);
         scoreQuiets();
-
-        if (depth < 3 * ONE_PLY)
-        {
-            MoveStack* good_quiet = std::partition(cur, end_moves, [](const MoveStack& m) { return m.score > SCORE_ZERO; });
-            insertionSort(cur, good_quiet);
-        }
-        else 
-            insertionSort(cur, end_moves);
-
+        partial_insertion_sort(cur, end_moves, -4000 * (depth / ONE_PLY));
         ++stage;
 
     case QUIET:
@@ -407,5 +398,5 @@ Move MovePicker::nextMove()
 int MovePicker::seeSign() const
 {
     return stage == GOOD_CAPTURES ? 1
-         : stage == BAD_CAPTURES ? -1 : 0;
+        : stage == BAD_CAPTURES ? -1 : 0;
 }

@@ -28,8 +28,3 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 class Board;
 void benchmark(Board& b);
-
-// global counter
-extern uint64_t g[30];
-
-extern std::vector<int> g_vec[128];

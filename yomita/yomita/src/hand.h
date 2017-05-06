@@ -59,8 +59,82 @@ public:
 
     // 引数のHandより優れていたらtrue
     // hのほうがどれかひとつでも多く持っていればBORROWのbitが立つ。
-    bool isSuperior(const Hand h) const { return ((*this - h) & BORROW_MASK) == 0; }
+    bool isSuperior(const Hand h) const 
+    { 
+        if (((*this - h) & BORROW_MASK) == 0)
+        {
+            return true;
+        }
 
+        constexpr uint32_t psg = PAWN_MASK | SILVER_MASK | GOLD_MASK;
+
+        // 桂馬と角の枚数が違う。
+        if ((hand_ ^ h.hand_) & (KNIGHT_MASK | BISHOP_MASK))
+        {
+            return false;
+        }
+
+        // 歩が一枚減っている
+        if ((h.hand_ & PAWN_MASK) == ((hand_ & PAWN_MASK) + (1 << PAWN_SHIFT)))
+        {
+            // 香、桂、銀、金、飛車のうちどれか優等である。
+            if (((hand_ ^ h.hand_) & ~PAWN_MASK)
+                && (((hand_ & ~PAWN_MASK) - (h.hand_ & ~PAWN_MASK)) & BORROW_MASK) == 0)
+            {
+                return true;
+            }
+        }
+        
+        // 香が一枚減っていて、歩、銀、金の枚数は同じで飛車を多く持っていれば優等
+        else if ((h.hand_ & LANCE_MASK) == ((hand_ & LANCE_MASK) + (1 << LANCE_SHIFT))
+            && (h.hand_ & psg) == (hand_ & psg)
+            && (h.hand_ & ROOK_MASK) < (hand_ & ROOK_MASK))
+        {
+            return true;
+        }
+
+        return false;
+    }
+#ifdef HELPER
+    bool isSuperior2(const Hand& h)
+    {
+        if (((*this - h) & BORROW_MASK) == 0)
+            return true;
+
+        if (count(KNIGHT) != h.count(KNIGHT) || count(BISHOP) != h.count(BISHOP))
+            return false;
+
+        // 歩が1枚減って、香、銀、金、飛が1枚増えたなら優等
+        if (h.count(PAWN) == count(PAWN) + 1)
+        {
+            if (count(LANCE) >= h.count(LANCE)
+                && count(SILVER) >= h.count(SILVER)
+                && count(GOLD) >= h.count(GOLD)
+                && count(ROOK) >= h.count(ROOK)
+                && (count(LANCE) > h.count(LANCE)
+                    || count(SILVER) > h.count(SILVER)
+                    || count(GOLD) > h.count(GOLD)
+                    || count(ROOK) > h.count(ROOK)))
+            {
+                return true;
+            }
+        }
+
+        // 香が1枚減って、飛車が1枚増えたなら優等
+        else if (h.count(LANCE) == count(LANCE) + 1)
+        {
+            if (count(ROOK) > h.count(ROOK)
+                && count(PAWN) >= h.count(PAWN)
+                && count(SILVER) >= h.count(SILVER)
+                && count(GOLD) >= h.count(GOLD))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+#endif
     // 各駒のあるなしを下位ビットから1ビットずつ並べて返す。
     uint32_t existsBit() const { return (uint32_t)pext(hand_ + EXISTS_MASK, BORROW_MASK); }
 
@@ -75,34 +149,34 @@ private:
     uint32_t hand_;
 
     static const int BISHOP_SHIFT = 0;
-    static const int ROOK_SHIFT = 3;
-    static const int PAWN_SHIFT = 6;
-    static const int LANCE_SHIFT = 12;
+    static const int ROOK_SHIFT   = 3;
+    static const int PAWN_SHIFT   = 6;
+    static const int LANCE_SHIFT  = 12;
     static const int KNIGHT_SHIFT = 16;
     static const int SILVER_SHIFT = 20;
-    static const int GOLD_SHIFT = 24;
+    static const int GOLD_SHIFT   = 24;
 
     static const uint32_t BISHOP_MASK = 0x03 << BISHOP_SHIFT;
-    static const uint32_t ROOK_MASK = 0x03 << ROOK_SHIFT;
-    static const uint32_t GOLD_MASK = 0x07 << GOLD_SHIFT;
-    static const uint32_t PAWN_MASK = 0x1f << PAWN_SHIFT;
-    static const uint32_t LANCE_MASK = 0x07 << LANCE_SHIFT;
+    static const uint32_t ROOK_MASK   = 0x03 << ROOK_SHIFT;
+    static const uint32_t GOLD_MASK   = 0x07 << GOLD_SHIFT;
+    static const uint32_t PAWN_MASK   = 0x1f << PAWN_SHIFT;
+    static const uint32_t LANCE_MASK  = 0x07 << LANCE_SHIFT;
     static const uint32_t KNIGHT_MASK = 0x07 << KNIGHT_SHIFT;
     static const uint32_t SILVER_MASK = 0x07 << SILVER_SHIFT;
     static const uint32_t EXCEPT_PAWN_MASK = BISHOP_MASK | ROOK_MASK | LANCE_MASK | KNIGHT_MASK | SILVER_MASK | GOLD_MASK;
     static const uint32_t EXISTS_MASK = PAWN_MASK | EXCEPT_PAWN_MASK;
-    static const uint32_t BORROW_MASK =
-        (1 << (ROOK_SHIFT - 1)) |
-        (1 << (PAWN_SHIFT - 1)) |
-        (1 << (LANCE_SHIFT - 1)) |
-        (1 << (KNIGHT_SHIFT - 1)) |
-        (1 << (SILVER_SHIFT - 1)) |
-        (1 << (GOLD_SHIFT - 1)) |
-        (GOLD_MASK + (1 << GOLD_SHIFT));
-    
+    static const uint32_t BORROW_MASK = (1 << (ROOK_SHIFT   - 1)) |
+                                        (1 << (PAWN_SHIFT   - 1)) |
+                                        (1 << (LANCE_SHIFT  - 1)) |
+                                        (1 << (KNIGHT_SHIFT - 1)) |
+                                        (1 << (SILVER_SHIFT - 1)) |
+                                        (1 << (GOLD_SHIFT   - 1)) |
+                                        (GOLD_MASK + (1 << GOLD_SHIFT));
     static const int HAND_SHIFT[HAND_MAX];
     static const uint32_t HAND_MASK[HAND_MAX];
     static const uint32_t HAND_INCREMENT[HAND_MAX];
 };
 
+#ifdef HELPER
 std::ostream& operator << (std::ostream &os, const Hand& h);
+#endif

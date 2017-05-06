@@ -56,7 +56,6 @@ Thread::Thread()
     // メンバ初期化
     reset_calls = exit = false;
     max_ply = calls_count = 0;
-    history.clear();
     counter_moves.clear();
     idx = Threads.size();
 

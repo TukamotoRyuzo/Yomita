@@ -25,9 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifdef GENSFEN
 
+//#define TEST_LEGAL_LEAF
+//#define TEST_UNPACK_SFEN
+
 #include <sstream>
 #include "usi.h"
 #include "search.h"
+#include "eval_kppt.h"
+
+using namespace Eval;
 
 namespace Learn
 {
@@ -35,30 +41,30 @@ namespace Learn
     {
         const int MAX_PLY = 256;
         StateInfo state[MAX_PLY + 64];
-        int ply;
         Move m = MOVE_NONE;
         auto th = Threads[thread_id];
         auto& b = th->root_board;
-        b.init(USI::START_POS, th);
+        th->pv_idx = 0;
 
         while (true)
         {
             b.init(USI::START_POS, th);
 
-            for (ply = 0; ply < MAX_PLY - 16; ++ply)
+            for (int ply = 0; ply < MAX_PLY - 16; ++ply)
             {
                 if (b.isMate())
                     break;
 
                 switch (b.repetitionType(16))
                 {
-                case NO_REPETITION: case REPETITION_SUPERIOR: case REPETITION_INFERIOR: break;
+                case NO_REPETITION: break;
+                case REPETITION_SUPERIOR: case REPETITION_INFERIOR:
                 case REPETITION_DRAW: case REPETITION_WIN: case REPETITION_LOSE: goto CONTINUE;
                 default: UNREACHABLE;
                 }
 
                 // 序盤においてrandomな手を指させることで、進行をばらけさせる。
-                if (b.ply() <= 20)
+                if (b.ply() <= 30)
                 {
                     MoveList<LEGAL> ml(b);
 
@@ -69,19 +75,24 @@ namespace Learn
 
                     do {
                         m = ml.begin()[rand(ml.size())].move;
-                    } while (isCapture(m) && ++play < 10);
+                    } while (isCapture(m) && isDrop(m) && ++play < 20);
                 }
                 else
                 {
                     // search_depth手読みの評価値とPV(最善応手列)
-                    // 進行をばらけさせるため、読みの深さはランダムな確立で+1させる。
-                    auto pv_value1 = Learn::search(b, -SCORE_INFINITE, SCORE_INFINITE, search_depth + (int)rand(2));
+                    auto pv_value1 = Learn::search(b, -SCORE_INFINITE, SCORE_INFINITE, search_depth * ONE_PLY);
                     auto value1 = pv_value1.first;
                     auto pv1 = pv_value1.second;
 
                     // 評価値の絶対値がこの値以上の局面については
                     // その局面を学習に使うのはあまり意味がないのでこの試合を終了する。
                     if (abs(value1) >= eval_limit)
+                        break;
+
+                    // pvの長さがsearch_depthより短いときは、探索で千日手か詰みがわかったときと、
+                    // 置換表の指し手でpvが途中で途切れたとき。pvが途中で途切れたならすでに書き込みを
+                    // 済ませている可能性が高いので戻る。
+                    if (pv1.size() < search_depth)
                         break;
 
                     // 局面を書き出そうと思ったら規定回数に達していた。
@@ -135,17 +146,11 @@ namespace Learn
                     for (auto pv_move : pv1)
                         std::cout << pv_move << " ";
                     std::cout << std::endl;
-
-                    // 静止探索のpvは存在しないことがある。(駒の取り合いがない場合など)　その場合は、現局面がPVのleafである。
-                    //std::cout << "qsearch() PV = ";
-                    //for (auto pv_move : pv2)
-                    //	std::cout << pv_move << " ";
-                    //std::cout << std::endl;
 #endif
 
 #ifdef TEST_LEGAL_LEAF
-                // デバッグ用の検証として、
-                // PVの指し手でleaf nodeまで進めて、非合法手が混じっていないかをテストする。
+                    // デバッグ用の検証として、
+                    // PVの指し手でleaf nodeまで進めて、非合法手が混じっていないかをテストする。
                     auto go_leaf_test = [&](auto pv)
                     {
                         int ply2 = ply;
@@ -172,14 +177,15 @@ namespace Learn
                     go_leaf_test(pv1); // 通常探索のleafまで行くテスト
                                        //      go_leaf_test(pv2); // 静止探索のleafまで行くテスト
 #endif
-                    
-                    {
-                        // 3手読みの指し手で局面を進める。
-                        m = pv1[0];
-                    }
+                    // N手読みの指し手で局面を進める。
+                    m = pv1[0];
                 }
 
                 b.doMove(m, state[ply]);
+                Eval::evaluate(b);
+#ifdef USE_PROGRESS
+                Prog::evaluateProgress(b);
+#endif
             }
         CONTINUE:;
         }
@@ -192,10 +198,10 @@ namespace Learn
         uint32_t thread_num = USI::Options["Threads"];
         uint64_t loop_max = 8000000000;
         int eval_limit = 2000;
-        int search_depth = 6;
+        int search_depth = 7;
 
         std::string dir = "";
-        std::string file_name =	"generated_kifu_" + std::to_string(now()) + ".bin";
+        std::string file_name = "generated_kifu_" + std::to_string(now()) + ".bin";
         std::string token;
 
         while (true)
@@ -240,8 +246,75 @@ namespace Learn
             multi_think.startFileWriteWorker();
             multi_think.think();
         }
-            
+
         std::cout << "gen_sfen finished." << std::endl;
+    }
+
+    // 細切れになったsfenファイルを一纏めにするコマンド。
+    void cleanSfen(std::istringstream & is)
+    {
+        // 評価関数の読み込みを済ませないとバグる。
+        USI::isReady();
+
+        // 出力ファイル名は"merged_sfen_" + タイムスタンプ.bin
+        const std::string output_filename = "merged_sfen_" + std::to_string(now()) + ".bin";
+
+        Learn::PackedSfenValue p;
+        const size_t sf_size = sizeof(Learn::PackedSfenValue);
+        std::ofstream os;
+        std::string sfen;
+        uint64_t sfen_count = 0;
+
+        while (true)
+        {
+            sfen.clear();
+
+            // 読み込むべきファイル名
+            is >> sfen;
+
+            // ファイル名が終わったら終わり。
+            if (sfen == "")
+                break;
+
+            std::ifstream fs(sfen, std::ios::binary);
+
+            // 読み込みに失敗したら次のファイル。
+            if (!fs)
+            {
+                std::cout << "\n" << sfen << " not found." << std::endl;
+                continue;
+            }
+
+            if (sfen_count == 0)
+                os.open(output_filename, std::ios::binary);
+
+            std::cout << "\nmerging " << sfen << "." << std::endl;
+
+            size_t n = 0;
+
+            while ((n = fs.read((char*)&p, sf_size).gcount()) > 0)
+            {
+                sfen_count++;
+
+                if (sfen_count % 200000 == 0)
+                {
+                    std::cout << ".";
+                    os.flush();
+                }
+
+                // 深い探索の評価値
+                auto deep_value = (Score)*(int16_t*)&p.data[32];
+
+                if (abs(deep_value) <= 2000)
+                    os.write((const char*)&(p.data), n);
+            }
+        }
+
+        if (sfen_count == 0)
+            std::cout << "files are not merged." << std::endl;
+        else
+            std::cout << "\nmerge end! sfen = " << sfen_count
+            << "\noutput file = " << output_filename << std::endl;
     }
 
     // 細切れになったsfenファイルを一纏めにするコマンド。
@@ -274,14 +347,14 @@ namespace Learn
                 break;
 
             std::ifstream fs(sfen, std::ios::binary);
-            
+
             // 読み込みに失敗したら次のファイル。
             if (!fs)
             {
                 std::cout << "\n" << sfen << " not found." << std::endl;
                 continue;
             }
-        
+
             if (sfen_count == 0)
                 os.open(output_filename, std::ios::binary);
 
@@ -308,7 +381,7 @@ namespace Learn
         if (sfen_count == 0)
             std::cout << "files are not merged." << std::endl;
         else
-            std::cout << "\nmerge end! sfen = " << sfen_count 
+            std::cout << "\nmerge end! sfen = " << sfen_count
             << "\noutput file = " << output_filename << std::endl;
 
         delete[] p;

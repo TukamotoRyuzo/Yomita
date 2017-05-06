@@ -60,6 +60,7 @@ const uint32_t Hand::HAND_INCREMENT[] =
     1 << GOLD_SHIFT
 };
 
+#ifdef HELPER
 std::ostream& operator << (std::ostream &os, const Hand& h)
 {
     os << "持ち駒:";
@@ -72,3 +73,4 @@ std::ostream& operator << (std::ostream &os, const Hand& h)
                 os << pretty(pt) << h.count(pt);
     return os;
 }
+#endif

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "usi.h"
 #include "genmove.h"
 #include "sfen_rw.h"
-
+#ifdef HELPER
 bool cantMove(Piece p, Square to)
 {
     switch (p)
@@ -140,12 +140,24 @@ void randomPlayer(Board& b, uint64_t loop_max)
             do {
                 m = ml.begin()[rng.rand<int>() % ml.size()].move;
             } while (cc++ < 3 && isDrop(m));
-
+#if 0
+            if (b.seeGe(m, (Score)0) != b.seeGe2(m, SCORE_ZERO))
+            {
+                count1++;
+                std::cout << b << pretty(m) << b.seeGe(m, SCORE_ZERO) << b.seeGe2(m, SCORE_ZERO) << std::endl;
+                std::cout << b.seeGe(m, Score(0));
+                std::cout << b.seeGe2(m, Score(0));
+            }
+            else
+            {
+                count2++;
+            }
+#endif
             b.doMove(m, state[ply], b.givesCheck(m));
             moves[ply] = m;
 
             // ランダムな局面でテストをする。
-            testOnRandomPosition(b);
+            //testOnRandomPosition(b);
         }
 
         while (ply > 0)
@@ -154,6 +166,10 @@ void randomPlayer(Board& b, uint64_t loop_max)
         if ((i % 1000) == 0)
             std::cout << ".";
     }
+#if 0
+    std::cout << "ok = " << count2 << "bad = " << count1
+        << "true rate = " << (double)count2 / (double)(count1 + count2) * 100.0 << "%" << std::endl;
+#endif
 }
 
 struct PerftSolverResult 
@@ -257,7 +273,7 @@ void userTest()
 {
 #if 1 // ランダムプレイヤーテスト
     USI::isReady();
-    uint64_t loop_max = 1000000;
+    uint64_t loop_max = 100000;
     std::cout << "Random Player test , loop_max = " << loop_max << std::endl;
     Board b;
     randomPlayer(b, loop_max);
@@ -318,16 +334,59 @@ void userTest()
 
     std::cout << r.first;
 #else
-    // 011 1111 1001 1111 1100 1111 1110 0111 1111 0011 1111 1001 1111 1100 1111 1110
-    // 
+    Hand n, p;
+    std::cout << "hand test" << std::endl;
+    int64_t count = 0;
+    for (int pawn = 0; pawn <= 18; pawn++)
+        for (int lance = 0; lance <= 4; lance++)
+            for (int knight = 0; knight <= 4; knight++)
+                for (int silver = 0; silver <= 4; silver++)
+                    for (int gold = 0; gold <= 4; gold++)
+                        for (int bishop = 0; bishop <= 2; bishop++)
+                            for (int rook = 0; rook <= 2; rook++)
+                            {
+                                n.set(PAWN, pawn);
+                                n.set(LANCE, lance);
+                                n.set(KNIGHT, knight);
+                                n.set(SILVER, silver);
+                                n.set(GOLD, gold);
+                                n.set(BISHOP, bishop);
+                                n.set(ROOK, rook);
 
-    std::ofstream of("E:\\デスクトップ\\bit.txt");
+                                for (int dpawn = 0; dpawn <= 18 - pawn; dpawn++)
+                                    for (int dlance = 0; dlance <= 4 - lance; dlance++)
+                                        for (int dknight = 0; dknight <= 4 - knight; dknight++)
+                                            for (int dsilver = 0; dsilver <= 4 - silver; dsilver++)
+                                                for (int dgold = 0; dgold <= 4 - gold; dgold++)
+                                                    for (int dbishop = 0; dbishop <= 2 - bishop; dbishop++)
+                                                        for (int drook = 0; drook <= 2 - rook; drook++)
+                                                        {
+                                                            p.set(PAWN, dpawn);
+                                                            p.set(LANCE, dlance);
+                                                            p.set(KNIGHT, dknight);
+                                                            p.set(SILVER, dsilver);
+                                                            p.set(GOLD, dgold);
+                                                            p.set(BISHOP, dbishop);
+                                                            p.set(ROOK, drook);
 
-    for (auto sq : Squares)
-    {
-        of << "0x" << std::hex << ((bishopAttackToEdge(sq) & ~mask(sq)).merge() & 0x3f9fcfe7f3f9fcfeULL) << "ULL, ";
+                                                            bool superi1 = n.isSuperior(p);
+                                                            bool superi2 = n.isSuperior2(p);
+                                                            bool superi3 = p.isSuperior(n);
+                                                            bool superi4 = p.isSuperior2(n);
 
-        if ((sq + 1) % 9 == 0)of << std::endl;
-    }
+                                                            if (superi1 != superi2
+                                                                || superi3 != superi4)
+                                                            {
+                                                                std::cout << "n = " << n << std::endl
+                                                                    << "p = " << p << std::endl
+                                                                    << "superi1 = " << superi1 << std::endl;
+                                                            }
+                                                            count++;
+                                                        }
+
+                            }
+
+    std::cout << count << std::endl;
 #endif
 }
+#endif

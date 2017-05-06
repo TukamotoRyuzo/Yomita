@@ -50,7 +50,7 @@ std::string toUSI(const Move m)
     return usi;
 }
 
-
+#ifdef HELPER
 std::string toCSA(const Move m)
 {
     static const std::string piece_to_csa[] = { "", "KA", "HI", "FU", "KY", "KE", "GI", "KI", "OU", "UM", "RY", "TO", "NY", "NK", "NG" };
@@ -87,3 +87,4 @@ std::string pretty(const Move m)
 
 
 std::ostream& operator << (std::ostream& os, const Move m) { os << toUSI(m); return os; }
+#endif

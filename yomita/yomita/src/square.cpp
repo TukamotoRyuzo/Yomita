@@ -54,7 +54,7 @@ const Bitboard RANK_MASK[RANK_MAX] =
     RANK1_MASK, RANK2_MASK, RANK3_MASK, RANK4_MASK, RANK5_MASK, RANK6_MASK, RANK7_MASK, RANK8_MASK, RANK9_MASK,	
 };
 
-const Bitboard SQUARE_MASK[SQ_MAX] =
+const Bitboard SQUARE_MASK[SQ_MAX + 1] =
 {
     Bitboard(1ULL << 0, 0), Bitboard(1ULL << 1, 0), Bitboard(1ULL << 2, 0), Bitboard(1ULL << 3, 0), Bitboard(1ULL << 4, 0), Bitboard(1ULL << 5, 0),
     Bitboard(1ULL << 6, 0), Bitboard(1ULL << 7, 0), Bitboard(1ULL << 8, 0), Bitboard(1ULL << 9, 0), Bitboard(1ULL << 10, 0), Bitboard(1ULL << 11, 0),
@@ -70,7 +70,8 @@ const Bitboard SQUARE_MASK[SQ_MAX] =
     Bitboard(1ULL << 58, 1ULL << 40), Bitboard(1ULL << 59, 1ULL << 41), Bitboard(1ULL << 60, 1ULL << 42), Bitboard(1ULL << 61, 1ULL << 43), Bitboard(1ULL << 62, 1ULL << 44),
     Bitboard(0, 1ULL << 45), Bitboard(0, 1ULL << 46), Bitboard(0, 1ULL << 47), Bitboard(0, 1ULL << 48), Bitboard(0, 1ULL << 49), Bitboard(0, 1ULL << 50),
     Bitboard(0, 1ULL << 51), Bitboard(0, 1ULL << 52), Bitboard(0, 1ULL << 53), Bitboard(0, 1ULL << 54), Bitboard(0, 1ULL << 55), Bitboard(0, 1ULL << 56),
-    Bitboard(0, 1ULL << 57), Bitboard(0, 1ULL << 58), Bitboard(0, 1ULL << 59), Bitboard(0, 1ULL << 60), Bitboard(0, 1ULL << 61), Bitboard(0, 1ULL << 62)
+    Bitboard(0, 1ULL << 57), Bitboard(0, 1ULL << 58), Bitboard(0, 1ULL << 59), Bitboard(0, 1ULL << 60), Bitboard(0, 1ULL << 61), Bitboard(0, 1ULL << 62),
+    allZeroMask()
 };
 
 const Bitboard F1_B = Bitboard(0, 0);
@@ -113,7 +114,7 @@ const EvalSquare SQ_TO_EVALSQ[SQ_MAX] =
 };
 #endif
 
-#ifdef GENERATED_SFEN_BY_FILESQ
+#if defined GENERATED_SFEN_BY_FILESQ || !defined IS_64BIT
 const Square NEXT_SQ[SQ_MAX] = 
 {
     // SQ_11,がスタート
@@ -143,6 +144,7 @@ const Square FILE_SQ[SQ_MAX] =
 };
 #endif
 
+#ifdef HELPER
 // 人がわかりやすい形に変換
 std::string pretty(const File f)
 {
@@ -157,9 +159,6 @@ std::string pretty(const Rank r)
 }
 
 std::string pretty(const Square sq) { return pretty(fileOf(sq)) + pretty(rankOf(sq)); }
-std::string toUSI(const File f) { const char c[] = { '9' - f, '\0' }; return std::string(c); }
-std::string toUSI(const Rank r) { const char c[] = { 'a' + r, '\0' }; return std::string(c); }
-std::string toUSI(const Square sq) { return toUSI(fileOf(sq)) + toUSI(rankOf(sq)); }
 std::string toCSA(const File f) { const char c[] = { '9' - f, '\0' }; return std::string(c); }
 std::string toCSA(const Rank r) { const char c[] = { '1' + r, '\0' }; return std::string(c); }
 std::string toCSA(const Square sq) { return toCSA(fileOf(sq)) + toCSA(rankOf(sq)); }
@@ -180,3 +179,7 @@ std::ostream& operator << (std::ostream& os, const Square sq)
 
     return os; 
 }
+#endif
+std::string toUSI(const File f) { const char c[] = { '9' - f, '\0' }; return std::string(c); }
+std::string toUSI(const Rank r) { const char c[] = { 'a' + r, '\0' }; return std::string(c); }
+std::string toUSI(const Square sq) { return toUSI(fileOf(sq)) + toUSI(rankOf(sq)); }

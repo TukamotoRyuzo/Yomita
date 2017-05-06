@@ -472,7 +472,12 @@ void Board::setFromPackedSfen(uint8_t data[32])
 #ifdef USE_EVAL
     // 時間がかかるので、テスト時には評価関数を呼び出さない。
     if (!Test)
+    {
+#ifdef USE_PROGRESS
+        Prog::computeProgress(*this);
+#endif
         Eval::computeEval(*this);
+    }
 #endif
     assert(verify());
 }

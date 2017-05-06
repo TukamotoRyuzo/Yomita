@@ -33,9 +33,11 @@ namespace
 {
     void onThreads(const Option&) { Threads.readUsiOptions(); }
     void onHashSize(const Option& opt) { TT.resize(opt); }
-    void onWriteDebugLog(const Option& opt) { startLogger(opt); }
 
-} // namespace
+#ifdef HELPER
+    void onWriteDebugLog(const Option& opt) { startLogger(opt); }
+#endif
+}
 
  // init()は引数で渡されたUSI option設定をhard codeされたデフォルト値で初期化する
  // OptionNameにはスペースを入れてはいけない。入れてしまうと、オプションとして認識してくれなくなる。
@@ -46,11 +48,13 @@ namespace
 void OptionsMap::init()
 {
 #ifdef IS_64BIT
-#define MAX_MEMORY 65536
+    const int MAX_MEMORY = 65536;
+    const int DEFAULT_MEMORY = 1024;
 #else
-#define MAX_MEMORY 512
+    const int DEFAULT_MEMORY = 1;
+    const int MAX_MEMORY = 512;
 #endif
-    (*this)["Hash"]                  = Option(1, 1, MAX_MEMORY, onHashSize);
+    (*this)["Hash"]                  = Option(DEFAULT_MEMORY, 1, MAX_MEMORY, onHashSize);
     (*this)["USI_Ponder"]            = Option(true);
     (*this)["Threads"]               = Option(1, 1, 128, onThreads);
     (*this)["Minimum_Thinking_Time"] = Option(15, 0, 5000);
@@ -58,27 +62,36 @@ void OptionsMap::init()
     (*this)["Slow_Mover"]            = Option(70, 10, 1000);
     (*this)["nodestime"]             = Option(0, 0, 10000);
     (*this)["byoyomi_margin"]        = Option(0, 0, 60000);
+#ifdef HELPER
     (*this)["Write_Debug_Log"]       = Option(false, onWriteDebugLog);
-    (*this)["Draw_Score"]            = Option(-50, -300, 300);
+#endif
+    (*this)["Draw_Score"]            = Option(-50, -32000, 32000);
     (*this)["MultiPV"]               = Option(1, 1, 500);
     (*this)["UseBook"]               = Option(true);
     (*this)["BookDir"]               = Option("book.txt");
 #ifdef USE_PROGRESS
-    (*this)["ProgressDir"]           = Option("progress");
+    (*this)["ProgressDir"]           = Option("progress/1");
+    (*this)["ProgressSaveDir"]       = Option("progress/save");
 #endif
 #ifdef USE_EVAL
     std::string eval = "eval/"     + std::string(EVAL_TYPE);
     std::string save = "evalsave/" + std::string(EVAL_TYPE);
 #ifdef EVAL_KPPT
 #ifdef USE_FILE_SQUARE_EVAL
-    eval += "/SDT4";
+    eval += "/WCSC27";
 #else
-    eval += "/7_2_177";
+    eval += "/1110";
 #endif
 #elif defined EVAL_PPT
     eval += "/25_2_282";
+#elif defined EVAL_PPTP
+    eval += "/8";
+#elif defined EVAL_KPPTP
+    eval += "/eval_zero";
 #endif
+#ifdef IS_64BIT
     (*this)["EvalShare"]             = Option(false);
+#endif
 #ifdef LEARN
     (*this)["EvalSaveDir"]           = Option(save.c_str());
 #endif
@@ -115,7 +128,7 @@ Option::Option(bool v, Fn* f) : type_("check"), min_(0), max_(0), on_change_(f)
 }
 Option::Option(int v, int minv, int maxv, Fn* f) : type_("spin"), min_(minv), max_(maxv), on_change_(f)
 {
-    default_value_ = current_value_ = std::to_string((_Longlong)v);
+    default_value_ = current_value_ = std::to_string(v);
 }
 
 // オプションに値をセットする。その際、範囲チェックも行う

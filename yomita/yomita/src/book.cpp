@@ -94,7 +94,7 @@ namespace USI
         return move;
     }
 }
-
+#ifdef HELPER
 // 手動で定跡手を登録するモード
 void MemoryBook::make(const Board& b, const std::string filename)
 {
@@ -160,7 +160,7 @@ void MemoryBook::make(const Board& b, const std::string filename)
     char temp[100];
     cin.getline(temp, sizeof(temp));
 }
-
+#endif
 // bookに指し手を加えてファイルに書き出す。
 void MemoryBook::store(const std::string filename, const std::string sfen, const Move m)
 {

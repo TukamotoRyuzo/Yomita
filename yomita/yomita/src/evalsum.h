@@ -208,4 +208,141 @@ namespace Eval
     };
 } // namespace Eval
 
+#elif defined EVAL_PPTP
+
+#include <array>
+#include "platform.h"
+#include "turn.h"
+
+class Board;
+
+namespace Eval
+{
+    struct EvalSum
+    {
+        EvalSum() {}
+        EvalSum(const EvalSum& es) 
+        { 
+            _mm256_store_si256(&y[0], es.y[0]); 
+            _mm256_store_si256(&y[1], es.y[1]);
+        }
+        EvalSum& operator = (const EvalSum& rhs) 
+        { 
+            _mm256_store_si256(&y[0], rhs.y[0]); 
+            _mm256_store_si256(&y[1], rhs.y[1]);
+            return *this; 
+        }
+
+        int32_t calcScore(const Board& b);
+
+        // その局面でevaluate()が呼ばれており評価値がセットされているかどうかを返す。
+        bool isNotEvaluated() { return p[0] == SCORE_NOT_EVALUATED; }
+
+        // まだその局面でevaluate()が呼ばれていないことを表す値をセットしておく。
+        void setNotEvaluated() { p[0] = SCORE_NOT_EVALUATED; }
+
+        union
+        {
+            std::array<int32_t, 16> p;
+            __m256i y[2];
+        };
+    };
+} // namespace Eval
+
+#elif defined EVAL_KPPTP
+
+#include <array>
+#include "platform.h"
+#include "turn.h"
+class Board;
+namespace Eval
+{
+    // [0] その配置の点数
+    // [1] 手番ボーナス
+    // [2]~[7] 進行度ボーナス
+    // [8]~[15] 持ち駒ボーナス
+    union Value
+    {
+        Value() {};
+        Value& operator = (Value& w) { _mm256_store_si256(&this->m, w.m); return *this; }
+        void clear() { _mm256_store_si256(&this->m, _mm256_setzero_si256()); }
+        std::array<int16_t, 16> p;
+        __m256i m;
+    };
+
+    union Value32
+    {
+        Value32() {};
+
+        Value32& operator = (Value& w) 
+        {
+#if 0
+            for (int i = 0; i < 16; i++)
+                p[i] = w.p[i];
+#else
+            _mm256_store_si256(&y[0], _mm256_cvtepi16_epi32(_mm256_extracti128_si256(w.m, 0)));
+            _mm256_store_si256(&y[1], _mm256_cvtepi16_epi32(_mm256_extracti128_si256(w.m, 1)));
+#endif
+            return *this; 
+        }
+
+        Value32& operator += (Value& w)
+        {
+#if 0
+            for (int i = 0; i < 16; i++)
+                p[i] += w.p[i];
+#else
+            _mm256_store_si256(&y[0], _mm256_add_epi32(y[0], _mm256_cvtepi16_epi32(_mm256_extracti128_si256(w.m, 0))));
+            _mm256_store_si256(&y[1], _mm256_add_epi32(y[1], _mm256_cvtepi16_epi32(_mm256_extracti128_si256(w.m, 1))));
+#endif
+            return *this;
+        }
+
+        Value32& operator -= (Value& w)
+        {
+#if 0
+            for (int i = 0; i < 16; i++)
+                p[i] -= w.p[i];
+#else
+            _mm256_store_si256(&y[0], _mm256_sub_epi32(y[0], _mm256_cvtepi16_epi32(_mm256_extracti128_si256(w.m, 0))));
+            _mm256_store_si256(&y[1], _mm256_sub_epi32(y[1], _mm256_cvtepi16_epi32(_mm256_extracti128_si256(w.m, 1))));
+#endif
+            return *this;
+        }
+
+        void clear() { y[0] = y[1] = _mm256_setzero_si256(); }
+
+        std::array<int32_t, 16> p;
+        __m256i y[2];
+    };
+
+    struct EvalSum
+    {
+        enum { ON_BOARD, TURN, PROGRESS };
+        enum { KPP_B, KPP_W, KKP_KK };
+
+        EvalSum() {}
+        EvalSum& operator = (const EvalSum& rhs)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                _mm256_store_si256(&u[i].y[0], rhs.u[i].y[0]);
+                _mm256_store_si256(&u[i].y[1], rhs.u[i].y[1]);
+            }
+
+            return *this;
+        }
+
+        int32_t calcScore(const Board& b);
+
+        // その局面でevaluate()が呼ばれており評価値がセットされているかどうかを返す。
+        bool isNotEvaluated() { return u[0].p[0] == SCORE_NOT_EVALUATED; }
+
+        // まだその局面でevaluate()が呼ばれていないことを表す値をセットしておく。
+        void setNotEvaluated() { u[0].p[0] = SCORE_NOT_EVALUATED; }
+        
+        Value32 u[3];
+    };
+} // namespace Eval
+
 #endif

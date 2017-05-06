@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "timeman.h" // for ponderhit 
 
 const std::string engine_name = "Yomita_";
-const std::string version = "2.03";
+const std::string version = "4.0";
 
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI
@@ -79,13 +79,11 @@ namespace Learn
     void learnProgress(Board& b, std::istringstream& is);
     void analyzeFutility(std::istringstream& is);
 #endif
-    
 } // namespace Learn
 
 
 void USI::isReady()
 {
-#if defined IS_64BIT
     static bool first = true;
 
     // 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
@@ -100,7 +98,7 @@ void USI::isReady()
 #endif
         first = false;
     }
-#endif
+
     SYNC_COUT << "readyok" << SYNC_ENDL;
 }
 
@@ -145,12 +143,12 @@ void USI::position(Board &b, std::istringstream &is)
         Search::setup_status->push(StateInfo());
         b.doMove(m, Search::setup_status->top());
         assert(b.verify());
-#ifdef USE_EVAL
-        Eval::evaluate(b);
-#endif
 #ifdef USE_PROGRESS
         Prog::evaluateProgress(b);
-        //std::cout << b << "progress = " << Prog::evaluateProgress(b) * 100.0 << "%" << std::endl;
+        //std::cout << "progress = " << Prog::evaluateProgress(b) * 100.0 << "%" << std::endl;
+#endif
+#ifdef USE_EVAL
+        Eval::evaluate(b);
 #endif
         ++current_ply;
     }
@@ -178,10 +176,10 @@ void USI::go(const Board &b, std::istringstream& ss_cmd)
         else if (token == "winc")     { ss_cmd >> limits.inc[WHITE];  }
         else if (token == "movetime") { ss_cmd >> limits.move_time;   }
         else if (token == "byoyomi")  { ss_cmd >> limits.byoyomi;     }
-        else if (token == "depth")    { ss_cmd >> limits.depth;		  }
-        else if (token == "nodes")    { ss_cmd >> limits.nodes;		  }
-        else if (token == "ponder")   { limits.ponder   = true;		  }
-        else if (token == "infinite") { limits.infinite = true;		  }
+        else if (token == "depth")    { ss_cmd >> limits.depth;       }
+        else if (token == "nodes")    { ss_cmd >> limits.nodes;       }
+        else if (token == "ponder")   { limits.ponder   = true;       }
+        else if (token == "infinite") { limits.infinite = true;       }
     }
 
     if (limits.byoyomi && limits.byoyomi * 6 > limits.time[b.turn()])
@@ -221,7 +219,7 @@ void USI::setOption(std::istringstream& ss_cmd)
     else
         Options[name] = value;
 }
-
+#ifdef HELPER
 // 指し手生成の速度を計測
 void USI::measureGenerateMoves(const Board& b, bool check = false)
 {
@@ -281,7 +279,7 @@ void USI::measureGenerateMoves(const Board& b, bool check = false)
 
     std::cout << std::endl;
 }
-
+#endif
 // usi文字列の指し手をMoveインスタンスに変換
 Move USI::toMove(const Board& b, std::string str)
 {
@@ -295,15 +293,9 @@ Move USI::toMove(const Board& b, std::string str)
 // 将棋所で将棋を指せるようにするためのメッセージループ。
 void USI::loop(int argc, char** argv)
 {
+#ifdef HELPER
     // デフォルトでログを取る。
     startLogger(true);
-
-#if !defined IS_64BIT
-    // x86環境では置換表の確保が行われた後に評価関数を読み込むとbad_allocを起こすことがある。
-    // これは評価関数の縦型→横型変換をするときにKPPTと同じ大きさの一時バッファを確保するので、
-    // 大きな置換表が既に確保された状態だと邪魔だからである。
-    Eval::load();
-    Prog::load();
 #endif
 
     Board board(Threads.main());
@@ -371,6 +363,7 @@ void USI::loop(int argc, char** argv)
         // 思考開始する局面を作る。
         else if (token == "position") { position(board, ss_cmd); }
 
+#ifdef HELPER
         // 以下、拡張コマンド
         // 指し手生成祭りの局面をセット
         else if (token == "maturi") { board.init(USI::BENCHMARK); std::cout << "maturi set." << std::endl; }
@@ -392,7 +385,7 @@ void USI::loop(int argc, char** argv)
         { 
             MoveList<LEGAL_ALL> mlist(board);
             std::cout << "size = " << mlist.size() << std::endl;
-            for(auto m : mlist) 
+            for (auto m : mlist) 
                 std::cout << pretty(m); 
             std::cout << std::endl; 
         }
@@ -488,7 +481,7 @@ void USI::loop(int argc, char** argv)
             board.init(USI::START_POS);
         
             TimePoint start = now();
-            auto c = Learn::search(board, -SCORE_INFINITE, SCORE_INFINITE, 6);
+            auto c = Learn::search(board, -SCORE_INFINITE, SCORE_INFINITE, 6 * ONE_PLY);
             TimePoint elapsed = now() - start;
             SYNC_COUT << "score = " << c.first << "pv = ";
 
@@ -510,6 +503,7 @@ void USI::loop(int argc, char** argv)
         // futility marginの解析
         else if (token == "analyze") { Learn::analyzeFutility(ss_cmd); }
 #endif
+#endif
         // 有効なコマンドではない。
         else { SYNC_COUT << "unknown command: " << cmd << SYNC_ENDL; }
 
@@ -526,7 +520,7 @@ std::string USI::score(Score s)
     if (abs(s) < SCORE_MATE - MAX_PLY)
         ss << "cp " << s * 100 / PAWN_SCORE;
     else
-        ss << "mate " << (s > 0 ? SCORE_MATE - s + 1 : -SCORE_MATE - s + 1);
+        ss << "mate " << (s > 0 ? SCORE_MATE - s - 1 : -SCORE_MATE - s + 1);
 
     return ss.str();
 }

@@ -222,3 +222,10 @@ io_log*
 engine-config*
 teacher
 /yomita_engine/useless_exe
+generated*
+*.exe
+*log*
+
+*.etl
+/yomita_engine/evalsave
+!yomita.exe

@@ -1,5 +1,5 @@
-ï»¿/*
-èª­ã¿å¤ªï¼ˆyomitaï¼‰, a USI shogi (Japanese chess) playing engine derived from
+/*
+“Ç‚İ‘¾iyomitaj, a USI shogi (Japanese chess) playing engine derived from
 Stockfish 7 & YaneuraOu mid 2016 V3.57
 Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
@@ -23,44 +23,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "learn.h"
 
-#if defined LEARN && defined EVAL_KPPT
+#if defined LEARN && defined EVAL_KPPTP
 
 #include <codecvt>
 #include <fstream>
 #include <unordered_set>
-#include "eval_kppt.h"
+#include "eval_kpptp.h"
 #include "usi.h"
 
 #define kk (*et.kk_)
 #define kpp (*et.kpp_)
 #define kkp (*et.kkp_)
 
-// æ¬¡å…ƒä¸‹ã’ã‚’è¡Œã†ã¨ãå®šç¾©
+// ŸŒ³‰º‚°‚ğs‚¤‚Æ‚«’è‹`
 //#define DIMENSION_DOWN_KPP
 
 namespace Eval
 {
-    // çµ¶å¯¾å€¤ã‚’æŠ‘åˆ¶ã™ã‚‹ãƒã‚¯ãƒ­
-#define SET_A_LIMIT_TO(X,MIN,MAX)  \
-    X[0] = std::min(X[0],(MAX));     \
-    X[0] = std::max(X[0],(MIN));     \
-    X[1] = std::min(X[1],(MAX));     \
-    X[1] = std::max(X[1],(MIN));
+    // â‘Î’l‚ğ—}§‚·‚éƒ}ƒNƒ
+#define SET_A_LIMIT_TO(X, MIN, MAX)  \
+for (int ss = 0; ss < 16; ss++){\
+    X[ss] = std::min(X[ss], (MAX));    \
+    X[ss] = std::max(X[ss], (MIN));    \
+}
 
     BonaPiece INV_PIECE[fe_end], MIR_PIECE[fe_end];
 
-    // kppé…åˆ—ã®åŒã˜é‡ã¿ãŒå…¥ã‚‹ã¹ãå ´æ‰€ã«åŒã˜å€¤ã‚’æ›¸ãè¾¼ã‚€ã€‚
-    void writeKpp(Square k1, BonaPiece p1, BonaPiece p2, ValueKpp value)
+    // kpp”z—ñ‚Ì“¯‚¶d‚İ‚ª“ü‚é‚×‚«êŠ‚É“¯‚¶’l‚ğ‘‚«‚ŞB
+    void writeKpp(Square k1, BonaPiece p1, BonaPiece p2, Value& value)
     {
+        assert(isOK(k1) && isOK2(p1) && isOK2(p2));
 #ifdef DIMENSION_DOWN_KPP
         BonaPiece mp1 = MIR_PIECE[p1];
         BonaPiece mp2 = MIR_PIECE[p2];
         Square mk1 = mirror(k1);
 
-        assert(kpp[k1][p1][p2] == kpp[k1][p2][p1]);
+        /*assert(kpp[k1][p1][p2] == kpp[k1][p2][p1]);
         assert(kpp[k1][p1][p2] == kpp[mk1][mp1][mp2] || fileOf(k1) == FILE_5);
         assert(kpp[k1][p1][p2] == kpp[mk1][mp2][mp1] || fileOf(k1) == FILE_5);
-
+*/
         kpp[k1][p1][p2]
             = kpp[k1][p2][p1]
             = kpp[mk1][mp1][mp2]
@@ -71,9 +72,11 @@ namespace Eval
 #endif
     }
 
-    // æ›¸ãè¾¼ã‚€å ´æ‰€ã‚’å°‘ãªãã™ã‚‹ç›®çš„ã§ã€ä¸€ç•ªè‹¥ã„ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’è¿”ã™ã€‚
+    // ‘‚«‚ŞêŠ‚ğ­‚È‚­‚·‚é–Ú“I‚ÅAˆê”Ôá‚¢ƒAƒhƒŒƒX‚ğ•Ô‚·B
     uint64_t getKppIndex(Square k1, BonaPiece p1, BonaPiece p2)
     {
+        assert(isOK(k1) && isOK2(p1) && isOK2(p2));
+
         const auto q0 = &kpp[0][0][0];
 
 #ifdef DIMENSION_DOWN_KPP
@@ -95,64 +98,84 @@ namespace Eval
 #endif
     }
 
-    void writeKkp(Square k1, Square k2, BonaPiece p1, ValueKkp value)
+    void writeKkp(Square k1, Square k2, BonaPiece p1, Value& value)
     {
         kkp[k1][k2][p1] = value;
     }
 
-    // å‹¾é…ã‚’deltaåˆ†å¢—ã‚„ã™ã€‚
-    void Weight::addGrad(WeightValue &delta)
+    // Œù”z‚ğdelta•ª‘‚â‚·B
+    void Weight::addGrad(WeightValue& delta)
     {
-        g[0] += delta[0];
-        g[1] += delta[1];
+        g += delta;
+
 #ifdef USE_SGD_UPDATE
         count++;
-        assert(abs(g[0] / count) <= 1);
 #endif
     }
 
-#define eta2 (eta / 4)
-    // å‹¾é…ã‚’é‡ã¿ã«åæ˜ ã•ã›ã‚‹ã€‚
+#define eta2 (eta / 4.0)
+#define eta3 (eta / 8.0)
+
+    // Œù”z‚ğd‚İ‚É”½‰f‚³‚¹‚éB
     bool Weight::update(bool skip_update)
     {
 #ifdef USE_SGD_UPDATE
-        if (g[0] == 0 && g[1] == 0)
+        
+        if (!g)
             return false;
 
         if (count)
         {
-            g[0] /= count;
-            g[1] /= count;
+            g /= count;
             count = 0;
-            w = WeightValue{ w[0] - eta * g[0], w[1] - eta2 * g[1] };
+
+            //g.p[0] *= eta;
+            //g.p[1] *= eta2;
+            //g.p[2] *= eta2;
+
+            //for (int i = 3; i < 16; i++)
+            //    g.p[i] *= eta3;
+
+            g *= eta;
+            //g *= 0.1;
+            w -= g;
         }
 
 #elif defined USE_ADA_GRAD_UPDATE
-        if (g[0] == 0 && g[1] == 0)
-            return false;
+        bool update = false;
 
-        // g2[i] += g * g;
-        // w[i] -= Î· * g / sqrt(g2[i]);
-        // g = 0 // mini-batchãªã‚‰ã“ã®ã‚¿ã‚¤ãƒŸãƒ³ã‚°ã§å‹¾é…é…åˆ—ã‚¯ãƒªã‚¢ã€‚
-
-        g2 += WeightValue{ g[0] * g[0] , g[1] * g[1] };
-
-        // å€¤ãŒå°ã•ã„ã†ã¡ã¯skipã™ã‚‹
-        if (!skip_update)
+        auto func = [&](int i, double e) 
         {
-            if (g2[0] >= 0.1f)
-                w[0] = w[0] - eta * g[0] / sqrt(g2[0]);
+            if (g.p[i])
+            {
+                g2.p[i] += g.p[i] * g.p[i];
 
-            if (g2[1] >= 0.1f)
-                w[1] = w[1] - eta2 * g[1] / sqrt(g2[1]);
-        }
+                // ’l‚ª¬‚³‚¢‚¤‚¿‚Ískip‚·‚é
+                if (!skip_update && g2.p[i] >= 0.1f)
+                {
+                    update = true;
+                    w.p[i] = w.p[i] - e * g.p[i] / sqrt(g2.p[i]);
+                }
+            }
+        };
+
+        func(0, eta);
+        func(1, eta2);
+        func(2, eta2);
+
+        for (int i = 3; i < 16; i++)
+            func(i, eta3);
 
 #endif
+        for (int i = 0; i < M_CNT; i++)
+            g.m[i] = _mm256_setzero_p();
 
-        g = { 0, 0 };
-
+#ifdef USE_ADA_GRAD_UPDATE
+        return update;
+#else
         return !skip_update;
-    }
+#endif
+}
 
     LearnFloatType Weight::eta;
 
@@ -168,50 +191,60 @@ namespace Eval
     {
         if (kk_w_ == nullptr)
         {
-            const auto sizekk = uint64_t(SQ_MAX) * uint64_t(SQ_MAX);
+            const auto sizekk  = uint64_t(SQ_MAX) * uint64_t(SQ_MAX);
             const auto sizekpp = uint64_t(SQ_MAX) * uint64_t(fe_end) * uint64_t(fe_end);
             const auto sizekkp = uint64_t(SQ_MAX) * uint64_t(SQ_MAX) * uint64_t(fe_end);
 
-            kk_w_ = (Weight(*)[SQ_MAX][SQ_MAX])        new Weight[sizekk];
-            kpp_w_ = (Weight(*)[SQ_MAX][fe_end][fe_end])new Weight[sizekpp];
-            kkp_w_ = (Weight(*)[SQ_MAX][SQ_MAX][fe_end])new Weight[sizekkp];
+            kk_w_  = (Weight(*)[SQ_MAX][SQ_MAX])        _aligned_malloc(sizekk  * sizeof(Weight), 32);
+            kpp_w_ = (Weight(*)[SQ_MAX][fe_end][fe_end])_aligned_malloc(sizekpp * sizeof(Weight), 32);
+            kkp_w_ = (Weight(*)[SQ_MAX][SQ_MAX][fe_end])_aligned_malloc(sizekkp * sizeof(Weight), 32);
 
-            memset(kk_w_, 0, sizeof(Weight) * sizekk);
+            memset(kk_w_,  0, sizeof(Weight) * sizekk);
             memset(kpp_w_, 0, sizeof(Weight) * sizekpp);
             memset(kkp_w_, 0, sizeof(Weight) * sizekkp);
 
 #ifdef RESET_TO_ZERO_VECTOR
             std::cout << "\n[RESET_TO_ZERO_VECTOR]";
-            memset(kk, 0, sizeof(ValueKk) * sizekk);
-            memset(kpp, 0, sizeof(ValueKpp) * sizekpp);
-            memset(kkp, 0, sizeof(ValueKkp) * sizekkp);
-#else
-            // å…ƒã®é‡ã¿ã‚’ã‚³ãƒ”ãƒ¼
+            /*memset(kk,  0, sizeof(Value) * sizekk);
+            memset(kpp, 0, sizeof(Value) * sizekpp);
+            memset(kkp, 0, sizeof(Value) * sizekkp);
+*/
             for (auto k1 : Squares)
                 for (auto k2 : Squares)
                 {
-                    kk_w[k1][k2].w[0] = LearnFloatType(kk[k1][k2][0]);
-                    kk_w[k1][k2].w[1] = LearnFloatType(kk[k1][k2][1]);
+                    kk[k1][k2].m = _mm256_setzero_si256();
 
                     for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
-                    {
-                        kkp_w[k1][k2][p].w[0] = LearnFloatType(kkp[k1][k2][p][0]);
-                        kkp_w[k1][k2][p].w[1] = LearnFloatType(kkp[k1][k2][p][1]);
-                    }
+                        kkp[k1][k2][p].m = _mm256_setzero_si256();
                 };
 
             for (auto k : Squares)
                 for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
                     for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
-                    {
-                        kpp_w[k][p1][p2].w[0] = LearnFloatType(kpp[k][p1][p2][0]);
-                        kpp_w[k][p1][p2].w[1] = LearnFloatType(kpp[k][p1][p2][1]);
-                    }
+                        kpp[k][p1][p2].m = _mm256_setzero_si256();
+#else
+            // Œ³‚Ìd‚İ‚ğƒRƒs[
+            for (auto k1 : Squares)
+                for (auto k2 : Squares)
+                {
+                    for (int i = 0; i < PARAMS_CNT; i++)
+                        kk_w[k1][k2].w.p[i] = kk[k1][k2].p[i];
+
+                    for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
+                        for (int i = 0; i < PARAMS_CNT; i++)
+                            kkp_w[k1][k2][p].w.p[i] = kkp[k1][k2][p].p[i];
+                };
+
+            for (auto k : Squares)
+                for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
+                    for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
+                        for (int i = 0; i < PARAMS_CNT; i++)
+                            kpp_w[k][p1][p2].w.p[i] = kpp[k][p1][p2].p[i];
 #endif
         }
     }
 
-    // ç¾åœ¨ã®å±€é¢ã§å‡ºç¾ã—ã¦ã„ã‚‹ç‰¹å¾´ã™ã¹ã¦ã«å¯¾ã—ã¦ã€å‹¾é…å€¤ã‚’å‹¾é…é…åˆ—ã«åŠ ç®—ã™ã‚‹ã€‚
+    // Œ»İ‚Ì‹Ç–Ê‚ÅoŒ»‚µ‚Ä‚¢‚é“Á’¥‚·‚×‚Ä‚É‘Î‚µ‚ÄAŒù”z’l‚ğŒù”z”z—ñ‚É‰ÁZ‚·‚éB
     void addGrad(Board& b, Turn root_turn, double delta_grad)
     {
         auto sq_bk = b.kingSquare(BLACK);
@@ -221,14 +254,60 @@ namespace Eval
         int i, j;
         BonaPiece k0, k1, l0, l1;
 
-        // æ‰‹ç•ªã‚’è€ƒæ…®ã—ãªã„å€¤
+        // è”Ô‚ğl—¶‚µ‚È‚¢’l
         auto f = (root_turn == BLACK) ? LearnFloatType(delta_grad) : -LearnFloatType(delta_grad);
 
-        // æ‰‹ç•ªã‚’è€ƒæ…®ã™ã‚‹å€¤
+        // è”Ô‚ğl—¶‚·‚é’l
         auto g = (root_turn == b.turn()) ? LearnFloatType(delta_grad) : -LearnFloatType(delta_grad);
 
+#ifdef USE_AVX
+        WeightValue w, mw;
+
+        for (int i = 0; i < M_CNT; i++)
+            w.m[i] = _mm256_setzero_p();
+#else
+        WeightValue w = { 0 };
+#endif
+#if 0
+        w.p[0] = f;
+        w.p[1] = g;
+        int pro = int(6.0 * b.state()->progress.rate());
+        pro = pro < 0 ? 0 : pro > 5 ? 5 : pro;
+        w.p[2 + pro] = f;
+
+        mw.p[0] = -w.p[0];
+        mw.p[1] = w.p[1];
+        for (int i = 2; i < PARAMS_CNT; i++)
+            mw.p[i] = -w.p[i];
+#endif
+        mw = w;
+#if 0
+        int pro = int(b.state()->progress.rate() * 8.0);
+        pro = (pro < 0 ? 0 : pro > 7 ? 7 : pro) * 2;
+#elif 0
+        w.p[pro + b.turn()] = f;
+        mw.p[pro + ~b.turn()] = -f;
+#else
+        //w.p[0] = f;
+        //w.p[1 + b.turn()] = g;
+        double progress = b.state()->progress.rate();
+        // is“xƒ{[ƒiƒX(è”Ô‚ÆŠÖŒW‚È‚¢ƒ{[ƒiƒX)
+        int pro = int(progress * 5.0);
+        pro = (pro < 0 ? 0 : pro > 4 ? 4 : pro);
+        w.p[3 + pro] = f;
+
+        // is“xƒ{[ƒiƒX(è”Ô‘¤‚É—^‚¦‚ç‚ê‚éƒ{[ƒiƒX)
+        int pro2 = int(progress * 4.0);
+        pro2 = (pro2 < 0 ? 0 : pro2 > 3 ? 3 : pro2) * 2;
+        w.p[8 + pro2 + b.turn()] = g;
+
+        //mw.p[0] = -f;
+        //mw.p[1 + ~b.turn()] = g;
+        mw.p[3 + pro] = -f;
+        mw.p[8 + pro2 + ~b.turn()] = g;
+#endif
         // KK
-        kk_w[sq_bk][sq_wk].addGrad(WeightValue{ f, g });
+        kk_w[sq_bk][sq_wk].addGrad(w);
 
         for (i = 0; i < PIECE_NO_KING; ++i)
         {
@@ -240,112 +319,56 @@ namespace Eval
                 l0 = list_fb[j];
                 l1 = list_fw[j];
 
-                // kppé…åˆ—ã«é–¢ã—ã¦ã¯ãƒŸãƒ©ãƒ¼(å·¦å³åˆ¤å®š)ã¨ãƒ•ãƒªãƒƒãƒ—(180åº¦å›è»¢)ã®æ¬¡å…ƒä¸‹ã’ã‚’è¡Œã†ã€‚
-                ((Weight*)kpp_w_)[getKppIndex(sq_bk, k0, l0)].addGrad(WeightValue{ f, g });
-                ((Weight*)kpp_w_)[getKppIndex(inverse(sq_wk), k1, l1)].addGrad(WeightValue{ -f, g });
+                // kpp”z—ñ‚ÉŠÖ‚µ‚Ä‚Íƒ~ƒ‰[(¶‰E”»’è)‚ÆƒtƒŠƒbƒv(180“x‰ñ“])‚ÌŸŒ³‰º‚°‚ğs‚¤B
+                ((Weight*)kpp_w_)[getKppIndex(sq_bk, k0, l0)].addGrad(w);
+                ((Weight*)kpp_w_)[getKppIndex(inverse(sq_wk), k1, l1)].addGrad(mw);
             }
 
-            kkp_w[sq_bk][sq_wk][k0].addGrad(WeightValue{ f, g });
+            kkp_w[sq_bk][sq_wk][k0].addGrad(w);
         }
     }
 
 
     void updateWeights(uint64_t mini_batch_size, uint64_t epoch)
     {
-        // 3å›ç›®ã¾ã§ã¯wã®updateã‚’ä¿ç•™ã™ã‚‹ã€‚
-        // ãŸã ã—ã€SGDã¯å±¥æ­´ãŒãªã„ã®ã§ã“ã‚Œã‚’è¡Œãªã†å¿…è¦ãŒãªã„ã€‚
+        // 3‰ñ–Ú‚Ü‚Å‚Íw‚Ìupdate‚ğ•Û—¯‚·‚éB
+        // ‚½‚¾‚µASGD‚Í—š—ğ‚ª‚È‚¢‚Ì‚Å‚±‚ê‚ğs‚È‚¤•K—v‚ª‚È‚¢B
         bool skip_update =
 #ifdef USE_SGD_UPDATE
             false;
 #else
-            epoch <= 20;
+            epoch <= 100;
 #endif
-        // kkpã®ä¸€ç•ªå¤§ããªå€¤ã‚’è¡¨ç¤ºã•ã›ã‚‹ã“ã¨ã§å­¦ç¿’ãŒé€²ã‚“ã§ã„ã‚‹ã‹ã®ãƒã‚§ãƒƒã‚¯ã«ç”¨ã„ã‚‹ã€‚
+        // kkp‚Ìˆê”Ô‘å‚«‚È’l‚ğ•\¦‚³‚¹‚é‚±‚Æ‚ÅŠwK‚ªi‚ñ‚Å‚¢‚é‚©‚Ìƒ`ƒFƒbƒN‚É—p‚¢‚éB
 #ifdef DISPLAY_STATS_IN_UPDATE_WEIGHTS
-        WeightValue max_kkp{ 0.0f, 0.0f };
+        LearnFloatType max_kktp[PARAMS_CNT] = { 0.0 };
 #endif
-
-        // å­¦ç¿’ãƒ¡ã‚½ãƒƒãƒ‰ã«å¿œã˜ãŸå­¦ç¿’ç‡è¨­å®š
+        // ŠwKƒƒ\ƒbƒh‚É‰‚¶‚½ŠwK—¦İ’è
 #ifdef USE_SGD_UPDATE
 #if defined (LOSS_FUNCTION_IS_CROSS_ENTOROPY)
-        Weight::eta = 3.2f;
-#elif defined (LOSS_FUNCTION_IS_WINNING_PERCENTAGE)
         Weight::eta = 1.0f;
+#elif defined (LOSS_FUNCTION_IS_WINNING_PERCENTAGE)
+        Weight::eta = 256.0f;
 #endif
 #elif defined USE_ADA_GRAD_UPDATE
-        Weight::eta = 5.0f;
+        Weight::eta = 8.0;
 #endif
 
-
-#if 0
-        for (auto k1 : Squares)
-            for (auto k2 : Squares)
-            {
-                auto& w = kk_w[k1][k2];
-#ifdef DISPLAY_STATS_IN_UPDATE_WEIGHTS
-                max_kkp[0] = std::max(max_kkp[0], abs(w.w[0]));
-                max_kkp[1] = std::max(max_kkp[1], abs(w.w[1]));
-#endif
-
-                // wã®å€¤ã«updateãŒã‚ã£ãŸãªã‚‰ã€å€¤ã‚’åˆ¶é™ã—ã¦ã€ã‹ã¤ã€kkã«åæ˜ ã•ã›ã‚‹ã€‚
-                if (w.update(skip_update))
-                {
-                    //std::cout << w.w[0] << " " << w.w[1] << std::endl;
-                    // çµ¶å¯¾å€¤ã‚’æŠ‘åˆ¶ã™ã‚‹ã€‚
-                    SET_A_LIMIT_TO(w.w, LearnFloatType((int32_t)INT16_MIN * 4), LearnFloatType((int32_t)INT16_MAX * 4));
-                    kk[k1][k2] = { (int32_t)w.w[0], (int32_t)w.w[1] };
-                }
-            }
-
-        for (auto k : Squares)
-            for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
-                for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
-                {
-                    auto& w = kpp_w[k][p1][p2];
-
-                    if (w.update(skip_update))
-                    {
-                        // çµ¶å¯¾å€¤ã‚’æŠ‘åˆ¶ã™ã‚‹ã€‚
-                        SET_A_LIMIT_TO(w.w, (LearnFloatType)(INT16_MIN / 2), (LearnFloatType)(INT16_MAX / 2));
-                        writeKpp(k, p1, p2, ValueKpp{ (int16_t)w.w[0], (int16_t)w.w[1] });
-                    }
-                }
-
-        for (auto k1 : Squares)
-            for (auto k2 : Squares)
-                for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
-                {
-                    auto& w = kkp_w[k1][k2][p];
-
-                    // std::cout << "\n" << w.g[0] << " & " << w.g[1];
-
-                    if (w.update(skip_update))
-                    {
-                        // çµ¶å¯¾å€¤ã‚’æŠ‘åˆ¶ã™ã‚‹ã€‚
-                        SET_A_LIMIT_TO(w.w, (LearnFloatType)(INT16_MIN / 2), (LearnFloatType)(INT16_MAX / 2));
-
-                        // kkpã¯ä¸Šã§æ›¸ã„ãŸç†ç”±ã§æ¬¡å…ƒä¸‹ã’ã‚’ã—ãªã„ã€‚
-                        kkp[k1][k2][p] = ValueKkp{ int32_t(w.w[0]),int32_t(w.w[1]) };
-                    }
-                }
-#else
         auto func = [&](size_t id)
         {
             for (auto k1 = 9 * id; k1 < 9 * (id + 1); k1++)
                 for (auto k2 : Squares)
                 {
                     auto& w = kk_w[k1][k2];
-#ifdef DISPLAY_STATS_IN_UPDATE_WEIGHTS
-                    max_kkp[0] = std::max(max_kkp[0], abs(w.w[0]));
-                    max_kkp[1] = std::max(max_kkp[1], abs(w.w[1]));
-#endif
-                    // wã®å€¤ã«updateãŒã‚ã£ãŸãªã‚‰ã€å€¤ã‚’åˆ¶é™ã—ã¦ã€ã‹ã¤ã€kkã«åæ˜ ã•ã›ã‚‹ã€‚
+
+                    // w‚Ì’l‚Éupdate‚ª‚ ‚Á‚½‚È‚çA’l‚ğ§ŒÀ‚µ‚ÄA‚©‚ÂAkk‚É”½‰f‚³‚¹‚éB
                     if (w.update(skip_update))
                     {
-                        //std::cout << w.w[0] << " " << w.w[1] << std::endl;
-                        // çµ¶å¯¾å€¤ã‚’æŠ‘åˆ¶ã™ã‚‹ã€‚
-                        SET_A_LIMIT_TO(w.w, LearnFloatType((int32_t)INT16_MIN * 4), LearnFloatType((int32_t)INT16_MAX * 4));
-                        kk[k1][k2] = { (int32_t)w.w[0], (int32_t)w.w[1] };
+                        // â‘Î’l‚ğ—}§‚·‚éB
+                        SET_A_LIMIT_TO(w.w.p, (LearnFloatType)(INT16_MIN), (LearnFloatType)(INT16_MAX));
+
+                        for (int i = 0; i < PARAMS_CNT; i++)
+                            kk[k1][k2].p[i] = w.w.p[i];
                     }
                 }
 
@@ -357,9 +380,15 @@ namespace Eval
 
                         if (w.update(skip_update))
                         {
-                            // çµ¶å¯¾å€¤ã‚’æŠ‘åˆ¶ã™ã‚‹ã€‚
-                            SET_A_LIMIT_TO(w.w, (LearnFloatType)(INT16_MIN / 2), (LearnFloatType)(INT16_MAX / 2));
-                            writeKpp(k, p1, p2, ValueKpp{ (int16_t)w.w[0], (int16_t)w.w[1] });
+                            // â‘Î’l‚ğ—}§‚·‚éB
+                            SET_A_LIMIT_TO(w.w.p, (LearnFloatType)(INT16_MIN), (LearnFloatType)(INT16_MAX));
+
+                            auto w2 = kpp[k][p1][p2];
+
+                            for (int i = 0; i < PARAMS_CNT; i++)
+                                w2.p[i] = w.w.p[i];
+
+                            writeKpp(k, p1, p2, w2);
                         }
                     }
 
@@ -368,16 +397,20 @@ namespace Eval
                     for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
                     {
                         auto& w = kkp_w[k1][k2][p];
-
-                        // std::cout << "\n" << w.g[0] << " & " << w.g[1];
-
+#ifdef DISPLAY_STATS_IN_UPDATE_WEIGHTS
+                        for (int i = 0; i < PARAMS_CNT; i++)
+                            max_kktp[i] = std::max(max_kktp[i], abs(w.w.p[i]));
+#endif
                         if (w.update(skip_update))
                         {
-                            // çµ¶å¯¾å€¤ã‚’æŠ‘åˆ¶ã™ã‚‹ã€‚
-                            SET_A_LIMIT_TO(w.w, (LearnFloatType)(INT16_MIN / 2), (LearnFloatType)(INT16_MAX / 2));
+                            SET_A_LIMIT_TO(w.w.p, (LearnFloatType)(INT16_MIN), (LearnFloatType)(INT16_MAX));
 
-                            // kkpã¯ä¸Šã§æ›¸ã„ãŸç†ç”±ã§æ¬¡å…ƒä¸‹ã’ã‚’ã—ãªã„ã€‚
-                            kkp[k1][k2][p] = ValueKkp{ int32_t(w.w[0]),int32_t(w.w[1]) };
+                            auto w2 = kkp[k1][k2][p];
+
+                            for (int i = 0; i < PARAMS_CNT; i++)
+                                w2.p[i] = w.w.p[i];
+
+                            kkp[k1][k2][p] = w2;
                         }
                     }
         };
@@ -389,16 +422,83 @@ namespace Eval
 
         for (int i = 0; i < 9; i++)
             th[i].join();
-#endif
+#if 0
+        for (auto k1 : Squares)
+            for (auto k2 : Squares)
+            {
+                auto& w = kk_w[k1][k2];
+
+                // w‚Ì’l‚Éupdate‚ª‚ ‚Á‚½‚È‚çA’l‚ğ§ŒÀ‚µ‚ÄA‚©‚ÂAkk‚É”½‰f‚³‚¹‚éB
+                if (w.update(skip_update))
+                {
+                    // â‘Î’l‚ğ—}§‚·‚éB
+                    SET_A_LIMIT_TO(w.w.p, (LearnFloatType)(INT16_MIN), (LearnFloatType)(INT16_MAX));
+
+                    for (int i = 0; i < PARAMS_CNT; i++)
+                        kk[k1][k2].p[i] = w.w.p[i];
+                }
+            }
+
+        for (auto k : Squares)
+            for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
+                for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
+                {
+                    auto& w = kpp_w[k][p1][p2];
 #ifdef DISPLAY_STATS_IN_UPDATE_WEIGHTS
-        SYNC_COUT << " , max_kkp = " << max_kkp[0] << ", " << max_kkp[1] << SYNC_ENDL;
+                    for (int i = 0; i < PARAMS_CNT; i++)
+                        max_kktp[i] = std::max(max_kktp[i], abs(w.w.p[i]));
+#endif
+                    if (w.update(skip_update))
+                    {
+                        // â‘Î’l‚ğ—}§‚·‚éB
+                        SET_A_LIMIT_TO(w.w.p, (LearnFloatType)(INT16_MIN), (LearnFloatType)(INT16_MAX));
+
+                        auto w2 = kpp[k][p1][p2];
+                        
+                        for (int i = 0; i < PARAMS_CNT; i++)
+                            w2.p[i] = w.w.p[i];
+
+                        writeKpp(k, p1, p2, w2);
+                    }
+                }
+
+        for (auto k1 : Squares)
+            for (auto k2 : Squares)
+                for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
+                {
+                    auto& w = kkp_w[k1][k2][p];
+
+
+                    // std::cout << "\n" << w.g[0] << " & " << w.g[1];
+
+                    if (w.update(skip_update))
+                    {
+                        SET_A_LIMIT_TO(w.w.p, (LearnFloatType)(INT16_MIN), (LearnFloatType)(INT16_MAX));
+
+                        auto w2 = kkp[k1][k2][p];
+
+                        for (int i = 0; i < PARAMS_CNT; i++)
+                            w2.p[i] = w.w.p[i];
+
+                        kkp[k1][k2][p] = w2;
+                    }
+                }
+#endif
+        
+#ifdef DISPLAY_STATS_IN_UPDATE_WEIGHTS
+        std::cout << "\nmax_kk = ";
+
+        for (int i = 0; i < PARAMS_CNT; i++)
+            std::cout << max_kktp[i] << ", ";
+
+        std::cout << std::endl;
 #endif
     }
 
-    // å­¦ç¿’ã®ãŸã‚ã®ãƒ†ãƒ¼ãƒ–ãƒ«ã®åˆæœŸåŒ–
+    // ŠwK‚Ì‚½‚ß‚Ìƒe[ƒuƒ‹‚Ì‰Šú‰»
     void evalLearnInit()
     {
-        // fã¨eã¨ã®äº¤æ›
+        // f‚Æe‚Æ‚ÌŒğŠ·
         int t[] = {
             f_hand_pawn - 1    , e_hand_pawn - 1   ,
             f_hand_lance - 1   , e_hand_lance - 1  ,
@@ -418,12 +518,12 @@ namespace Eval
             f_dragon           , e_dragon          ,
         };
 
-        // æœªåˆæœŸåŒ–ã®å€¤ã‚’çªã£è¾¼ã‚“ã§ãŠãã€‚
+        // –¢‰Šú‰»‚Ì’l‚ğ“Ë‚Á‚ñ‚Å‚¨‚­B
         for (BonaPiece p = BONA_PIECE_ZERO; p < fe_end; ++p)
         {
             INV_PIECE[p] = (BonaPiece)-1;
 
-            // mirrorã¯æ‰‹é§’ã«å¯¾ã—ã¦ã¯æ©Ÿèƒ½ã—ãªã„ã€‚å…ƒã®å€¤ã‚’è¿”ã™ã ã‘ã€‚
+            // mirror‚Íè‹î‚É‘Î‚µ‚Ä‚Í‹@”\‚µ‚È‚¢BŒ³‚Ì’l‚ğ•Ô‚·‚¾‚¯B
             MIR_PIECE[p] = (p < f_pawn) ? p : (BonaPiece)-1;
         }
 
@@ -435,26 +535,26 @@ namespace Eval
                 {
                     Square sq = (Square)(p - t[i]);
 
-                    // è¦‹ã¤ã‹ã£ãŸ!!
+                    // Œ©‚Â‚©‚Á‚½!!
                     BonaPiece q = (p < fe_hand_end) ? BonaPiece(sq + t[i + 1]) : (BonaPiece)(inverse(sq) + t[i + 1]);
                     INV_PIECE[p] = q;
                     INV_PIECE[q] = p;
 
                     /*
-                    ã¡ã‚‡ã£ã¨ãƒˆãƒªãƒƒã‚­ãƒ¼ã ãŒã€pã«é–¢ã—ã¦ç›¤ä¸Šã®é§’ã¯
+                    ‚¿‚å‚Á‚ÆƒgƒŠƒbƒL[‚¾‚ªAp‚ÉŠÖ‚µ‚Ä”Õã‚Ì‹î‚Í
                     p >= fe_hand_end
-                    ã®ã¨ãã€‚
+                    ‚Ì‚Æ‚«B
 
-                    ã“ã®pã«å¯¾ã—ã¦ã€nã‚’æ•´æ•°ã¨ã—ã¦(ä¸Šã®ã‚³ãƒ¼ãƒ‰ã®iã¯å¶æ•°ã—ã‹ã¨ã‚‰ãªã„)ã€
-                    a)  t[2n + 0] <= p < t[2n + 1] ã®ã¨ãã¯å…ˆæ‰‹ã®é§’
-                    b)  t[2n + 1] <= p < t[2n + 2] ã®ã¨ãã¯å¾Œæ‰‹ã®é§’
-                    ã§ã‚ã‚‹ã€‚
+                    ‚±‚Ìp‚É‘Î‚µ‚ÄAn‚ğ®”‚Æ‚µ‚Ä(ã‚ÌƒR[ƒh‚Ìi‚Í‹ô”‚µ‚©‚Æ‚ç‚È‚¢)A
+                    a)  t[2n + 0] <= p < t[2n + 1] ‚Ì‚Æ‚«‚Íæè‚Ì‹î
+                    b)  t[2n + 1] <= p < t[2n + 2] ‚Ì‚Æ‚«‚ÍŒãè‚Ì‹î
+                    ‚Å‚ ‚éB
 
-                    ã‚†ãˆã«ã€a)ã®ç¯„å›²ã«ã‚ã‚‹pã‚’q = inverse(p-t[2n+0]) + t[2n+1] ã¨ã™ã‚‹ã¨180åº¦å›è»¢ã•ã›ãŸå‡ã«ã‚ã‚‹å¾Œæ‰‹ã®é§’ã¨ãªã‚‹ã€‚
-                    ãã“ã§pã¨qã‚’swapã•ã›ã¦INV_PIECE[ ]ã‚’åˆæœŸåŒ–ã—ã¦ã‚ã‚‹ã€‚
+                    ‚ä‚¦‚ÉAa)‚Ì”ÍˆÍ‚É‚ ‚ép‚ğq = inverse(p-t[2n+0]) + t[2n+1] ‚Æ‚·‚é‚Æ180“x‰ñ“]‚³‚¹‚½¡‚É‚ ‚éŒãè‚Ì‹î‚Æ‚È‚éB
+                    ‚»‚±‚Åp‚Æq‚ğswap‚³‚¹‚ÄINV_PIECE[ ]‚ğ‰Šú‰»‚µ‚Ä‚ ‚éB
                     */
 
-                    // æ‰‹é§’ã«é–¢ã—ã¦ã¯mirrorãªã©å­˜åœ¨ã—ãªã„ã€‚
+                    // è‹î‚ÉŠÖ‚µ‚Ä‚Ímirror‚È‚Ç‘¶İ‚µ‚È‚¢B
                     if (p < fe_hand_end)
                         continue;
 
@@ -477,17 +577,17 @@ namespace Eval
                 || MIR_PIECE[p] == (BonaPiece)-1
                 )
             {
-                // æœªåˆæœŸåŒ–ã®ã¾ã¾ã«ãªã£ã¦ã„ã‚‹ã€‚ä¸Šã®ãƒ†ãƒ¼ãƒ–ãƒ«ã®åˆæœŸåŒ–ã‚³ãƒ¼ãƒ‰ãŒãŠã‹ã—ã„ã€‚
+                // –¢‰Šú‰»‚Ì‚Ü‚Ü‚É‚È‚Á‚Ä‚¢‚éBã‚Ìƒe[ƒuƒ‹‚Ì‰Šú‰»ƒR[ƒh‚ª‚¨‚©‚µ‚¢B
                 assert(false);
             }
 
 #if 0
-        // è©•ä¾¡é–¢æ•°ã®ãƒŸãƒ©ãƒ¼ã‚’ã—ã¦ã‚‚å¤§ä¸ˆå¤«ã§ã‚ã‚‹ã‹ã®äº‹å‰æ¤œè¨¼
-        // å€¤ã‚’æ›¸ãè¾¼ã‚“ã ã¨ãã«assertionãŒã‚ã‚‹ã®ã§ã€ãƒŸãƒ©ãƒ¼ã—ã¦ãƒ€ãƒ¡ã§ã‚ã‚‹å ´åˆã€
-        // ãã®assertã«å¼•ã£ã‹ã‹ã‚‹ã¯ãšã€‚
+        // •]‰¿ŠÖ”‚Ìƒ~ƒ‰[‚ğ‚µ‚Ä‚à‘åä•v‚Å‚ ‚é‚©‚Ì–‘OŒŸØ
+        // ’l‚ğ‘‚«‚ñ‚¾‚Æ‚«‚Éassertion‚ª‚ ‚é‚Ì‚ÅAƒ~ƒ‰[‚µ‚Äƒ_ƒ‚Å‚ ‚éê‡A
+        // ‚»‚Ìassert‚Éˆø‚Á‚©‚©‚é‚Í‚¸B
 
-        // Aperyã®WCSC26ã®è©•ä¾¡é–¢æ•°ã€kppã®p1==0ã¨ã‹p1==20(å¾Œæ‰‹ã®0æšç›®ã®æ­©)ã¨ã‹ã®
-        // ã¨ã“ã‚ã«ã‚´ãƒŸãŒå…¥ã£ã¦ã„ã¦ã€ã“ã‚Œã‚’å›é¿ã—ãªã„ã¨assertã«å¼•ã£ã‹ã‹ã‚‹ã€‚
+        // Apery‚ÌWCSC26‚Ì•]‰¿ŠÖ”Akpp‚Ìp1==0‚Æ‚©p1==20(Œãè‚Ì0–‡–Ú‚Ì•à)‚Æ‚©‚Ì
+        // ‚Æ‚±‚ë‚ÉƒSƒ~‚ª“ü‚Á‚Ä‚¢‚ÄA‚±‚ê‚ğ‰ñ”ğ‚µ‚È‚¢‚Æassert‚Éˆø‚Á‚©‚©‚éB
 
         std::unordered_set<BonaPiece> s;
         std::vector<int> a =
@@ -503,24 +603,24 @@ namespace Eval
         for (auto b : a)
             s.insert((BonaPiece)b);
 
-        // ã•ã‚‰ã«å‡ºç¾ã—ãªã„å‡ã®ç›¤ä¸Šã®æ­©ã€é¦™ã€æ¡‚ã‚‚é™¤å¤–(Aperyã¯ã“ã“ã«ã‚‚ã‚´ãƒŸãŒå…¥ã£ã¦ã„ã‚‹)
+        // ‚³‚ç‚ÉoŒ»‚µ‚È‚¢¡‚Ì”Õã‚Ì•àAAŒj‚àœŠO(Apery‚Í‚±‚±‚É‚àƒSƒ~‚ª“ü‚Á‚Ä‚¢‚é)
         for (Rank r = RANK_1; r <= RANK_2; ++r)
             for (File f = FILE_1; f <= FILE_9; ++f)
             {
                 if (r == RANK_1)
                 {
-                    // 1æ®µç›®ã®æ­©
+                    // 1’i–Ú‚Ì•à
                     BonaPiece b1 = BonaPiece(f_pawn + sqOf(f, r));
                     s.insert(b1);
                     s.insert(INV_PIECE[b1]);
 
-                    // 1æ®µç›®ã®é¦™
+                    // 1’i–Ú‚Ì
                     BonaPiece b2 = BonaPiece(f_lance + sqOf(f, r));
                     s.insert(b2);
                     s.insert(INV_PIECE[b2]);
                 }
 
-                // 1,2æ®µç›®ã®æ¡‚
+                // 1,2’i–Ú‚ÌŒj
                 BonaPiece b = BonaPiece(f_knight + sqOf(f, r));
                 s.insert(b);
                 s.insert(INV_PIECE[b]);
@@ -567,9 +667,10 @@ namespace Eval
             if (!ofsKKP.write(reinterpret_cast<char*>(kkp), sizeof(kkp)))
                 goto Error;
 
+            const size_t kpp_size = sizeof(Value) * size_t(SQ_MAX) * size_t(fe_end) * size_t(fe_end);
             // KPP
             std::ofstream ofsKPP(path(eval_dir, KPP_BIN), std::ios::binary);
-            if (!ofsKPP.write(reinterpret_cast<char*>(kpp), sizeof(kpp)))
+            if (!ofsKPP.write(reinterpret_cast<char*>(kpp), kpp_size))
                 goto Error;
 
             std::cout << "save_eval() finished. folder = " << eval_dir << std::endl;

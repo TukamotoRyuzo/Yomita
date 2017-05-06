@@ -36,7 +36,7 @@ enum MoveType
     DROP,                          // 駒打ち。 二歩は含まない。
     CAPTURE_PLUS_PAWN_PROMOTE,     // 駒を取る手 + (歩の駒を取らない成る手)。
     NO_CAPTURE_MINUS_PAWN_PROMOTE, // 駒を取らない手 - (歩の駒を取らない成る手) - (香の2段目への駒を取らない不成)
-    QUIETS,                        // DROP + NO_CAPTURE_MINUS_PROMOTE
+    QUIETS,                        // DROP + NO_CAPTURE_MINUS_PAWN_PROMOTE
     RECAPTURES,                    // 特定の位置への取り返しの手
     EVASIONS,                      // 王手回避。歩, 飛, 角 の不成は含まない。
     NO_EVASIONS,                   // 王手が掛かっていないときの合法手 (玉の移動による自殺手、pinされている駒の移動による自殺手は回避しない。)
@@ -161,12 +161,13 @@ inline bool isOK(const Move m) { return m != MOVE_NONE && m != MOVE_NULL; }
 
 // USI変換用
 std::string toUSI(const Move m);
+#ifdef HELPER
 std::string toCSA(const Move m);
 std::string pretty(const Move m);
 
 // Move型を人間にとってわかりやすい形式で出力する。デバッグ用。
 std::ostream& operator << (std::ostream& os, const Move m);
-
+#endif
 // 手とスコアが一緒になった構造体
 // TODO: スコアはスコアリングするときにくっつければいい気もする。
 struct MoveStack

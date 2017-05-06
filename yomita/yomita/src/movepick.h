@@ -28,62 +28,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "genmove.h"
 #include "search.h"
 
+struct HistoryStats
+{
+    static const int Max = 1 << 28;
+
+    int get(Turn t, Move m) const { return table[t][isDrop(m) ? toSq(m) : fromSq(m)][toSq(m)]; }
+    void clear() { std::memset(table, 0, sizeof(table)); }
+    void update(Turn t, Move m, int s)
+    {
+        // 324を超えると、ヒストリ値が一定の値で飽和しなくなる。
+        const int D = 324;
+        assert(abs(s) <= D);
+
+        Square to = toSq(m);
+        Square from = isDrop(m) ? to : fromSq(m);
+
+        table[t][from][to] -= table[t][from][to] * abs(s) / D;
+        table[t][from][to] += s * 32;
+    }
+
+private:
+    Score table[TURN_MAX][SQ_MAX][SQ_MAX];
+};
+
 // Statsは指し手の統計を保存する。テンプレートパラメータに応じてクラスはhistoryとcountermoveを保存することができる。
 // Historyのレコード(現在の探索中にどれくらいの頻度で異なるmoveが成功or失敗したか)は、
 // 手のオーダリングの決定とreductionに利用される。
 // countermoveは以前の手をやり込める手を格納する。
 // entryは移動先と動かした駒を使って格納される。したがって異なる手が同じ移動先と駒種ならば
 // 2つの手は同一とみなされる。
-template<typename T, bool CM = false>
+template<typename T>
 struct Stats
 {
-    static const Score Max = Score(1 << 28);
-
     void clear() { std::memset(table, 0, sizeof(table)); }
 
     // drop, turn, piecetype, toを呼び出し側で計算するより隠蔽してMoveで渡してもらったほうが実装が楽。
-    T& refer(const Move m) 
-    { 
-        bool d = isDrop(m);
-        Turn t = turnOf(m);
-        int p = movedPieceTypeTo(m) - 1;
-        Square to = toSq(m);
+    T* refer() { return (T*)table; }
+    T* refer(const Move m)       { return &table[isDrop(m)][turnOf(m)][movedPieceTypeTo(m) - 1][toSq(m)]; }
+    T  value(const Move m) const { return  table[isDrop(m)][turnOf(m)][movedPieceTypeTo(m) - 1][toSq(m)]; }
+    void update(const Move m, Move sm)  {  table[isDrop(m)][turnOf(m)][movedPieceTypeTo(m) - 1][toSq(m)] = sm; }
 
-        assert(!(d < 0 || d > 1 || t < 0 || t > 1 || p < 0 || p > 13 || to < 0 || to > 80));
-
-        return table[d][t][p][to]; 
-    }
-    T  value(const Move m) const 
+    void update(const Move m, int s)
     {
-        bool d = isDrop(m);
-        Turn t = turnOf(m);
-        int p = movedPieceTypeTo(m) - 1;
-        Square to = toSq(m);
-
-        assert(!(d < 0 || d > 1 || t < 0 || t > 1 || p < 0 || p > 13 || to < 0 || to > 80));
-
-        return table[d][t][p][to];
-    }
-    void update(const Move i, Move m) 
-    {
-        bool d = isDrop(i);
-        Turn t = turnOf(i);
-        int p = movedPieceTypeTo(i) - 1;
-        Square to = toSq(i);
-
-        assert(!(d < 0 || d > 1 || t < 0 || t > 1 || p < 0 || p > 13 || to < 0 || to > 80));
-
-        table[d][t][p][to] = m;
-    }
-
-    void update(const Move m, Score s)
-    {
-        if (abs(int(s)) >= 324)
-            return;
-
-        T& t = refer(m);
-        t -= t * abs(int(s)) / (CM ? 936 : 324);
-        t += int(s) * 32;
+        const int D = 936;
+        assert(abs(s) <= D);
+        T& t = *refer(m);
+        t -= t * abs(s) / D;
+        t += s * 32;
     }
 
 private:
@@ -95,39 +86,11 @@ private:
 // ある指し手に対する指し手を登録しておくためのもの
 typedef Stats<Move> MoveStats;
 
-// history。beta cutoffした指し手に加点して、それ以外のQuietな手には減点したもの。
-typedef Stats<Score, false> HistoryStats;
-
 // ある指し手に対する点数を保存しておくためのもの
-typedef Stats<Score, true> CounterMoveStats;
+typedef Stats<int> CounterMoveStats;
 
 // ある指し手に対するカウンター手とスコアの表
 typedef Stats<CounterMoveStats> CounterMoveHistoryStats;
-
-#if 0
-const size_t t_size = sizeof(MoveStats) + sizeof(HistoryStats) + sizeof(CounterMoveStats) + sizeof(CounterMoveHistoryStats);
-const int mbsize = t_size >> 20;
-#endif
-
-struct FromToStats
-{
-    Score get(Turn t, Move m) const { return table[t][isDrop(m) ? SQ_MAX : fromSq(m)][toSq(m)]; }
-    void clear() { std::memset(table, 0, sizeof(table)); }
-    void update(Turn t, Move m, Score s)
-    {
-        if (abs(int(s)) >= 324)
-            return;
-
-        Square from = isDrop(m) ? SQ_MAX : fromSq(m);
-        Square to = toSq(m);
-
-        table[t][from][to] -= table[t][from][to] * abs(int(s)) / 324;
-        table[t][from][to] += int(s) * 32;
-    }
-
-private:
-    Score table[TURN_MAX][SQ_MAX_PLUS1][SQ_MAX];
-};
 
 // 指し手を生成していい順番にひとつずつ手を取り出してくれる。
 // いきなり全部の指し手を生成するわけではないので効率がいい。
