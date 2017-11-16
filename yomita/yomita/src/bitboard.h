@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,9 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "config.h"
+
+
+#ifdef USE_BITBOARD
+
+#include "types.h"
 #include "bitop.h"
-#include "turn.h"
-#include "square.h"
 
 enum Index { HIGH, LOW, ID_MAX };
 
@@ -104,10 +108,10 @@ public:
     // range based forのためのoperator
     Square operator * () { return firstOne(); }
     void operator ++ () {};
-#ifdef HELPER
+
     // デバッグ用。ビットボードのレイアウトを見たいときに使う
     friend std::ostream& operator << (std::ostream& ofs, const Bitboard& b);
-#endif
+
 private:
 #if defined (HAVE_SSE2) || defined (HAVE_SSE4)
     union
@@ -143,6 +147,45 @@ private:
 
     // Redundant Bitboard (RBB)
 };
+
+// 64bit変数に対するforeach
+#define FOR64(mask, sq, id, xxx) \
+do{\
+while(mask){\
+sq = firstOne<id, true>(mask);\
+xxx;\
+}\
+}while(false)
+
+// bitboardに対するforeach
+#define FORBB(bb, sq, xxx) \
+do{\
+uint64_t hi = bb.b(HIGH);\
+while(hi){\
+sq = firstOne<HIGH>(hi);\
+xxx;\
+}\
+uint64_t lo = bb.b(LOW) & EXCEPT_MASK[LOW];\
+while(lo){\
+sq = firstOne<LOW>(lo);\
+xxx;\
+}\
+}while(false)
+
+// bitboardのb[0]とb[1]のかぶっていないビットを取り出すマスク
+const uint64_t EXCEPT_MASK[2] = { 0x3ffffULL, 0x7fffe00000000000ULL };
+
+// TURNから見たHIGH盤面から敵陣を取り出すマスク
+const uint64_t ENEMY_MASK[TURN_MAX] = { 0x7ffffffULL, 0x7ffffff000000000ULL };
+
+// TURNから見たLOW盤面から自陣を取り出すマスク
+const uint64_t SELF_MASK[TURN_MAX] = { 0x7ffffffffffffe00ULL, 0x3fffffffffffffULL };
+
+const uint64_t RANK1_MASK_HIGH[TURN_MAX] = { 0x1ffULL, 0x7fc0000000000000ULL };
+const uint64_t RANK2_MASK_HIGH[TURN_MAX] = { 0x3fe00ULL, 0x3fe00000000000ULL };
+const uint64_t RANK3_MASK_HIGH[TURN_MAX] = { 0x7fc0000ULL, 0x1ff000000000ULL };
+const uint64_t RANK3_MASK_LOW[TURN_MAX] = { 0x1ffULL, 0x7fc0000000000000ULL };
+const uint64_t TO3_7_MASK_HIGH[TURN_MAX] = { 0x7ffffffffffc0000ULL, 0x1fffffffffffULL };
 
 #ifdef HAVE_BMI2
 extern __m256i YMM_TO[SQ_MAX];
@@ -281,6 +324,35 @@ inline Bitboard   rookAttack(const Square sq, const Bitboard& occupied) { return
 inline Bitboard  horseAttack(const Square sq, const Bitboard& occupied) { return bishopAttack(sq, occupied) | kingAttack(sq); }
 inline Bitboard dragonAttack(const Square sq, const Bitboard& occupied) { return   rookAttack(sq, occupied) | kingAttack(sq); }
 
+// 駒が定数でない場合は、これで振り分ける
+inline Bitboard attackAll(const Piece pc, const Square sq, const Bitboard& occupied)
+{
+    switch (pc)
+    {
+
+    case B_PAWN:	return pawnAttack(BLACK, sq);
+    case B_KNIGHT:	return knightAttack(BLACK, sq);
+    case B_SILVER:	return silverAttack(BLACK, sq);
+    case B_LANCE:   return lanceAttack(BLACK, sq, occupied);
+    case B_GOLD: case B_PRO_PAWN: case B_PRO_LANCE: case B_PRO_KNIGHT: case B_PRO_SILVER: return goldAttack(BLACK, sq);
+
+    case W_PAWN:	return pawnAttack(WHITE, sq);
+    case W_LANCE:   return lanceAttack(WHITE, sq, occupied);
+    case W_KNIGHT:	return knightAttack(WHITE, sq);
+    case W_SILVER:	return silverAttack(WHITE, sq);
+    case W_GOLD: case W_PRO_PAWN: case W_PRO_LANCE: case W_PRO_KNIGHT: case W_PRO_SILVER: return goldAttack(WHITE, sq);
+
+    case B_BISHOP: case W_BISHOP:	return bishopAttack(sq, occupied);
+    case B_ROOK:   case W_ROOK:		return rookAttack(sq, occupied);
+    case B_HORSE:  case W_HORSE:	return horseAttack(sq, occupied);
+    case B_DRAGON: case W_DRAGON:   return dragonAttack(sq, occupied);
+    case B_KING:   case W_KING:		return kingAttack(sq);
+
+    default: UNREACHABLE;
+    }
+    return allZeroMask();
+}
+
 // sq1とsq2の間が1になっているbitboardを返す。
 inline Bitboard bbBetween(const Square sq1, const Square sq2) { return BB_OBSTACLE[sq1][sq2]; }
 inline Bitboard bbLine(const Square sq1, const Square sq2) { return BB_LINE[sq1][sq2]; }
@@ -327,3 +399,5 @@ template <Index Id, bool Clear = true> inline Square firstOne(uint64_t& mask)
     const int index = Clear ? popLSB(mask) : bsf64(mask);
     return Square(Id == HIGH ? index : index + 18);
 }
+
+#endif

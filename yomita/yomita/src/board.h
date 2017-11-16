@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,20 +22,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #pragma once
-
-#include "piece.h"
-#include "square.h"
+#include <iostream>
+#include <string>
 #include "hand.h"
-#include "bitboard.h"
+#include "types.h"
 #include "common.h"
+#include "evalsum.h"
+#include "bitboard.h"
 #include "evaluate.h"
 #include "progress.h"
-
-#if defined USE_EVAL
-#include "evalsum.h"
-#endif
-
-//#define MATE3PLY
+#include "byteboard.h"
 
 struct Thread;
 class Board;
@@ -79,8 +75,14 @@ struct StateInfo
     // 連続王手回数
     int continue_check[TURN_MAX];
 
-    // ******ここから下はdoMove時にコピーしない******
+    // 歩がいる列が1になっているフラグ（泥臭い）
+    uint16_t nifu_flags[TURN_MAX];
 
+    // ******ここから下はdoMove時にコピーしない******
+    // この局面での評価関数の駒割
+    Score material;
+
+#ifdef USE_BITBOARD
     // 現局面で手番側に対して王手をしている駒のbitboard。doMove()で更新される
     Bitboard checkers;
 
@@ -92,19 +94,24 @@ struct StateInfo
 
     // 自駒の駒種Xによって敵玉が王手となる升のbitboard
     Bitboard check_sq[PIECETYPE_MAX];
+#endif
 
-    // この局面での評価関数の駒割
-    Score material;
-
+#ifdef USE_BYTEBOARD
+    __m256i king_neighbor[TURN_MAX], king_ray[TURN_MAX];
+    __m256i checker_knights, checker_no_knights;
+    uint32_t slider_blockers[TURN_MAX];
+    __m256i reach_sliders;
+#endif
 #ifdef USE_EVAL
     // 評価値。(次の局面で評価値を差分計算するときに用いる)
     Eval::EvalSum sum;
 
     // 評価値の差分計算の管理用
     DirtyPiece dirty_piece;
-#endif
+
 #ifdef USE_PROGRESS
-    Prog::ProgressSum progress;
+    Progress::ProgressSum progress;
+#endif
 #endif
     // この局面における手番側の持ち駒。優等局面の判定のために必要
     Hand hand;
@@ -124,25 +131,6 @@ struct StateInfo
 
     // 持ち駒のハッシュキー
     Key handKey() const { return hand_key; }
-
-#ifdef HELPER
-#if defined(IS_64BIT)
-    bool operator == (const StateInfo st) const
-    {
-        return boardKey() == st.boardKey()
-            && handKey() == st.handKey()
-            && material == st.material
-            && checkers == st.checkers
-            && hand == st.hand
-            && blockers_for_king[BLACK] == st.blockers_for_king[BLACK]
-            && blockers_for_king[WHITE] == st.blockers_for_king[WHITE]
-            && pinners_for_king[BLACK] == st.pinners_for_king[BLACK]
-            && pinners_for_king[WHITE] == st.pinners_for_king[WHITE];
-    }
-
-    bool operator != (const StateInfo st) const { return !(*this == st); }
-#endif
-#endif
 };
 
 class Board
@@ -164,18 +152,15 @@ public:
     // スレッドのゲット
     Thread* thisThread() const { return this_thread_; }
 
-    // 探索局面数を返す。探索開始前にゼロクリアされる。
-    uint64_t nodeSearched() const { return nodes_; }
-
     // ゼロクリア
     void clear();
 
     // sqにpieceの駒を置くときに必要な情報のセットを行う。
     void setPiece(const Piece piece, const Square sq, PieceNo piece_no);
-#ifdef HELPER
+
     // validator
     bool verify() const;
-#endif
+
     // sqにある駒を返す。
     Piece piece(const Square sq) const { return board_[sq]; }
 
@@ -203,6 +188,7 @@ public:
     // CheckInfoのセットと、敵味方に関係なくpinされている駒のbitboardをセットする。
     template <bool DoNullMove = false> void setCheckInfo(StateInfo* si) const;
 
+#ifdef USE_BITBOARD
     // 手番tのptの駒をsqに置いたときのbitboardの更新を行う。
     void xorBBs(const PieceType pt, const Square sq, const Turn t);
 
@@ -243,7 +229,6 @@ public:
 
     // attackersの戻り値がboolになっているバージョン。ちょっとだけ早い（ことを目指している）
     bool existAttacker(const Turn t, const Square sq, const Bitboard& occ) const;
-    bool existAttacker(const Turn t, const Square sq) const { return existAttacker(t, sq, bbOccupied()); }
 
     // 敵玉と自分の駒の間にpinされている自分の駒を取得する。
     Bitboard discoveredCheckCandidates() const { return st_->blockers_for_king[~turn()] & bbTurn(turn()); }
@@ -254,6 +239,26 @@ public:
     // ptを打つと王手になる場所が1のbitboardを返す。
     Bitboard checkSquares(const PieceType pt) const { return st_->check_sq[pt]; }
 
+    // fromにいる駒がpinされていると仮定して、fromからtoに移動したときking_squareにいる玉に王手がかかるかどうか
+    // king_squareは自玉、敵玉どちらでもよいので自殺手かどうか調べるときも使える
+    bool isDiscoveredCheck(const Square from, const Square to, const Square king_square, const Bitboard& bb_discovered) const
+    {
+        return (bb_discovered & from) && !isAligned(from, to, king_square);
+    }
+
+    // ピンされている駒(return)、している駒(pinners)を返す。tはsniperのturn, sqはking_sq
+    // BlockersOnlyはBlockersだけを求めたいときにtrueにする。
+    template <bool BlockersOnly = false> Bitboard sliderBlockers(Turn t, Square s, Bitboard* pinners = nullptr) const;
+
+    // 相手が自分に対して王手している駒のbitboardを返す
+    Bitboard bbCheckers() const { return st_->checkers; }
+
+    bool canPieceCapture(const Turn t, const Square sq, const Square king_square, const Bitboard& bb_discovered) const;
+    template <Index TK> bool canKingEscape(const Square ksq, const Turn t, const Square, const Bitboard& bb) const;
+
+    // 1手詰めルーチン本体。
+    template <Turn T, Index TK> Move mate1ply(const Square ksq);
+#endif
     // 局面を指し手moveで一手進める。
     void doMove(const Move move, StateInfo& st, bool gives_check);
 
@@ -269,71 +274,74 @@ public:
     // NullMoveした後、元に戻す。
     void undoNullMove();
 
-#ifdef MATE3PLY
-    // 3手詰め用の王手生成
-    void doMoveNearCheck(const Move move, StateInfo& st);
-    void doMoveKingAndCapture(const Move move, StateInfo& st);
-    Move mate3ply();
-    Move is3mate();
-#endif
-
-    // fromにいる駒がpinされていると仮定して、fromからtoに移動したときking_squareにいる玉に王手がかかるかどうか
-    // king_squareは自玉、敵玉どちらでもよいので自殺手かどうか調べるときも使える
-    template <bool IsKnight = false>
-    bool isDiscoveredCheck(const Square from, const Square to, const Square king_square, const Bitboard& bb_discovered) const
-    {
-        // 桂馬ならどこに動いてもあき王手になる
-        // fromの駒がpinされていて、かつ（桂馬または一直線上にいない)ならtrue
-        return (bb_discovered & from) && (IsKnight || !isAligned(from, to, king_square));
-    }
-
-    // 打ち歩詰めかどうかを判定する。
-    bool isPawnDropCheckMate(const Turn t, const Square sq, const Square king_square) const;
 
     // 指し手生成を用いて詰んでいるかどうかをチェックする。
     bool isMate() const;
 
-    // 1手詰めルーチン本体。
-    template <Turn T, Index TK> Move mate1ply(const Square ksq);
+    // 千日手、連続王手の千日手、優等局面、劣等局面を分類する。
+    RepetitionType repetitionType(int max_ply) const;
 
     // 1手詰めルーチンのラッパー。
-    Move mate1ply();
+    Move mate1ply1() const;
+    Move mate1ply2() const;
+    Move mate1ply() const;
 
-    // 指し手生成による1手詰め判定。
-    bool is1mate();
+    // 王手されている局面かどうかを返す。
+    bool inCheck1() const;
+    bool inCheck2() const;
+    bool inCheck() const;
 
-    // 相手が自分に対して王手している駒のbitboardを返す
-    Bitboard bbCheckers() const { return st_->checkers; }
+    // mが相手玉に対して王手になるかどうかを返す。
+    bool givesCheck1(Move m) const;
+    bool givesCheck2(Move m) const;
+    bool givesCheck(Move m) const;
+
+    // 静止探索
+    bool seeGe1(const Move, const Score) const;
+    bool seeGe2(const Move, const Score) const;
+    bool seeGe(const Move m, const Score s) const;
+
+    // 宣言勝ちかどうかを返す。
+    bool isDeclareWin1() const;
+    bool isDeclareWin2() const;
+    bool isDeclareWin() const;
+    
+    // 打ち歩詰めかどうかを判定する。
+    bool isPawnDropCheckMate1(const Turn t, const Square sq, const Square king_square) const;
+    bool isPawnDropCheckMate2(const Turn t, const Square sq, const Square king_square) const;
+    bool isPawnDropCheckMate(const Turn t, const Square sq, const Square king_square) const;
+
+    // 任意のmoveに対して、PseudoLegalかどうかを判定する
+    bool pseudoLegal1(const Move move) const;
+    bool pseudoLegal2(const Move move) const;
+    bool pseudoLegal(const Move move) const;
 
     // pseudoLegalな手が本当にlegalかどうかをチェックする。
     // pseudoLegalとは、玉が取られてしまうような着手を含めた合法手群のことである
+    template <bool NotAlwaysDrop = false> bool legal1(const Move move) const;
+    template <bool NotAlwaysDrop = false> bool legal2(const Move move) const;
     template <bool NotAlwaysDrop = false> bool legal(const Move move) const;
 
-    // 任意のmoveに対して、PseudoLegalかどうかを判定する
-    bool pseudoLegal(const Move move) const;
+    // 1手詰め判定のヘルパー関数。
+    bool canPieceCapture1(const Turn t, const Square sq, const Square ksq) const;
+    bool canPieceCapture2(const Turn t, const Square sq, const Square ksq) const;
+    bool canPieceCapture(const Turn t, const Square sq, const Square ksq) const;
 
-    // 指し手生成による合法性のチェック
-    bool moveIsLegal(const Move move) const;
+    bool existAttacker1(const Turn t, const Square sq) const;
+    bool existAttacker2(const Turn t, const Square sq) const;
+    bool existAttacker(const Turn t, const Square sq) const;
 
-    // 王手されている局面かどうかを返す。
-    bool inCheck() const { return bbCheckers(); }
-
-    // mが相手玉に対して王手になるかどうかを返す。
-    bool givesCheck(Move m) const;
-
-    // 千日手、連続王手の千日手、優等局面、劣等局面を分類する。
-    RepetitionType repetitionType(int max_ply) const;
-    
-    // 静止探索
-    bool seeGe(const Move, const Score) const;
-
-    // ピンされている駒(return)、している駒(pinners)を返す。tはsniperのturn, sqはking_sq
-    // BlockersOnlyはBlockersだけを求めたいときにtrueにする。
-    template <bool BlockersOnly = false> Bitboard sliderBlockers(Turn t, Square s, Bitboard* pinners = nullptr) const;
-
-    // 宣言勝ちかどうかを返す。
-    bool isDeclareWin() const;
-
+#ifdef USE_BYTEBOARD
+    template <Turn T> Move mate1ply2(const Square ksq) const;
+    bool canPieceCapture2(const Turn t, const Square sq, const Square ksq, uint32_t slider_blockers) const;
+    bool canPieceCapture2(const Turn t, const Square sq, const Square ksq, uint32_t slider_blockers, __m256i neighbor, __m256i ray) const;
+    template <Turn T> bool canKingEscape2(const Square ksq, const Square sq) const;
+    Square pieceSquare(int i) const { return pieceno_to_sq_[i]; }
+    const Byteboard& getByteboard() const { return bb_; }
+    uint64_t getExistsPiece(Turn t) const { return stm_piece_[t]; }
+    template <Turn T, PieceType PT> bool mateCheck(Square to, Square ksq);
+    template <Turn T, PieceType PT, bool Promote> bool mateCheck(Square from, Square to, Square ksq);
+#endif
 #ifdef USE_EVAL
     // 評価関数で使うための、どの駒番号の駒がどこにあるかなどの情報
     const Eval::EvalList* evalList() const { return &eval_list_; }
@@ -352,8 +360,8 @@ public:
 
     // 盤上のpcの駒のPieceNoを返す
     PieceNo pieceNoOf(Piece pc, Square sq) const { return eval_list_.pieceNoOf((Eval::BonaPiece)(Eval::BP_BOARD_ID[pc].fb + sq)); }
-#endif
 
+#endif
     Key key() const { return st_->key(); }
     Key afterKey(const Move m) const;
 
@@ -361,24 +369,40 @@ public:
     Board& operator = (const Board& b);
     std::string sfen() const;
 
-#if defined LEARN || defined GENSFEN
-    template <bool Test = false> void setFromPackedSfen(uint8_t data[32]);
-    static std::string sfenFromRawdata(Piece board[81], Hand hands[2], Turn turn, int gamePly_);
+#if defined LEARN
+    void setFromPackedSfen(uint8_t data[32]);
     void sfenPack(uint8_t data[32]) const;
-    static std::string sfenUnPack(uint8_t data[32]);
 #endif
-#ifdef HELPER
     // 画面出力用
     friend std::ostream& operator << (std::ostream& os, const Board& b);
-#endif
-private:
-    
-    // 1手詰め判定のヘルパー関数。
-    bool canPieceCapture(const Turn t, const Square sq, const Square king_square) const;
-    bool canPieceCapture(const Turn t, const Square sq, const Square king_square, const Bitboard& bb_discovered) const;
-    template <Index TK> bool canKingEscape(const Square ksq, const Turn t, const Square, const Bitboard& bb) const;
 
+
+    // sqの筋にt側の歩があるならtrueを返す。
+    bool existPawnFile(Turn t, Square sq) const { return state()->nifu_flags[t] & (1 << fileOf(sq)); }
+    bool existPawnFile(Turn t, File f) const { return state()->nifu_flags[t] & (1 << f); }
 private:
+
+#ifdef USE_BYTEBOARD
+    // 先手後手両方が入ったbyteboard
+    Byteboard bb_;
+
+    // 駒位置のキャッシュ
+    Square pieceno_to_sq_[PIECE_NO_NB];
+    PieceNo sq_to_pieceno_[SQ_MAX];
+    uint64_t stm_piece_[TURN_MAX];
+
+#ifdef CALC_MOVE_DIFF
+    // 指し手配列。盤面上の駒だけ。
+    // 竜、馬は256bitに指し手が収まりきらないので、成ることで追加される動きをPieceNo+6番目に入れておく。
+    __m256i move_cache_[PIECE_NO_NB + 4];
+    uint64_t dirty_flag_;
+public:
+    template <bool IsDrop, bool Undo> void calcMoveDiff(Square from, Square to);
+    template <Turn T> __m256i* getMove(PieceNo no, Square sq, Piece p, __m256i* mlist);
+private:
+#endif
+#endif
+#ifdef USE_BITBOARD
     // 手番側の、駒がいる場所が1になっているビットボード
     Bitboard bb_turn_[TURN_MAX];
 
@@ -386,7 +410,7 @@ private:
     // すべての駒種に対して、駒がある場所が1になっているビットボードを表す
     Bitboard bb_type_[PIECETYPE_MAX];
     Bitboard bb_gold_;
-
+#endif
     // 将棋盤81マス
     Piece board_[SQ_MAX];
 
@@ -402,8 +426,6 @@ private:
     // 手数
     int ply_;
 
-    int64_t nodes_;
-
     // start_state_ はst_が初期状態で指しているStateInfo
     StateInfo start_state_, *st_;
 
@@ -412,5 +434,5 @@ private:
 #ifdef USE_EVAL
     // 評価関数で用いる駒のリスト
     Eval::EvalList eval_list_;
-#endif
+#endif 
 };

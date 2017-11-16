@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,36 +22,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <sstream>
-#include "benchmark.h"
+
+#include "usi.h"
 #include "search.h"
-#include "thread.h"
 
 using namespace std;
-uint64_t g[20];
 
 namespace USI
 {
-    extern void isReady();
+    extern void isready();
     extern void position(Board& b, istringstream& up);
     extern void go(const Board& b, istringstream& ss_cmd);
-    extern void setOption(istringstream& ss_cmd);
+    extern void setoption(istringstream& ss_cmd);
 }
 
 void benchmark(Board& b)
 {
-    USI::isReady();
+    USI::isready();
 
     // ここに探索時の条件を追加
     string options[] =
     {
         "name Threads value 1",
         "name Hash value 128",
-        "name USI_Ponder value true",
-        "name Minimum_Thinking_Time value 15",
-        "name Move_Overhead value 70",
-        "name nodestime value 0",
-        "name byoyomi_margin value 1000",
-        "name Draw_Score value -100",
+        "name NetworkDelay value 0",
+        "name DrawScore value -50",
     };
 
     // ここに探索局面を追加
@@ -72,19 +67,22 @@ void benchmark(Board& b)
         //"startpos moves 7g7f 8c8d 5g5f 8d8e 8h7g 7a6b 5f5e 5a4b 2h5h 7c7d 5i4h 6b7c 4h3h 7c6d 7i7h 6a5b 6g6f 7d7e 7f7e 8b8d 3h2h 4b3b 3i3h 6d7e 7g6h P*7f 6h4f 6c6d 5e5d 3a4b 5d5c+ 4b5c P*7b 8e8f 8g8f P*8h 7b7a+ 8h8i+ 7a8a 8d8a P*5d 5c4b P*7c 8a8c 7c7b+ 8i8h 7b7c 8c7c N*6e 8h7h 6e7c+ 7h6i R*7b G*5i 5d5c+ 5i5h 5c5b 5h4i 5b4b 4a4b 3h4i R*8h G*3h G*6a 7b4b+ 3b4b 4f3e P*5b G*5d N*4a 7c6c 2b3a S*5c 5b5c 6c5c 4a5c 3e5c+ 4b4a 5c4c",
 
         // ▲23銀で21手詰み
-        "sfen lr6+L/2P3gk1/4g4/4pppp1/p8/1Pnp+s1P2/P5SP1/LS7/K7R b BGS2NL6Pbgnp 1",
+        "sfen lr6+L/2P3gk1/4g4/4pppp1/p8/1Pnp+s1P2/P5SP1/LS7/K7R b BGS2NL6Pbgnp 100",
+
+        // 馬を取れば勝ち確定なのに引き分けのスコアを返す局面
+        //"sfen 1n2+B3K/l2k2s2/p2pg2+b1/1+rp2g3/5g3/9/1+p+n1+p2+p1/6+n1+p/1+r+p6 w 10p3ln3sg 187",
     };
 
     // ここに探索時の持ち時間など　探索深さでもいい
     string str_go =
         //"go infinite";
-        " depth 16";
-    //" btime 0 wtime 0 byoyomi 10000";
+        " depth 18";
+        //" btime 0 wtime 0 byoyomi 10000";
 
     for (auto& str : options)
     {
         istringstream is(str);
-        USI::setOption(is);
+        USI::setoption(is);
     }
 
     Search::clear();
@@ -95,12 +93,12 @@ void benchmark(Board& b)
     {
         istringstream is(positions[i]);
         USI::position(b, is);
-        //cout << b << endl;
+        cout << b << endl;
         is.clear(stringstream::goodbit);
         is.str(str_go);
         USI::go(b, is);
         Threads.main()->join();
-        nodes += Threads.main()->root_board.nodeSearched();
+        nodes += Threads.nodeSearched();
         Search::clear();
     }
 
@@ -111,3 +109,4 @@ void benchmark(Board& b)
          << "\nNodes searched  : " << nodes
          << "\nNodes/second    : " << 1000 * nodes / elapsed << endl;
 }
+

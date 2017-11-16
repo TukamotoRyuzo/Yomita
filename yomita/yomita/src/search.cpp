@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,30 +22,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <sstream>
+
+#include "tt.h"
+#include "usi.h"
+#include "book.h"
 #include "search.h"
 #include "thread.h"
-#include "usi.h"
-#include "score.h"
-#include "tt.h"
-#include "genmove.h"
-#include "evaluate.h"
 #include "timeman.h"
+#include "evaluate.h"
 #include "movepick.h"
-#include "book.h"
-
-// 置換表を用いるかどうか。
-// 学習時は使わないほうがよいが、棋譜生成時には使ったほうが早く終わる。
-#if !defined LEARN || defined GENSFEN
-#define ENABLE_TT
-#endif
-
-// 評価関数の差分計算を行うかどうか。
-#ifdef USE_EVAL
-#define EVAL_DIFF
-#endif
 
 // 1手詰めルーチンを呼び出す手数。この手数以上であれば呼び出す。
-#define MATE_PLY 70
+#define MATE_PLY 40
 #define MATE1PLY
 #if 1
 #define FRONT_PRUNE
@@ -62,18 +50,20 @@ namespace
     // nullwindow探索をしていないときはPV
     enum NodeType { NO_PV, PV, };
 
+    // Sizes and phases of the skip-blocks, used for distributing search depths across the threads.
+    const int skip_size[20] = { 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4 };
+    const int skip_phase[20] = { 0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7 };
+
+    // Razoring and futility margin based on depth
+    const int razor_margin[4] = { 0, 570, 603, 721 };
+
     // d手で挽回可能な点数
     Score futilityMargin(Depth d, double p)
     {
-#ifdef GENSFEN
-        // 棋譜生成時は大きめにしとく。
-        return Score((int)(150 + 250 * p) * (d / ONE_PLY));
-#else
 #ifdef USE_PROGRESS
-        return Score((int)(50 + 150 * p) * (d / ONE_PLY));
+        return Score((int)(50 + 250 * p) * (d / ONE_PLY));
 #else
-        return Score((70 + b.ply() * 2) * (d / ONE_PLY));
-#endif
+        return Score(170 * (d / ONE_PLY));
 #endif
     }
 
@@ -86,13 +76,6 @@ namespace
     // Threshold used for countermoves based pruning
     const int CounterMovePruneThreshold = 0;
 
-    // Sizes and phases of the skip-blocks, used for distributing search depths across the threads.
-    static int skipsize[20] = { 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4 };
-    static int phase[20] = { 0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7 };
-
-    // Razoring and futility margin based on depth
-    const int razor_margin[4] = { 0, 570, 603, 721 };
-
     template <bool PvNode> Depth reduction(bool i, Depth d, int mn)
     {
         return Reductions[PvNode][i][std::min(d / ONE_PLY, 63)][std::min(mn, QT - 1)] * ONE_PLY;
@@ -104,20 +87,6 @@ namespace
         return d > 17 ? 0 : d * d + 2 * d - 2;
     }
 
-    template <NodeType NT>
-    Score search(Board& b, Stack* ss, Score alpha, Score beta, Depth depth, bool cut_node, bool skip_early_pruning = false);
-
-    template <NodeType NT, bool InCheck>
-    Score qsearch(Board& b, Stack* ss, Score alpha, Score beta, Depth depth = DEPTH_ZERO);
-
-    Score scoreToTT(Score s, int ply);
-    Score scoreFromTT(Score s, int ply);
-    Score drawScore(Turn root_turn, Turn t);
-    void updatePv(Move* pv, Move move, Move* childPv);
-    void updateCmStats(Stack* ss, Move m, int bonus);
-    void updateStats(const Board& b, Stack* ss, Move move, Depth depth, Move* quiets, int quiet_cnt, bool skip_early_pruning);
-    void checkTime();
-    
     // easy moveを検知するのに使われる。PVが深いiterationまで安定しているのなら、即座に指し手を返すことができる
     struct EasyMoveManager
     {
@@ -159,11 +128,25 @@ namespace
     EasyMoveManager EasyMove;
     Turn RootTurn;
     Score DrawScore;
+
+    template <NodeType NT>
+    Score search(Board& b, Stack* ss, Score alpha, Score beta, Depth depth, bool cut_node, bool skip_early_pruning = false);
+
+    template <NodeType NT, bool InCheck, bool TTProbe = true>
+    Score qsearch(Board& b, Stack* ss, Score alpha, Score beta, Depth depth = DEPTH_ZERO);
+
+    Score scoreToTT(Score s, int ply);
+    Score scoreFromTT(Score s, int ply);
+    Score drawScore(Turn root_turn, Turn t);
+    void updatePv(Move* pv, Move move, Move* childPv);
+    void updateCmStats(Stack* ss, Move m, int bonus);
+    void updateStats(const Board& b, Stack* ss, Move move, Depth depth, Move* quiets, int quiet_cnt, bool skip_early_pruning);
+
 } // namespace
 
 void Search::init()
 {
-    DrawScore = Score((int)Options["Draw_Score"]);
+    DrawScore = Score((int)Options["DrawScore"]);
 
     for (int imp = 0; imp <= 1; ++imp)
         for (int d = 1; d < 64; ++d)
@@ -189,22 +172,16 @@ void Search::init()
 void Search::clear()
 {
     if (Options["UseBook"])
-        Book.read(Options["BookDir"]);
+        Book.read(Options["BookName"]);
 
-    TT.clear();
+    GlobalTT.clear();
 
     for (Thread* th : Threads)
-    {
-        th->history.clear();
-        th->counter_moves.clear();
-        th->counter_move_history.clear();
-        CounterMoveStats& cm = *th->counter_move_history.refer();
-        int *t = cm.refer();
-        std::fill(t, t + sizeof(cm) / sizeof(int), CounterMovePruneThreshold - 1);
-    }
+        th->clear();
 
+    Threads.main()->calls_cnt = 0;
     Threads.main()->previous_score = SCORE_INFINITE;
-    DrawScore = Score((int)Options["Draw_Score"]);
+    DrawScore = Score((int)Options["DrawScore"]);
 }
 
 void MainThread::search()
@@ -212,11 +189,15 @@ void MainThread::search()
     bool declare_win = false, book_hit = false;
     Turn t = RootTurn = root_board.turn();
     Time.init(Limits, t, root_board.ply());
+    GlobalTT.newSearch();
+
+    SYNC_COUT << "info string optimumTime = " << Time.optimum()
+        << " maximumTime = " << Time.maximum() << SYNC_ENDL;
 
     // 合法手がない == 詰んでいる局面もしくはステイルメイト。将棋は両方負けである。
     if (root_moves.empty())
     {
-        root_moves.push_back(RootMove(MOVE_NONE));
+        root_moves.emplace_back(MOVE_NONE);
         SYNC_COUT << "info depth 0 score " << USI::score(-SCORE_MATE) << SYNC_ENDL;
     }
 
@@ -227,7 +208,7 @@ void MainThread::search()
         SYNC_COUT << "info depth 0 score " << USI::score(SCORE_MATE) << SYNC_ENDL;
     }
 
-    else 
+    else
     {
         // 定跡手
         if (Options["UseBook"] && !Limits.infinite)
@@ -264,19 +245,19 @@ void MainThread::search()
                 for (auto th : Threads.slaves)
                     th->startSearching();
 
-                // 探索開始
+                // Let's start searching!
                 Thread::search();
             }
         }
     }
 
-    if (!Signals.stop && (Limits.ponder || Limits.infinite))
+    if (!Threads.stop && (Limits.ponder || Limits.infinite))
     {
-        Signals.stop_on_ponderhit = true;
-        wait(Signals.stop);
+        Threads.stop_on_ponderhit = true;
+        wait(Threads.stop);
     }
 
-    Signals.stop = true;
+    Threads.stop = true;
 
     // slaveスレッドの探索がすべて終了するのを待つ
     for (auto th : Threads.slaves)
@@ -294,7 +275,8 @@ void MainThread::search()
             Depth depth_diff = th->completed_depth - best_thread->completed_depth;
             Score score_diff = th->root_moves[0].score - best_thread->root_moves[0].score;
 
-            if (score_diff > 0 && depth_diff >= 0)
+            if (score_diff > 0 
+                && (depth_diff >= 0 || th->root_moves[0].score >= SCORE_MATE_IN_MAX_PLY))
                 best_thread = th;
         }
     }
@@ -303,18 +285,23 @@ void MainThread::search()
 
     // もし必要なら新たなpvを表示しておく
     if (best_thread != this)
-        SYNC_COUT << USI::pv(best_thread->root_board, best_thread->completed_depth, -SCORE_INFINITE, SCORE_INFINITE) << SYNC_ENDL;
+        SYNC_COUT << USI::pv(best_thread, best_thread->completed_depth, -SCORE_INFINITE, SCORE_INFINITE) << SYNC_ENDL;
 
     // 宣言勝ちできるなら勝ち
     if (declare_win)
         SYNC_COUT << "bestmove win" << SYNC_ENDL;
+
+    // 投了のスコアを下回っていたら投了
+    else if (!book_hit
+        && best_thread->root_moves[0].score <= Options["ResignScore"])
+        SYNC_COUT << "bestmove resign" << SYNC_ENDL;
 
     else
     {
         const Move best_move = best_thread->root_moves[0].pv[0];
 
         SYNC_COUT << "bestmove " << toUSI(best_move);
-
+        
         if (Options["USI_Ponder"]
             && best_thread->root_moves[0].pv.size() > 1
             || (best_thread->root_moves[0].pv[0] != MOVE_NONE
@@ -352,20 +339,19 @@ void Thread::search()
         WeakPonder = MOVE_NONE;
         main_thread->easy_move_played = main_thread->failed_low = false;
         main_thread->best_move_changes = 0;
-        TT.newSearch();
     }
 
     const size_t multi_pv = std::min((size_t)Options["MultiPV"], root_moves.size());
 
     while ((root_depth += ONE_PLY) < DEPTH_MAX 
-        && !Signals.stop 
-        && (!Limits.depth || Threads.main()->root_depth / ONE_PLY <= Limits.depth))
+        && !Threads.stop 
+        && !(Limits.depth && main_thread && root_depth / ONE_PLY > Limits.depth))
     {
         // Distribute search depths across the threads
         if (idx)
         {
             int i = (idx - 1) % 20;
-            if (((root_depth / ONE_PLY + root_board.ply() + phase[i]) / skipsize[i]) % 2)
+            if (((root_depth / ONE_PLY + root_board.ply() + skip_phase[i]) / skip_size[i]) % 2)
                 continue;
         }
 
@@ -376,7 +362,7 @@ void Thread::search()
         for (RootMove& rm : root_moves)
             rm.previous_score = rm.score;
 
-        for (pv_idx = 0; pv_idx < multi_pv && !Signals.stop; pv_idx++)
+        for (pv_idx = 0; pv_idx < multi_pv && !Threads.stop; pv_idx++)
         {
             if (root_depth >= 5 * ONE_PLY)
             {
@@ -397,12 +383,12 @@ void Thread::search()
                     && (best_score >= SCORE_MATE_IN_MAX_PLY 
                     || (best_score >= SCORE_KNOWN_WIN && root_moves.size() == 1)))
                 {
-                    SYNC_COUT << USI::pv(root_board, root_depth, alpha, beta) << SYNC_ENDL;
+                    SYNC_COUT << USI::pv(this, root_depth, alpha, beta) << SYNC_ENDL;
                     completed_depth = DEPTH_MAX;
-                    Signals.stop = true;
+                    Threads.stop = true;
                 }
 
-                if (Signals.stop)
+                if (Threads.stop)
                     break;
 
                 // 探索をする前にUIに出力する
@@ -413,7 +399,7 @@ void Thread::search()
                     && (root_depth < 3 * ONE_PLY || last_info_time + pv_interval < Time.elapsed()))
                 {
                     last_info_time = Time.elapsed();
-                    SYNC_COUT << USI::pv(root_board, root_depth, alpha, beta) << SYNC_ENDL;
+                    SYNC_COUT << USI::pv(this, root_depth, alpha, beta) << SYNC_ENDL;
                 }
 
                 // fail high/lowを起こしているならwindow幅を広げる
@@ -426,14 +412,11 @@ void Thread::search()
                     {
                         // 安定していないので
                         main_thread->failed_low = true;
-                        Signals.stop_on_ponderhit = false;
+                        Threads.stop_on_ponderhit = false;
                     }
                 }
                 else if (best_score >= beta)
-                {
-                    alpha = (alpha + beta) / 2;
                     beta = std::min(best_score + delta, SCORE_INFINITE);
-                }
                 else
                     break;
 
@@ -447,15 +430,15 @@ void Thread::search()
             if (!main_thread)
                 continue;
 
-            if (Signals.stop || (pv_idx + 1 == multi_pv || Time.elapsed() > 3000)
+            if (Threads.stop || (pv_idx + 1 == multi_pv || Time.elapsed() > 3000)
                 && (root_depth < 3 * ONE_PLY || last_info_time + pv_interval < Time.elapsed()))
             {
                 last_info_time = Time.elapsed();
-                SYNC_COUT << USI::pv(root_board, root_depth, alpha, beta) << SYNC_ENDL;
+                SYNC_COUT << USI::pv(this, root_depth, alpha, beta) << SYNC_ENDL;
             }
         }
 
-        if (!Signals.stop)
+        if (!Threads.stop)
             completed_depth = root_depth;
 
         if (!main_thread)
@@ -464,15 +447,9 @@ void Thread::search()
         if (main_thread->root_moves[0].pv.size() > 1)
             WeakPonder = main_thread->root_moves[0].pv[1];
 
-        // Have we found a "mate in x"?
-        if (Limits.mate
-            && best_score >= SCORE_MATE_IN_MAX_PLY
-            && SCORE_MATE - best_score <= 2 * Limits.mate)
-            Signals.stop = true;
-
         if (Limits.useTimeManagement())
         {
-            if (!Signals.stop && !Signals.stop_on_ponderhit)
+            if (!Threads.stop && !Threads.stop_on_ponderhit)
             {
                 const int F[] = { main_thread->failed_low,
                                   best_score - main_thread->previous_score };
@@ -489,9 +466,9 @@ void Thread::search()
                     || (main_thread->easy_move_played = do_easy_move, do_easy_move))
                 {
                     if (Limits.ponder)
-                        Signals.stop_on_ponderhit = true;
+                        Threads.stop_on_ponderhit = true;
                     else
-                        Signals.stop = true;
+                        Threads.stop = true;
                 }
             }
 
@@ -531,27 +508,15 @@ namespace
 
         // Step 1. ノード初期化
         Thread* this_thread = b.thisThread();
-        const bool in_check = b.bbCheckers();
+        const bool in_check = b.inCheck();
+        TranspositionTable* tt = this_thread->tt;
         Score best_score = -SCORE_INFINITE;
         ss->ply = (ss - 1)->ply + 1;
         move_count = quiet_count = ss->move_count = 0;
         ss->history = 0;
 
-        // checkTime()を呼ぶためのカウンタをリセットする
-        if (this_thread->reset_calls.load(std::memory_order_relaxed))
-        {
-            this_thread->reset_calls = false;
-            this_thread->calls_count = 0;
-        }
-
-        // 利用可能な残り時間のチェック
-        if (++this_thread->calls_count > 4096)
-        {
-            for (Thread* th : Threads)
-                th->reset_calls = true;
-
-            checkTime();
-        }
+        if (this_thread == Threads.main())
+            static_cast<MainThread*>(this_thread)->checkTime();
 
         // GUIへselDepth(現在、選択的に読んでいる手の探索深さ)情報を送信するために使用
         if (PvNode && this_thread->max_ply < ss->ply)
@@ -560,18 +525,18 @@ namespace
         if (!rootNode)
         {
             // Step 2. 引き分けか探索中断かをチェックする
-
+#if !defined LEARN
             // 256手以上指していたら引き分け
             if (b.ply() >= 256)
                 return SCORE_DRAW;
-
+#endif
             // 宣言法により勝ち。重いので190手目以降に呼ぶことにする
             if (b.ply() >= 190 && b.isDeclareWin())
                 return mateIn(ss->ply);
 
             switch (b.repetitionType(16))
             {
-            case NO_REPETITION:       if (!Signals.stop.load(std::memory_order_relaxed) && ss->ply < MAX_PLY) { break; }
+            case NO_REPETITION:       if (!Threads.stop.load(std::memory_order_relaxed) && ss->ply < MAX_PLY) { break; }
             case REPETITION_DRAW:     return drawScore(RootTurn, b.turn()); // ※↑のifに引っかからなかったらここに来る
             case REPETITION_WIN:      return mateIn(ss->ply);
             case REPETITION_LOSE:     return matedIn(ss->ply);
@@ -598,8 +563,6 @@ namespace
         // singular extensionするべきノードかどうかを確かめるために、この局面の置換表の指し手を
         // 除外して探索するときはss->excluded_moveが存在し、その場合異なる局面のキーを用いる必要がある
         const Move excluded_move = ss->excluded_move;
-
-#ifdef ENABLE_TT
         TTEntry *tte;
         Move tt_move;
         Score tt_score;
@@ -608,7 +571,7 @@ namespace
         Score tt_eval;
 
         const Key key = b.key() ^ Key(excluded_move << 1);
-        const bool tt_hit = TT.probe(key, tte);
+        const bool tt_hit = tt->probe(key, tte);
 
         if (tt_hit)
         {
@@ -626,15 +589,6 @@ namespace
             tt_bound = BOUND_NONE;
             tt_eval = SCORE_NONE;
         }
-#else
-        const bool tt_hit = false;
-        const TTEntry* tte = nullptr;
-        const Move tt_move = MOVE_NONE;
-        const Score tt_score = SCORE_NONE;
-        const Depth tt_depth = DEPTH_NONE;
-        const Bound tt_bound = BOUND_NONE;
-        const Score tt_eval  = SCORE_NONE;
-#endif
 
         // pvノードではないなら置換表を見て枝刈りする
         if (!PvNode
@@ -682,11 +636,11 @@ namespace
             if (best_move != MOVE_NONE)
             {
                 best_score = mateIn(ss->ply + 1);
-#ifdef ENABLE_TT
+
                 // staticEvalはなんでもいい
                 tte->save(key, scoreToTT(best_score, ss->ply), BOUND_EXACT,
-                    DEPTH_MAX, best_move, best_score, TT.generation());
-#endif
+                    DEPTH_MAX, best_move, best_score, tt->generation());
+
                 return best_score;
             }
         }
@@ -694,7 +648,9 @@ namespace
 
 #ifdef USE_PROGRESS
         // 進行度を差分計算
-        const double progress = Prog::evaluateProgress(b);
+        const double progress = Progress::evaluate(b);
+#else
+        const double progress = 0.0;
 #endif
         // Step 5. 王手ならすぐ指し手ループへ行く
         if (in_check)
@@ -714,16 +670,10 @@ namespace
         }
         else
         {
-#if defined USE_EVAL_TURN
-            // 手番評価があるため、(ss-1)->static_evalは使えない。
             eval = ss->static_eval = evaluate(b);
-#else
-            eval = ss->static_eval = (ss - 1)->current_move != MOVE_NULL ? evaluate(b) : -(ss - 1)->static_eval;
-#endif
-#ifdef ENABLE_TT
+
             // 評価関数を呼び出したので置換表に登録しておく。この後すぐに枝刈りされるかもしれないのでこのタイミングがベスト
-            tte->save(key, SCORE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE, eval, TT.generation());
-#endif
+            tte->save(key, SCORE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE, eval, tt->generation());
         }
 
         // 枝刈りしない
@@ -762,13 +712,12 @@ namespace
         // それでもbetaを超えているなら普通に指してもbetaを超えると推測できるので、探索をスキップする
         if (!PvNode
             && eval >= beta
-            && (ss->static_eval >= beta - 35 * (depth / ONE_PLY - 6) || depth >= 13 * ONE_PLY))
+            && ss->static_eval >= beta - 36 * depth / ONE_PLY + 225)
         {
             ss->current_move = MOVE_NULL;
             ss->counter_moves = this_thread->counter_move_history.refer();
             assert(eval - beta >= 0);
-
-#ifdef EVAL_DIFF
+#ifdef USE_EVAL
             if (b.state()->sum.isNotEvaluated())
                 ss->static_eval = evaluate(b);
 #endif
@@ -806,12 +755,9 @@ namespace
             && !isPawnPromote((ss - 1)->current_move)) // ただし直前の指し手が歩成りならカットせずに普通に探索したほうがいいかも。
         {
             Score rbeta = std::min(beta + 200, SCORE_INFINITE);
-            Depth rdepth = depth - 4 * ONE_PLY;
 
-            assert(rdepth >= ONE_PLY);
             assert(isOK((ss - 1)->current_move));
-
-#ifdef EVAL_DIFF
+#ifdef USE_EVAL
             if (b.state()->sum.isNotEvaluated())
                 ss->static_eval = evaluate(b);
 #endif
@@ -825,7 +771,7 @@ namespace
                     ss->current_move = move;
                     ss->counter_moves = this_thread->counter_move_history.refer(move);
                     b.doMove(move, st, b.givesCheck(move));
-                    score = -search<NO_PV>(b, ss + 1, -rbeta, -rbeta + 1, rdepth, !cut_node);
+                    score = -search<NO_PV>(b, ss + 1, -rbeta, -rbeta + 1, depth - 4 * ONE_PLY, !cut_node);
                     b.undoMove(move);
 
                     if (score >= rbeta)
@@ -833,7 +779,7 @@ namespace
                 }
         }
 #endif
-#ifdef ENABLE_TT // 置換表がないのなら多重反復深化をする意味がない。
+
         // Step 10. Internal iteratiove deepening (skipped when in check)
         // 現局面から少しの得でbetaを超えそうなら、探索深さを減らして探索してみて、得られた手から探索する。
         if (depth >= 6 * ONE_PLY
@@ -842,21 +788,20 @@ namespace
         {
             Depth d = (3 * depth / (4 * ONE_PLY) - 2) * ONE_PLY;
             Score s = search<NT>(b, ss, alpha, beta, d, cut_node, true);
-            tt_move = TT.probe(key, tte) ? tte->move() : MOVE_NONE;
+            tt_move = tt->probe(key, tte) ? tte->move() : MOVE_NONE;
         }
-#endif
+
     moves_loop: // 指し手生成ループ
 
         const CounterMoveStats* cmh = (ss - 1)->counter_moves;
         const CounterMoveStats* fmh = (ss - 2)->counter_moves;
         const CounterMoveStats* fm2 = (ss - 4)->counter_moves;
-
-#ifdef EVAL_DIFF
+#ifdef USE_EVAL
         if (b.state()->sum.isNotEvaluated())
             evaluate(b);
-
-        assert(!in_check || ss->static_eval == SCORE_NONE);
 #endif
+        assert(!in_check || ss->static_eval == SCORE_NONE);
+
         MovePicker mp(b, tt_move, depth, ss);
 
         score = best_score;
@@ -873,6 +818,9 @@ namespace
                                           && !excluded_move
                                           && (tt_bound & BOUND_LOWER)
                                           && tt_depth >= depth - 3 * ONE_PLY;
+
+        bool tt_capture = false;
+        bool pv_exact = PvNode && tt_hit && tt_bound == BOUND_EXACT;
 
         // Step 11. Loop through moves
         while ((move = mp.nextMove()) != MOVE_NONE)
@@ -907,10 +855,7 @@ namespace
             // Step 12. 王手延長
             // 駒損しない王手と有効そうな王手は延長する。
             if (gives_check && !move_count_pruning)
-                extension = (movedPieceType(move) == PAWN 
-                    || (fromSq(move) & b.state()->blockers_for_king[~b.turn()])
-                    || (isDrop(move) && toSq(move) == b.kingSquare(~b.turn()) + (b.turn() == BLACK ? DELTA_S : DELTA_N))
-                    || b.seeGe(move, SCORE_ZERO)) ? ONE_PLY : ONE_PLY / 2;
+                extension = b.seeGe(move, SCORE_ZERO) ? ONE_PLY : ONE_PLY / 2;
 
             // singular extension search
             else if (singular_extension_node
@@ -972,6 +917,9 @@ namespace
                 continue;
             }
 
+            if (move == tt_move && capture_or_pawn_promotion)
+                tt_capture = true;
+
             // この深さでの(現在探索中の)指し手
             ss->current_move = move;
             ss->counter_moves = this_thread->counter_move_history.refer(move);
@@ -992,6 +940,15 @@ namespace
                     r -= r ? ONE_PLY : DEPTH_ZERO;
                 else
                 {
+                    if ((ss - 1)->move_count > 15)
+                        r -= ONE_PLY;
+
+                    if (pv_exact)
+                        r -= ONE_PLY;
+
+                    if (tt_capture)
+                        r += ONE_PLY;
+
                     if (cut_node)
                         r += 2 * ONE_PLY;
 
@@ -1001,10 +958,10 @@ namespace
                                 + this_thread->history.get(~b.turn(), move)
                                 - 4000;
 
-                    if (ss->history > 0 && (ss - 1)->history < 0)
+                    if (ss->history >= 0 && (ss - 1)->history < 0)
                         r -= ONE_PLY;
 
-                    else if (ss->history < 0 && (ss - 1)->history > 0)
+                    else if (ss->history < 0 && (ss - 1)->history >= 0)
                         r += ONE_PLY;
 
                     r = std::max(DEPTH_ZERO, (r / ONE_PLY - ss->history / 20000) * ONE_PLY);
@@ -1044,7 +1001,7 @@ namespace
             assert(score > -SCORE_INFINITE && score < SCORE_INFINITE);
 
             // 探索終了したけどstopの時はsearchの戻り値は信用できないので置換表もpvも更新せずに戻る
-            if (Signals.stop.load(std::memory_order_relaxed))
+            if (Threads.stop.load(std::memory_order_relaxed))
                 return SCORE_ZERO;
 
             // Step 18. bestmoveのチェック
@@ -1078,12 +1035,6 @@ namespace
 
                 if (score > alpha)
                 {
-                    if (PvNode
-                        && this_thread == Threads.main()
-                        && EasyMove.get(b.key())
-                        && (move != EasyMove.get(b.key()) || move_count > 1))
-                        EasyMove.clear();
-
                     best_move = move;
 
                     if (PvNode && !rootNode) // Update pv even in fail-high case
@@ -1107,10 +1058,10 @@ namespace
 
         assert(move_count || !in_check || excluded_move || !MoveList<LEGAL>(b).size());
 
-        // 一手も指されなかったということは、引き分けか詰み
+        // 一手も指されなかったということは詰み。
+        // チェスでは王手ではない局面で指し手がない==ステイルメイト==引き分けだが、将棋では負けである。
         if (!move_count)
-            best_score = excluded_move ? alpha
-                            : in_check ? matedIn(ss->ply) : drawScore(RootTurn, b.turn());
+            best_score = excluded_move ? alpha : matedIn(ss->ply);
 
         // quietな手が最善だった。統計を更新する
         else if (best_move)
@@ -1134,19 +1085,18 @@ namespace
             && isOK((ss - 1)->current_move))
             updateCmStats(ss - 1, (ss - 1)->current_move, statBonus(depth + ONE_PLY));
 
-#ifdef ENABLE_TT
         if (!excluded_move)
             tte->save(key, scoreToTT(best_score, ss->ply),
                 best_score >= beta ? BOUND_LOWER :
                 PvNode && best_move ? BOUND_EXACT : BOUND_UPPER,
-                depth, best_move, ss->static_eval, TT.generation());
+                depth, best_move, ss->static_eval, tt->generation());
 
         assert(best_score > -SCORE_INFINITE && best_score < SCORE_INFINITE);
-#endif
+
         return best_score;
     }
 
-    template<NodeType NT, bool InCheck>
+    template<NodeType NT, bool InCheck, bool TTProbe>
     Score qsearch(Board& b, Stack* ss, Score alpha, Score beta, Depth depth)
     {
         const bool PvNode = NT == PV;
@@ -1157,9 +1107,11 @@ namespace
         assert(depth <= DEPTH_ZERO);
 
         Move best_move;
-
+        Score old_alpha;
+        TranspositionTable* tt = b.thisThread()->tt;
         ss->current_move = best_move = MOVE_NONE;
         ss->ply = (ss - 1)->ply + 1;
+        int move_count = 0;
 
         if (PvNode)
         {
@@ -1167,6 +1119,7 @@ namespace
             if (b.thisThread()->max_ply < ss->ply)
                 b.thisThread()->max_ply = ss->ply;
 
+            old_alpha = alpha;
             (ss + 1)->pv = b.thisThread()->pv[ss->ply];
             ss->pv[0] = MOVE_NONE;
         }
@@ -1187,10 +1140,9 @@ namespace
 
         assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
-        // 王手を含めるかどうかを決定する。また使用しようとしているTTエントリの深さのタイプを修正する
+        // 王手を含めるかどうかを決定する。また使用しようとしているGlobalTTエントリの深さのタイプを修正する
         Depth qdepth = (InCheck || depth >= DEPTH_QS_CHECKS) ? DEPTH_QS_CHECKS : DEPTH_QS_NO_CHECKS;
 
-#ifdef ENABLE_TT
         TTEntry* tte;
         Move tt_move;
         Score tt_score;
@@ -1199,9 +1151,9 @@ namespace
         Score tt_eval;
 
         const Key key = b.key();
-        bool tt_hit = TT.probe(key, tte);
+        const bool tt_hit = TTProbe ? tt->probe(key, tte) : false;
 
-        if (tt_hit)
+        if (TTProbe && tt_hit)
         {
             tt_move = tte->move();
             tt_score = scoreFromTT(tte->score(), ss->ply);
@@ -1217,29 +1169,17 @@ namespace
             tt_bound = BOUND_NONE;
             tt_eval = SCORE_NONE;
         }
-#else
-        const TTEntry* tte = nullptr;
-        const bool tt_hit = false;
-        const Move tt_move = MOVE_NONE;
-        const Score tt_score = SCORE_NONE;
-        const Depth tt_depth = DEPTH_NONE;
-        const Bound tt_bound = BOUND_NONE;
-        const Score tt_eval = SCORE_NONE;
-#endif
-#if 1
+
         // 置換表のほうが読みが深いなら置換表の評価値を返す
         if (!PvNode
+            && TTProbe
             && tt_hit
             && tt_depth >= depth
             && tt_score != SCORE_NONE
             && (tt_score >= beta ? (tt_bound & BOUND_LOWER)
                                  : (tt_bound & BOUND_UPPER)))
             return tt_score;
-#endif
-#ifdef USE_PROGRESS
-        // 進行度を差分計算
-        //Prog::evaluateProgress(b);
-#endif
+
         Score score, best_score, futility_base;
 
         // 評価関数を呼び出して現局面の評価値を得ておく
@@ -1255,24 +1195,21 @@ namespace
                 // 置換表に評価値が入っていない
                 if ((ss->static_eval = best_score = tt_eval) == SCORE_NONE)
                     ss->static_eval = best_score = evaluate(b);
+
+                if (tt_score != SCORE_NONE
+                    && (tt_bound & (tt_score > best_score ? BOUND_LOWER : BOUND_UPPER)))
+                    best_score = tt_score;
             }
             else
-            {
-#if defined USE_EVAL_TURN
                 ss->static_eval = best_score = evaluate(b);
-#else
-                ss->static_eval = best_score = (ss - 1)->current_move != MOVE_NULL ? evaluate(b) : -(ss - 1)->static_eval;
-#endif
-            }
 
             // stand pat。評価値が少なくともbetaよりも大きいのであればすぐに戻る
             if (best_score >= beta)
             {
-#ifdef ENABLE_TT
-                if (!tt_hit) // 置換表に値がないのなら登録
+                if (TTProbe && !tt_hit) // 置換表に値がないのなら登録
                     tte->save(key, scoreToTT(best_score, ss->ply), BOUND_LOWER,
-                        DEPTH_NONE, MOVE_NONE, ss->static_eval, TT.generation());
-#endif
+                        DEPTH_NONE, MOVE_NONE, ss->static_eval, tt->generation());
+
                 return best_score;
             }
 #ifdef MATE1PLY
@@ -1283,10 +1220,11 @@ namespace
                 if (best_move != MOVE_NONE)
                 {
                     best_score = mateIn(ss->ply + 1);
-#ifdef ENABLE_TT
-                    tte->save(key, scoreToTT(best_score, ss->ply), BOUND_EXACT,
-                        DEPTH_MAX, best_move, SCORE_NONE, TT.generation());
-#endif
+
+                    if (TTProbe)
+                        tte->save(key, scoreToTT(best_score, ss->ply), BOUND_EXACT,
+                            DEPTH_MAX, best_move, SCORE_NONE, tt->generation());
+
                     return best_score;
                 }
             }
@@ -1296,12 +1234,10 @@ namespace
 
             futility_base = best_score + 128;
         }
-
-#ifdef EVAL_DIFF
+#ifdef USE_EVAL
         if (b.state()->sum.isNotEvaluated())
             evaluate(b);
 #endif
-
         // 探索深さが0以下なのでRecaptureか成り、depthがDEPTH_QS_CHECKより大きい場合は王手を生成する
         MovePicker mp(b, tt_move, depth, (ss - 1)->current_move);
         Move move;
@@ -1310,6 +1246,7 @@ namespace
         while ((move = mp.nextMove()) != MOVE_NONE)
         {
             const bool gives_check = b.givesCheck(move);
+            move_count++;
 #ifdef FRONT_PRUNE
             // Futility pruning
             if (!InCheck
@@ -1336,7 +1273,7 @@ namespace
             }
 
             const bool evasionPrunable = InCheck
-                                      && depth != DEPTH_ZERO
+                                      && (depth != DEPTH_ZERO || move_count > 2)
                                       && best_score > SCORE_MATED_IN_MAX_PLY
                                       && !isCapture(move);
 
@@ -1347,14 +1284,17 @@ namespace
                 continue;
 #endif
             if (!b.legal(move))
+            {
+                move_count--;
                 continue;
+            }
 
             ss->current_move = move;
 
             b.doMove(move, si, gives_check);
 
-            score = gives_check ? -qsearch<NT,  true>(b, ss + 1, -beta, -alpha, depth - ONE_PLY)
-                                : -qsearch<NT, false>(b, ss + 1, -beta, -alpha, depth - ONE_PLY);
+            score = gives_check ? -qsearch<NT,  true, TTProbe>(b, ss + 1, -beta, -alpha, depth - ONE_PLY)
+                                : -qsearch<NT, false, TTProbe>(b, ss + 1, -beta, -alpha, depth - ONE_PLY);
             b.undoMove(move);
 
             assert(score > -SCORE_INFINITE && score < SCORE_INFINITE);
@@ -1376,10 +1316,10 @@ namespace
                     }
                     else // Fail high
                     {
-#ifdef ENABLE_TT
-                        tte->save(key, scoreToTT(score, ss->ply), BOUND_LOWER,
-                            depth, move, ss->static_eval, TT.generation());
-#endif
+                        if (TTProbe)
+                            tte->save(key, scoreToTT(score, ss->ply), BOUND_LOWER,
+                                depth, move, ss->static_eval, tt->generation());
+
                         return score;
                     }
                 }
@@ -1389,39 +1329,14 @@ namespace
         if (InCheck && best_score == -SCORE_INFINITE)
             return matedIn(ss->ply);
 
-#ifdef ENABLE_TT
-        tte->save(key, scoreToTT(best_score, ss->ply),
-            PvNode && best_move ? BOUND_EXACT : BOUND_UPPER,
-            depth, best_move, ss->static_eval, TT.generation());
-#endif
+        if (TTProbe)
+            tte->save(key, scoreToTT(best_score, ss->ply),
+                PvNode && best_score > old_alpha ? BOUND_EXACT : BOUND_UPPER,
+                depth, best_move, ss->static_eval, tt->generation());
+
         assert(best_score > -SCORE_INFINITE && best_score < SCORE_INFINITE);
 
         return best_score;
-    }
-
-    // 利用可能時間を過ぎて探索している場合、Signals.stopをtrueにして探索を中止する
-    void checkTime()
-    {
-        // checkTime()が一番最初に呼び出されたときの時間
-        static TimePoint last_info_time = now();
-
-        // "go"が送られてきてからの経過時間
-        int elapsed = Time.elapsed();
-
-        // 現在時刻
-        TimePoint tick = Limits.start_time + elapsed;
-
-        if (tick - last_info_time >= 1000)
-            last_info_time = tick;
-
-        // ponder中は停止しない
-        if (Limits.ponder)
-            return;
-
-        if ((!Limits.move_time && Limits.useTimeManagement() && elapsed > Time.maximum() - 10)
-            || (Limits.move_time && elapsed >= Limits.move_time) // 一あたりの探索時間が決まっているなら探索時間を比較
-            || (Limits.nodes && Threads.nodeSearched() >= Limits.nodes)) // 探索局面数による打ち切りが有効なら探索局面数を比較
-            Signals.stop = true;
     }
 
     // ルートからの手数による詰みのスコアを、現局面からの手数による詰みのスコアに調整する
@@ -1511,7 +1426,28 @@ namespace
     }
 } // namespace
 
-  // ponder moveを何も考えていないときに探索終了要求がきたらなんとかしてTTからponder moveを返すように努力する
+// 利用可能時間を過ぎて探索している場合、Threads.stopをtrueにして探索を中止する
+void MainThread::checkTime()
+{
+    if (--calls_cnt > 0)
+        return;
+
+    calls_cnt = Limits.nodes ? std::min(4096, int(Limits.nodes / 1024)) : 4096;
+
+    // "go"が送られてきてからの経過時間
+    int elapsed = Time.elapsed();
+
+    // ponder中は停止しない
+    if (Limits.ponder)
+        return;
+
+    if ((!Limits.move_time && Limits.useTimeManagement() && elapsed > Time.maximum())
+        || (Limits.move_time && elapsed >= Limits.move_time)
+        || (Limits.nodes && Threads.nodeSearched() >= Limits.nodes))
+        Threads.stop = true;
+}
+
+  // ponder moveを何も考えていないときに探索終了要求がきたらなんとかしてGlobalTTからponder moveを返すように努力する
 bool Search::RootMove::extractPonderFromTT(Board & b, Move weak_ponder)
 {
     StateInfo st;
@@ -1520,7 +1456,7 @@ bool Search::RootMove::extractPonderFromTT(Board & b, Move weak_ponder)
 
     b.doMove(pv[0], st);
 
-    Move m = TT.probe(b.key(), tte) ? tte->move() : weak_ponder;
+    Move m = GlobalTT.probe(b.key(), tte) ? tte->move() : weak_ponder;
     const bool contains = MoveList<LEGAL>(b).contains(m);
 
     b.undoMove(pv[0]);
@@ -1532,18 +1468,18 @@ bool Search::RootMove::extractPonderFromTT(Board & b, Move weak_ponder)
 }
 
 // GUIにpvやスコアを表示する
-std::string USI::pv(const Board & b, Depth depth, Score alpha, Score beta)
+std::string USI::pv(const Thread* th, Depth depth, Score alpha, Score beta)
 {
     std::stringstream ss;
     int elapsed = Time.elapsed() + 1;
-    const std::vector<RootMove>& root_moves = b.thisThread()->root_moves;
-    size_t pv_idx = b.thisThread()->pv_idx;
+    const std::vector<RootMove>& root_moves = th->root_moves;
+    size_t pv_idx = th->pv_idx;
     size_t multi_pv = std::min((size_t)Options["MultiPV"], root_moves.size());
     uint64_t nodes_searched = Threads.nodeSearched();
 
     for (size_t i = 0; i < multi_pv; i++)
     {
-        bool updated = (i <= pv_idx);
+        bool updated = (i <= pv_idx && root_moves[i].score != -SCORE_INFINITE);
 
         if (depth == ONE_PLY && !updated)
             continue;
@@ -1555,16 +1491,16 @@ std::string USI::pv(const Board & b, Depth depth, Score alpha, Score beta)
             ss << "\n";
 
         ss << "info"
-            << " depth " << d / ONE_PLY
-            << " seldepth " << b.thisThread()->max_ply
-            << " multipv " << i + 1
-            << " score " << USI::score(s)
-            << (s >= beta ? " lowerbound" : s <= alpha ? " upperbound" : "")
-            << " nodes " << nodes_searched
-            << " nps " << nodes_searched * 1000 / elapsed;
+           << " depth "    << d / ONE_PLY
+           << " seldepth " << th->max_ply
+           << " multipv "  << i + 1
+           << " score "    << USI::score(s)
+           << (s >= beta ? " lowerbound" : s <= alpha ? " upperbound" : "")
+           << " nodes "    << nodes_searched
+           << " nps "      << nodes_searched * 1000 / elapsed;
 
         if (elapsed > 1000)
-            ss << " hashfull " << TT.hashfull();
+            ss << " hashfull " << GlobalTT.hashfull();
 
         ss << " time " << elapsed
            << " pv";
@@ -1576,18 +1512,17 @@ std::string USI::pv(const Board & b, Depth depth, Score alpha, Score beta)
     return ss.str();
 }
 
-#if defined LEARN || defined GENSFEN
+#if defined LEARN
 namespace Learn
 {
     void initLearn(Board& b)
     {
         auto& limits = USI::Limits;
         limits.infinite = true;
-
         auto th = b.thisThread();
-
         th->max_ply = 0;
-
+        th->root_depth = DEPTH_ZERO;
+        th->pv_idx = 0;
         auto& root_moves = th->root_moves;
         root_moves.clear();
 
@@ -1595,61 +1530,45 @@ namespace Learn
             root_moves.push_back(Search::RootMove(m));
 
         assert(root_moves.size());
-
-        th->root_depth = DEPTH_ZERO;
     }
 
-    std::pair<Score, std::vector<Move>> search(Board& b, Score alpha, Score beta, Depth depth)
+    std::pair<Score, std::vector<Move>> search(Board& b, Depth depth, size_t multi_pv, Score multi_pv_range)
     {
-        Stack stack[MAX_PLY + 7], *ss = stack + 5;
-        memset(ss - 5, 0, 8 * sizeof(Stack));
+        // (ss - 4) and (ss + 2)という参照を許すため
+        Stack stack[MAX_PLY + 7], *ss = stack + 4;
+        std::memset(ss - 4, 0, 7 * sizeof(Stack));
+
+        for (int i = 4; i > 0; i--)
+            (ss - i)->counter_moves = b.thisThread()->counter_move_history.refer(); // Use as sentinel
 
         initLearn(b);
-        Score best_score, delta;
-        best_score = delta = -SCORE_INFINITE;
-
+        Score best_score = -SCORE_INFINITE;
         auto th = b.thisThread();
-        auto& root_depth = th->root_depth;
         auto& root_moves = th->root_moves;
+        auto& root_depth = th->root_depth;
+        multi_pv = std::min(multi_pv, root_moves.size());
+        Score alpha = -SCORE_INFINITE, beta = SCORE_INFINITE;
 
-        while ((root_depth += ONE_PLY) <= depth)
+        while ((root_depth += ONE_PLY) <= depth && !Threads.stop)
         {
-            if (root_depth >= 5 * ONE_PLY)
-            {
-                delta = Score(60);
-                alpha = std::max(root_moves[0].previous_score - delta, -SCORE_INFINITE);
-                beta  = std::min(root_moves[0].previous_score + delta, SCORE_INFINITE);
-            }
-
-            while (true)
+            for (th->pv_idx = 0; th->pv_idx < multi_pv; th->pv_idx++)
             {
                 best_score = ::search<PV>(b, ss, alpha, beta, root_depth, false);
-                std::stable_sort(root_moves.begin(), root_moves.end());
+                std::stable_sort(root_moves.begin() + th->pv_idx, root_moves.end());
 
-                if (best_score <= alpha)
+                if (th->pv_idx >= 1
+                    && root_depth == depth
+                    && root_moves[0].score - root_moves[th->pv_idx].score > multi_pv_range)
                 {
-                    beta = (alpha + beta) / 2;
-                    alpha = std::max(best_score - delta, -SCORE_INFINITE);
-                }
-                else if (best_score >= beta)
-                {
-                    alpha = (alpha + beta) / 2;
-                    beta = std::min(best_score + delta, SCORE_INFINITE);
-                }
-                else
-                {
+                    multi_pv = th->pv_idx;
                     break;
                 }
-
-                delta += delta / 4 + 5;
-
-                assert(-SCORE_INFINITE <= alpha && beta <= SCORE_INFINITE);
             }
         }
 
         std::vector<Move> pvs;
 
-        for (Move move : root_moves[0].pv)
+        for (Move move : root_moves[multi_pv - 1].pv)
         {
             if (!isOK(move))
                 break;
@@ -1660,64 +1579,24 @@ namespace Learn
         return std::pair<Score, std::vector<Move>>(best_score, pvs);
     }
 
-    std::pair<Score, std::vector<Move>> qsearch(Board& b, Score alpha, Score beta)
+    std::pair<Score, std::vector<Move>> qsearch(Board& b)
     {
+        Score alpha = -SCORE_INFINITE, beta = SCORE_INFINITE;
         Stack stack[MAX_PLY + 7], *ss = stack + 5;
         memset(ss - 5, 0, 8 * sizeof(Stack));
-
         Move pv[MAX_PLY + 1];
         ss->pv = pv;
-
         initLearn(b);
-
         auto th = b.thisThread();
         const bool in_check = b.inCheck();
-        Score best_score = in_check ? ::qsearch<PV, true>(b, ss, alpha, beta, DEPTH_ZERO)
-                                    : ::qsearch<PV, false>(b, ss, alpha, beta, DEPTH_ZERO);
-
+        Score best_score = in_check ? ::qsearch<PV, true,  false>(b, ss, alpha, beta, DEPTH_ZERO)
+                                    : ::qsearch<PV, false, false>(b, ss, alpha, beta, DEPTH_ZERO);
         std::vector<Move> pvs;
 
         for (Move* p = &ss->pv[0]; isOK(*p); ++p)
             pvs.push_back(*p);
 
         return std::pair<Score, std::vector<Move>>(best_score, pvs);
-    }
-
-    // 枝刈りなしの単純なαβ
-    template <NodeType NT>
-    Score ab(Board& b, Stack* ss, Score alpha, Score beta, Depth depth, bool cut_node)
-    {
-        return SCORE_ZERO;
-    }
-
-    template<NodeType NT, bool InCheck>
-    Score qab(Board& b, Stack* ss, Score alpha, Score beta, Depth depth)
-    {
-        return SCORE_ZERO;
-    }
-
-    Score ab(Board& b, Score alpha, Score beta, Depth depth)
-    {
-        Search::Stack stack[MAX_PLY + 7], *ss = stack + 5;
-        memset(ss - 5, 0, 8 * sizeof(Search::Stack));
-
-        Learn::initLearn(b);
-        Time.reset();
-        TT.newSearch();
-        Score best_score = -SCORE_INFINITE;
-
-        auto th = b.thisThread();
-        auto& root_depth = th->root_depth;
-        auto& root_moves = th->root_moves;
-
-        for (root_depth = ONE_PLY; root_depth <= depth; root_depth += ONE_PLY)
-        {
-            best_score = ab<PV>(b, ss, -SCORE_INFINITE, SCORE_INFINITE, root_depth, false);
-            std::stable_sort(root_moves.begin(), root_moves.end());
-            //std::cout << USI::pv(b, root_depth, -SCORE_INFINITE, SCORE_INFINITE) << std::endl;
-        }
-
-        return best_score;
     }
 } // namespace Learn
 

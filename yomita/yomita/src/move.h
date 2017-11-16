@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,12 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-#include <algorithm>
 #include <iostream>
-#include "piece.h"
-#include "platform.h"
+#include <algorithm>
+
+#include "types.h"
 #include "board.h"
-#include "square.h"
 
 // 指し手の種類
 enum MoveType
@@ -161,15 +160,13 @@ inline bool isOK(const Move m) { return m != MOVE_NONE && m != MOVE_NULL; }
 
 // USI変換用
 std::string toUSI(const Move m);
-#ifdef HELPER
 std::string toCSA(const Move m);
 std::string pretty(const Move m);
 
 // Move型を人間にとってわかりやすい形式で出力する。デバッグ用。
 std::ostream& operator << (std::ostream& os, const Move m);
-#endif
+
 // 手とスコアが一緒になった構造体
-// TODO: スコアはスコアリングするときにくっつければいい気もする。
 struct MoveStack
 {
     Move move;
@@ -183,3 +180,122 @@ struct MoveStack
 inline bool operator < (const MoveStack& f, const MoveStack& s) { return f.score < s.score; }
 inline bool operator > (const MoveStack& f, const MoveStack& s) { return f.score > s.score; }
 
+// Move16はByteboardで盤上の駒を動かす手を生成するときにのみ用いる。
+typedef uint16_t Move16;
+
+// 00000000 01111111 to
+// 00111111 10000000 from
+// 01000000 00000000 promote flag
+// 10000000 00000000 drop flag
+
+inline Move move16ToMove(Move16 m16, const Piece p, const Piece c)
+{
+    return (Move)m16 | pieceToMove(p) | captureToMove(c);
+}
+
+inline Move move16ToMove(Move16 m16, const Board& b)
+{
+    return move16ToMove(m16, b.piece(fromSq((Move)m16)), b.piece(toSq((Move)m16)));
+}
+
+// 駒を動かす手を生成
+inline Move16 makeMove16(const Square from, const Square to, const bool promote)
+{
+    return Move16(toToMove(to) | fromToMove(from) | promoteToMove(promote));
+}
+
+class Board;
+template <bool All>
+Move* generateLegal(const Board& b, Move* mlist);
+Move* generateEvasion(const Board& b, Move* mlist);
+Move* generateRecapture(const Board& b, Move* mlist, const Square sq);
+Move* generateDrop(const Board& b, Move* mlist);
+template <MoveType MT>
+__m256i* generateOnBoard(const Board& b, __m256i* mlist);
+
+MoveStack* generateQuietCheck(const Board& b, MoveStack* mlist);
+
+template <MoveType MT>
+inline Move* generate(Move* mlist, const Board& b)
+{
+    static_assert(MT == LEGAL || MT == LEGAL_ALL, "");
+
+    if (MT == LEGAL)
+        return generateLegal<false>(b, mlist);
+    else if (MT == LEGAL_ALL)
+        return generateLegal<true>(b, mlist);
+}
+
+// MoveType の全ての指し手を生成
+template <MoveType MT> MoveStack* generate(MoveStack* mlist, const Board& b);
+template <MoveType MT> MoveStack* generate(MoveStack* mlist, const Board& b, const Square to);
+
+#if defined USE_BITBOARD
+// MoveStackTypeに応じたMoveStackStackのリストを作るクラス
+template <MoveType MT> class MoveList
+{
+public:
+    explicit MoveList(const Board& b) : curr_(mlist_), last_(generate<MT>(mlist_, b)) {}
+    void operator ++ () { ++curr_; }
+    const MoveStack* begin() const { return mlist_; }
+    const MoveStack* end() const { return last_; }
+    MoveStack move() const { return *curr; }
+
+    // 生成した手の数を返す
+    size_t size() const { return static_cast<size_t>(last_ - mlist_); }
+
+    // 渡されたmoveがリストの中にあるかどうか
+    bool contains(const Move move) const
+    {
+        for (const MoveStack* it(mlist_); it != last_; ++it)
+            if (*it == move)
+                return true;
+
+        return false;
+    }
+
+private:
+    MoveStack mlist_[MAX_MOVES];
+    MoveStack* curr_;
+    MoveStack* last_;
+};
+#else
+// MoveTypeに応じたMoveStackのリストを作るクラス
+template <MoveType MT> class MoveList
+{
+public:
+    explicit MoveList(const Board& b) : curr_(mlist_), last_(generate<MT>(mlist_, b)) {}
+    void operator ++ () { ++curr_; }
+    const Move* begin() const { return mlist_; }
+    const Move* end() const { return last_; }
+    Move move() const { return *curr; }
+
+    // 生成した手の数を返す
+    size_t size() const { return static_cast<size_t>(last_ - mlist_); }
+
+    // 渡されたmoveがリストの中にあるかどうか
+    bool contains(const Move move) const
+    {
+        for (const Move* it(mlist_); it != last_; ++it)
+            if (*it == move)
+                return true;
+
+        return false;
+    }
+
+private:
+    Move mlist_[MAX_MOVES];
+    Move* curr_;
+    Move* last_;
+};
+#endif
+template <MoveType MT>
+std::ostream& operator << (std::ostream &os, const MoveList<MT>& mlist)
+{
+    std::cout << "size = " << mlist.size() << std::endl;
+
+    for (auto m : mlist)
+        std::cout << pretty(m);
+
+    return os;
+}

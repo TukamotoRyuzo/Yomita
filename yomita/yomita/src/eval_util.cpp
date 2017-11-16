@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,12 +23,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "evaluate.h"
 
-#ifdef USE_EVAL
+#if !defined USE_EVAL
+
+#include "board.h"
+
+    // この関数のために.cpp作るのもバカらしいのでここで定義する。
+    namespace Eval
+    {
+        // 駒割だけ。手番から見た値を返す。
+        Score evaluate(const Board& b) { return b.turn() == BLACK ? b.state()->material : -b.state()->material; }
+    }
+#else
 
 #include <string>
+#include <codecvt>
+#include <fstream>
+#include <iostream>
+#include <windows.h>
+
+#include "usi.h"
 
 namespace Eval
 {
+    // Grobalな評価関数テーブル
+    Evaluater* GlobalEvaluater;
+
     ExtBonaPiece BP_BOARD_ID[PIECE_MAX] =
     {
         { BONA_PIECE_ZERO, BONA_PIECE_ZERO },
@@ -42,11 +61,17 @@ namespace Eval
         { f_king, e_king },
         { f_horse, e_horse }, // 馬
         { f_dragon, e_dragon }, // 龍
+#ifdef CONSIDER_PROMOTION_IN_EVAL
+        { f_pro_pawn, e_pro_pawn }, // 成歩
+        { f_pro_lance, e_pro_lance }, // 成香
+        { f_pro_knight, e_pro_knight }, // 成桂
+        { f_pro_silver, e_pro_silver }, // 成銀
+#else
         { f_gold, e_gold }, // 成歩
         { f_gold, e_gold }, // 成香
         { f_gold, e_gold }, // 成桂
         { f_gold, e_gold }, // 成銀
-
+#endif
         { BONA_PIECE_ZERO, BONA_PIECE_ZERO }, // 金の成りはない
 
         // 後手から見た場合。fとeが入れ替わる。
@@ -61,11 +86,17 @@ namespace Eval
         { e_king, f_king },
         { e_horse, f_horse }, // 馬
         { e_dragon, f_dragon }, // 龍
+#ifdef CONSIDER_PROMOTION_IN_EVAL
+        { e_pro_pawn, f_pro_pawn }, // 成歩
+        { e_pro_lance, f_pro_lance }, // 成香
+        { e_pro_knight, f_pro_knight }, // 成桂
+        { e_pro_silver, f_pro_silver }, // 成銀
+#else
         { e_gold, f_gold }, // 成歩
         { e_gold, f_gold }, // 成香
         { e_gold, f_gold }, // 成桂
         { e_gold, f_gold }, // 成銀
-
+#endif
         //{ BONA_PIECE_ZERO, BONA_PIECE_ZERO }, // 金の成りはない
     };
 
@@ -92,7 +123,7 @@ namespace Eval
             { e_hand_gold, f_hand_gold },
         },
     };
-#ifdef HELPER
+
     // BonaPieceの内容を表示する。手駒ならH,盤上の駒なら升目。例) HP3 (3枚目の手駒の歩)
     std::ostream& operator << (std::ostream& os, BonaPiece bp)
     {
@@ -127,7 +158,51 @@ namespace Eval
     End:;
         return os;
     }
-#endif
+
+    // memory mapped fileに必要。
+    void load()
+    {
+        const size_t size = sizeof(Evaluater);
+        const std::string dir_name = USI::Options["EvalDir"];
+
+        if (!(bool)USI::Options["EvalShare"])
+        {
+            GlobalEvaluater = new Evaluater;
+            GlobalEvaluater->load(dir_name);
+            SYNC_COUT << "info string use non-shared eval memory " << dir_name << SYNC_ENDL;
+            return;
+        }
+
+        std::string wd = dir_name;
+        replace(wd.begin(), wd.end(), '\\', '_');
+        replace(wd.begin(), wd.end(), '/', '_');
+        std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
+        auto mapped = TEXT("YOMITA_KPPT_MMF") + cv.from_bytes(wd);
+        auto mutex = TEXT("YOMITA_KPPT_MUTEX") + cv.from_bytes(wd);
+        auto h_mutex = CreateMutex(NULL, FALSE, mutex.c_str());
+
+        WaitForSingleObject(h_mutex, INFINITE);
+        {
+            auto h_map = CreateFileMapping(INVALID_HANDLE_VALUE,
+                NULL,
+                PAGE_READWRITE,
+                DWORD(size >> 32), DWORD(size & 0xffffffffULL),
+                mapped.c_str());
+
+            bool exists = GetLastError() == ERROR_ALREADY_EXISTS;
+            GlobalEvaluater = (Evaluater*)MapViewOfFile(h_map, FILE_MAP_ALL_ACCESS, 0, 0, size);
+
+            if (!exists)
+            {
+                GlobalEvaluater->load(dir_name);
+                SYNC_COUT << "info string created shared eval memory " << dir_name << SYNC_ENDL;
+            }
+            else
+                SYNC_COUT << "info string use shared eval memory " << dir_name << SYNC_ENDL;
+
+            ReleaseMutex(h_mutex);
+        }
+    }
 }
 
 #endif

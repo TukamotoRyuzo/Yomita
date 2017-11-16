@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -53,9 +53,6 @@ typedef unsigned __int64 uint64_t;
 #endif
 #endif
 
-// いらない関数をすべて無効にして実行ファイルを小さくする。
-#define HELPER
-
 // bsfq命令(_Bitscanforword)を使うか
 #if defined(_WIN64) && !defined(IS_64BIT)
 #include <intrin.h> // MSVC popcnt and bsfq instrinsics
@@ -63,7 +60,12 @@ typedef unsigned __int64 uint64_t;
 #define USE_BSF
 #endif
 
-// uint64_tに対するpopcnt命令を使うか
+#ifdef IS_64BIT
+const bool Is64bit = true;
+#else
+const bool Is64bit = false;
+#endif
+
 #if defined(_MSC_VER) && defined(IS_64BIT)
 #define USE_POPCNT
 #define HAVE_SSE42

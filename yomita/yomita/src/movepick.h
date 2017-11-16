@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,9 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-#include "board.h"
 #include "move.h"
-#include "genmove.h"
+#include "board.h"
 #include "search.h"
 
 struct HistoryStats
@@ -110,11 +109,21 @@ struct MovePicker
     Move nextMove();
     int seeSign() const;
 private:
-    void scoreCaptures();
+#ifdef USE_BYTEBOARD
+    void initReCaptures(Square rsq);
+    void initQuietChecks();
+#endif
     void scoreQuiets();
     void scoreEvasions();
+    void scoreCaptures();
+
     MoveStack* begin() { return moves; }
     MoveStack* end() { assert(end_moves < moves + MAX_MOVES); return end_moves; }
+
+    bool inRange(MoveStack* ms) const
+    {
+        return moves <= ms && ms <= moves + MAX_MOVES;
+    }
 
     const Board& board;
     const Search::Stack *ss;
@@ -125,6 +134,7 @@ private:
     Square recapture_square;
     Move tt_move;
     int stage;
-    MoveStack *cur, *end_moves, *end_bad_captures;
+
+    MoveStack *cur, *end_moves, *end_bads;
     MoveStack moves[MAX_MOVES];
 };

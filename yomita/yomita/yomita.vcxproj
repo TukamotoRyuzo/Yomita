@@ -19,74 +19,29 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\benchmark.h" />
-    <ClInclude Include="src\bitboard.h" />
-    <ClInclude Include="src\bitop.h" />
-    <ClInclude Include="src\board.h" />
-    <ClInclude Include="src\book.h" />
-    <ClInclude Include="src\common.h" />
-    <ClInclude Include="src\config.h" />
-    <ClInclude Include="src\enumoperator.h" />
-    <ClInclude Include="src\evalsum.h" />
-    <ClInclude Include="src\evaluate.h" />
-    <ClInclude Include="src\eval_kpptp.h" />
-    <ClInclude Include="src\eval_ppt.h" />
-    <ClInclude Include="src\eval_kppt.h" />
-    <ClInclude Include="src\eval_pptp.h" />
-    <ClInclude Include="src\genmove.h" />
-    <ClInclude Include="src\gensfen.h" />
-    <ClInclude Include="src\hand.h" />
-    <ClInclude Include="src\learn.h" />
-    <ClInclude Include="src\move.h" />
-    <ClInclude Include="src\movepick.h" />
-    <ClInclude Include="src\multi_think.h" />
-    <ClInclude Include="src\piece.h" />
-    <ClInclude Include="src\piecescore.h" />
-    <ClInclude Include="src\platform.h" />
-    <ClInclude Include="src\progress.h" />
-    <ClInclude Include="src\range.h" />
-    <ClInclude Include="src\score.h" />
-    <ClInclude Include="src\search.h" />
-    <ClInclude Include="src\sfen_rw.h" />
-    <ClInclude Include="src\square.h" />
-    <ClInclude Include="src\test.h" />
-    <ClInclude Include="src\thread.h" />
-    <ClInclude Include="src\timeman.h" />
-    <ClInclude Include="src\tt.h" />
-    <ClInclude Include="src\turn.h" />
-    <ClInclude Include="src\usi.h" />
+    <Text Include="..\..\更新履歴.txt" />
+    <Text Include="..\..\気になること.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\benchmark.cpp" />
     <ClCompile Include="src\bitboard.cpp" />
     <ClCompile Include="src\board.cpp" />
-    <ClCompile Include="src\bonapiece.cpp" />
     <ClCompile Include="src\book.cpp" />
+    <ClCompile Include="src\byteboard.cpp" />
     <ClCompile Include="src\common.cpp" />
-    <ClCompile Include="src\eval_kpp.cpp" />
-    <ClCompile Include="src\eval_kpptp.cpp" />
-    <ClCompile Include="src\eval_ppt.cpp" />
     <ClCompile Include="src\eval_kppt.cpp" />
+    <ClCompile Include="src\eval_ppt.cpp" />
     <ClCompile Include="src\eval_pptp.cpp" />
+    <ClCompile Include="src\eval_util.cpp" />
     <ClCompile Include="src\genmove.cpp" />
-    <ClCompile Include="src\gensfen.cpp" />
     <ClCompile Include="src\haffman.cpp" />
-    <ClCompile Include="src\hand.cpp" />
     <ClCompile Include="src\learn.cpp" />
-    <ClCompile Include="src\learn_kppt.cpp" />
-    <ClCompile Include="src\learn_kpptp.cpp" />
-    <ClCompile Include="src\learn_ppt.cpp" />
-    <ClCompile Include="src\learn_pptp.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\move.cpp" />
     <ClCompile Include="src\movepick.cpp" />
-    <ClCompile Include="src\multi_think.cpp" />
-    <ClCompile Include="src\piece.cpp" />
+    <ClCompile Include="src\pretty.cpp" />
     <ClCompile Include="src\progress.cpp" />
     <ClCompile Include="src\search.cpp" />
     <ClCompile Include="src\sfen_rw.cpp" />
-    <ClCompile Include="src\shared_memory.cpp" />
-    <ClCompile Include="src\square.cpp" />
     <ClCompile Include="src\test.cpp" />
     <ClCompile Include="src\thread.cpp" />
     <ClCompile Include="src\timeman.cpp" />
@@ -95,39 +50,61 @@
     <ClCompile Include="src\usioption.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\..\更新履歴.txt" />
-    <Text Include="..\..\気になること.txt" />
+    <ClInclude Include="src\bitboard.h" />
+    <ClInclude Include="src\bitop.h" />
+    <ClInclude Include="src\board.h" />
+    <ClInclude Include="src\book.h" />
+    <ClInclude Include="src\byteboard.h" />
+    <ClInclude Include="src\common.h" />
+    <ClInclude Include="src\config.h" />
+    <ClInclude Include="src\enumoperator.h" />
+    <ClInclude Include="src\evalsum.h" />
+    <ClInclude Include="src\evaluate.h" />
+    <ClInclude Include="src\hand.h" />
+    <ClInclude Include="src\learn.h" />
+    <ClInclude Include="src\move.h" />
+    <ClInclude Include="src\movepick.h" />
+    <ClInclude Include="src\platform.h" />
+    <ClInclude Include="src\progress.h" />
+    <ClInclude Include="src\range.h" />
+    <ClInclude Include="src\search.h" />
+    <ClInclude Include="src\sfen_rw.h" />
+    <ClInclude Include="src\thread.h" />
+    <ClInclude Include="src\timeman.h" />
+    <ClInclude Include="src\tt.h" />
+    <ClInclude Include="src\types.h" />
+    <ClInclude Include="src\usi.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{70D62DC5-76BE-4831-BEEB-7A48283445A0}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>yomita</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>

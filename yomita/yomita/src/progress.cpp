@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -29,17 +29,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <iostream>
 #include <sstream>
 #include <iomanip>
-#include "progress.h"
-#include "board.h"
-#include "genmove.h"
-#include "usi.h"
-#include "multi_think.h"
-#include "tt.h"
-#include "timeman.h"
 
-namespace Prog
+#include "usi.h"
+#include "board.h"
+#include "learn.h"
+#include "progress.h"
+
+#define PROGRESS_BIN "progress.bin"
+#define SAVE_PROGRESS_DIR "save"
+
+namespace Progress
 {
-    ValueProg PROGRESS[SQ_MAX][Eval::fe_end];
+    int32_t PROGRESS[SQ_MAX][Eval::fe_end];
 
     // 進行度ファイルの読み込み
     void load()
@@ -59,7 +60,7 @@ namespace Prog
                 PRNG rng(11);
                 for (auto sq : Squares)
                     for (int i = 0; i < Eval::fe_end; i++)
-                        PROGRESS[sq][i] = rng.rand<ValueProg>();
+                        PROGRESS[sq][i] = 0;// rng.rand<ValueProg>();
             }
 #endif
             std::cout << "info string open success " << p << "." << std::endl;
@@ -69,20 +70,15 @@ namespace Prog
     // 進行度ファイルの保存
     void save(std::string dir_name)
     {
-        std::string prog_dir = path(USI::Options["ProgressSaveDir"], dir_name);
+        std::string prog_dir = path("progress/save", dir_name);
         mkdir(prog_dir);
         std::ofstream ofs(path(prog_dir, PROGRESS_BIN), std::ios::binary);
 
         if (!ofs.write(reinterpret_cast<char*>(PROGRESS), sizeof(PROGRESS)))
-            goto Error;
-
-        return;
-    Error:
-        std::cout << "can't save progress." << std::endl;
+            std::cout << "can't save progress." << std::endl;
     }
 
-    // 進行度を全計算
-    double computeProgress(const Board& b)
+    double computeAll(const Board& b)
     {
         auto sq_bk0 = b.kingSquare(BLACK);
         auto sq_wk1 = inverse(b.kingSquare(WHITE));
@@ -102,7 +98,7 @@ namespace Prog
     }
 
     // 進行度を差分計算
-    double calcProgressDiff(const Board& b)
+    double computeDiff(const Board& b)
     {
         auto now = b.state();
 
@@ -112,7 +108,7 @@ namespace Prog
         auto prev = now->previous;
 
         if (prev->progress.isNone())
-            return computeProgress(b);
+            return computeAll(b);
 
         auto sq_bk0 = b.kingSquare(BLACK);
         auto sq_wk1 = inverse(b.kingSquare(WHITE));
@@ -176,77 +172,23 @@ namespace Prog
         return now->progress.rate();
     }
 
-    double evaluateProgress(const Board& b)
+    double evaluate(const Board& b)
     {
-        double s = calcProgressDiff(b);
-#if 0
-        double ss = computeProgress(b);
-
-        if (s != ss)
-            std::cout << b.key();
-#endif
-        return s;
+        return computeDiff(b);
     }
 
-} // namespace Prog
+    double ProgressSum::rate() const
+    {
+        return Learn::sigmoid(double(bkp + wkp) / double(1 << 16)); 
+    }
+
+} // namespace Progress
 
 #ifdef LEARN
 namespace Learn
 {
 
-#if 0
-    // 楽な実装だが重い
-    Move csaToMove(std::string csa, Board& b)
-    {
-        for (auto m : MoveList<LEGAL_ALL>(b))
-            if (csa == toCSA(m))
-                return m;
-
-        return MOVE_NONE;
-    }
-#endif
-
-    // なので直接変換する
-    Move csaToMove(std::string csa, Board& b)
-    {
-        File f;
-        Rank r;
-        Square from;
-        Move ret;
-
-        if (csa[0] != '0')
-        {
-            f = File('9' - csa[0]);
-            r = Rank(csa[1] - '1');
-            from = sqOf(f, r);
-        }
-        else
-            from = SQ_MAX;
-
-        f = File('9' - csa[2]);
-        r = Rank(csa[3] - '1');
-        Square to = sqOf(f, r);
-
-        // 持ち駒を打つとき、USIにこの文字列を送信する。
-        static const std::string piece_to_csa[] = { "", "KA", "HI", "FU", "KY", "KE", "GI", "KI", "OU", "UM", "RY", "TO", "NY", "NK", "NG" };
-        PieceType pt;
-
-        for (pt = BISHOP; pt < 15; pt++)
-            if (piece_to_csa[pt] == csa.substr(4))
-                break;
-
-        assert(pt < 15);
-
-        if (from == SQ_MAX)
-            ret = makeDrop(toPiece(pt, b.turn()), to);
-        else
-            ret = pt == typeOf(b.piece(from)) ? makeMove<LEGAL>(from, to, toPiece(pt, b.turn()), b)
-            : makeMovePromote<LEGAL>(from, to, b.piece(from), b);
-
-        return ret;
-    }
-
-#define eta 0.1
+#define eta 1.0
     struct Weight
     {
         double w, g, g2;
@@ -280,7 +222,7 @@ namespace Learn
 #if 1
         for (auto k : Squares)
             for (auto p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1)
-                prog_w[k][p1].w = Prog::PROGRESS[k][p1];
+                prog_w[k][p1].w = Progress::PROGRESS[k][p1];
 #endif
     }
 
@@ -300,7 +242,7 @@ namespace Learn
         }
     }
 
-    // 教師の数も少なく、現在のニューラルネットワークの出力値を求める時間も少ないので、mini batchは必要ない。
+    // 教師の数も少なく、現在の出力値を求める時間も少ないので、mini batchは必要ない。
     void updateWeights()
     {
         for (auto sq : Squares)
@@ -309,11 +251,9 @@ namespace Learn
                 auto& w = prog_w[sq][i];
 
                 if (w.update())
-                    Prog::PROGRESS[sq][i] = (Prog::ValueProg)w.w;
+                    Progress::PROGRESS[sq][i] = static_cast<int32_t>(w.w);
             }
     }
-
-    double dsigmoid(double x);
 
     // 勾配を計算する関数
     double calcGrad(double teacher, double now)
@@ -336,156 +276,166 @@ namespace Learn
 
     typedef std::vector<Game> GameVector;
 
-    // 進行度学習をマルチスレッドで行うクラス
-    struct ProgressLearner : public MultiThink
+    namespace ProgressSpace
     {
-        ProgressLearner() {}
-        virtual void work(size_t thread_id);
-
         std::vector<GameVector> games;
         GameVector errors;
-
-        // updateWeightsしている途中であることを表すフラグ
-        std::atomic_bool updating;
-
-        // 親クラスにもあるがこちらでも定義する。
         uint64_t max_loop;
-    };
 
-    void ProgressLearner::work(size_t thread_id)
-    {
-        const int MAX_PLY = 256;
-        StateInfo st[MAX_PLY + 64];
-        auto th = Threads[thread_id];
-        auto& b = th->root_board;
-        const bool is_main = th == Threads.main();
-        th->add_grading = true;
-
-#ifdef _DEBUG
-        const int interval = 5000;
-#else
-        const int interval = 10000000;
-#endif
-
-        for (int loop = 0; loop < max_loop;)
+        struct ProgressLearnThread : public WorkerThread
         {
-            for (auto game : games[thread_id])
+            virtual void search()
             {
-                // 平手初期局面セット
-                b.init(USI::START_POS, th);
-
-                // 再生
-                for (int i = 0; i < game.ply - 1; i++)
+                const int MAX_PLY = 256;
+                StateInfo st[MAX_PLY + 64];
+                Board& b = root_board;
+                const bool is_main = isMain();
+#ifdef _DEBUG
+                const int interval = 5000;
+#else
+                const int interval = 10000000;
+#endif
+                for (int loop = 0; loop < max_loop && !Threads.stop;)
                 {
-                    Move m = game.move[i];
-                    b.doMove(m, st[i]);
-
-                    // 教師の進行度
-                    auto t = (double)(i + 1) / (double)game.ply;
-
-                    // NNの出力
-                    auto p = Prog::evaluateProgress(b);
-
-                    // 勾配ベクトル
-                    auto delta = calcGrad(t, p);
-
-                    addGrad(b, delta);
-
-                    if (is_main)
+                    for (auto game : games[idx])
                     {
+                        // 平手初期局面セット
+                        b.init(USI::START_POS, this);
+
+                        // 再生
+                        for (int i = 0; i < game.ply - 1; i++)
+                        {
+                            Move m = game.move[i];
+                            b.doMove(m, st[i]);
+
+                            // 教師の進行度
+                            auto t = (double)(i + 1) / (double)game.ply;
+
+                            // 出力
+                            auto p = Progress::evaluate(b);
+
+                            // 勾配ベクトル
+                            auto delta = calcGrad(t, p);
+
+                            addGrad(b, delta);
+
+                            if (is_main)
+                            {
 #if 0
-                        SYNC_COUT << b << "progress = " << p * 100.0 << "%\n"
-                            << "teacher = " << t * 100.0 << "%" << SYNC_ENDL;
+                                SYNC_COUT << b << "progress = " << p * 100.0 << "%\n"
+                                    << "teacher = " << t * 100.0 << "%" << SYNC_ENDL;
 #endif
 #if 1
-                        static int j = 0;
-                        if (++j % interval == 0)
-                        {
-                            SYNC_COUT << "now = " << std::setw(5) << std::setprecision(2) << p * 100 << "%"
-                                << " teacher = " << std::setw(5) << std::setprecision(2) << t * 100 << "%" << SYNC_ENDL;
-                        }
+                                static int j = 0;
+                                if (++j % interval == 0)
+                                {
+                                    SYNC_COUT << "now = " << std::setw(5) << std::setprecision(2) << p * 100 << "%"
+                                        << " teacher = " << std::setw(5) << std::setprecision(2) << t * 100 << "%" << SYNC_ENDL;
+                                }
 #endif
+                            }
+                        }
                     }
-                }
-            }
 
-            // メインスレッドだけがWeightを変更する。
-            if (is_main)
-            {
-                int j = 0;
-                double sum_error = 0;
-
-                for (auto game : errors)
-                {
-                    // 平手初期局面セット
-                    b.init(USI::START_POS, th);
-
-                    // 誤差の計算
-                    for (int i = 0; i < game.ply - 1; i++)
+                    // メインスレッドだけがWeightを変更する。
+                    if (is_main)
                     {
-                        Move m = game.move[i];
-                        b.doMove(m, st[i]);
-                        auto t = (double)(i + 1) / (double)game.ply;
-                        auto p = Prog::evaluateProgress(b);
-                        sum_error += calcError(p, t);
-                        j++;
+                        int j = 0;
+                        double sum_error = 0;
+
+                        for (auto game : errors)
+                        {
+                            // 平手初期局面セット
+                            b.init(USI::START_POS, this);
+
+                            // 誤差の計算
+                            for (int i = 0; i < game.ply - 1; i++)
+                            {
+                                Move m = game.move[i];
+                                b.doMove(m, st[i]);
+                                auto t = (double)(i + 1) / (double)game.ply;
+                                auto p = Progress::evaluate(b);
+                                sum_error += calcError(p, t);
+                                j++;
+                            }
+                        }
+
+                        auto rmse = std::sqrt(sum_error / j);
+                        SYNC_COUT << std::endl << std::setprecision(8) << "rmse = " << rmse << SYNC_ENDL;
+
+                        for (auto th : Threads.slaves)
+                            th->join();
+
+                        updateWeights();
+
+                        for (auto th : Threads.slaves)
+                            th->startSearching();
+
+                        if (++loop % 100 == 0)
+                        {
+                            Progress::save(std::to_string(rmse));
+                            SYNC_COUT << localTime() << SYNC_ENDL;
+                        }
+                    }
+
+                    // その他のスレッドは待ってもらう。
+                    else
+                    {
+                        searching = false;
+                        startSearching(true);
+                        wait(searching);
+                        ++loop;
                     }
                 }
 
-                auto rmse = std::sqrt(sum_error / j);
-                SYNC_COUT << std::endl << std::setprecision(8) << "rmse = " << rmse << SYNC_ENDL;
-
-                updating = true;
-
-                for (auto t : Threads.slaves)
-                    t->cond.notify_one();
-
-                // 他のスレッドがすべてaddGradし終えるのを待つ。
-                for (auto t : Threads.slaves)
+                // 最後に一回保存！
+                if (is_main)
                 {
-                    std::unique_lock<Mutex> lk(t->update_mutex);
-                    t->cond.wait(lk, [&] { return !t->add_grading; });
-                }
-
-                updateWeights();
-                updating = false;
-
-                for (auto t : Threads.slaves)
-                    t->cond.notify_one();
-
-                if (++loop % 100 == 0)
-                {
-                    Prog::save(std::to_string(loop / 1000));
-                    SYNC_COUT << localTime() << SYNC_ENDL;
+                    Progress::save("end");
+                    SYNC_COUT << "learn_progress end." << SYNC_ENDL;
                 }
             }
+        };
+    } // namespace ProgressSpace
 
-            // その他のスレッドは待ってもらう。
-            else
-            {
-                // updateWeights中にaddGradしないためのwait機構。
-                th->add_grading = false;
+    // 直接変換する
+    Move csaToMove(std::string csa, Board& b)
+    {
+        File f;
+        Rank r;
+        Square from;
+        Move ret;
 
-                // update中なので、addGradする前にメインスレッドがupdateを終えるのを待つ。
-                std::unique_lock<Mutex> lk(th->update_mutex);
-
-                th->cond.wait(lk, [&] { return (bool)updating; });
-
-                // join待ちしているメインスレッドに通知。
-                th->cond.notify_one();
-
-                // updateスレッドが終わるのを知らせてくれるまで待つ。
-                th->cond.wait(lk, [&] { return !updating; });
-
-                th->add_grading = true;
-
-                ++loop;
-            }
+        if (csa[0] != '0')
+        {
+            f = File('9' - csa[0]);
+            r = Rank(csa[1] - '1');
+            from = sqOf(f, r);
         }
+        else
+            from = SQ_MAX;
 
-        // 最後に一回保存！
-        if (is_main)
-            Prog::save("end");
+        f = File('9' - csa[2]);
+        r = Rank(csa[3] - '1');
+        Square to = sqOf(f, r);
+
+        // 持ち駒を打つとき、USIにこの文字列を送信する。
+        static const std::string piece_to_csa[] = { "", "KA", "HI", "FU", "KY", "KE", "GI", "KI", "OU", "UM", "RY", "TO", "NY", "NK", "NG" };
+        PieceType pt;
+
+        for (pt = BISHOP; pt < 15; pt++)
+            if (piece_to_csa[pt] == csa.substr(4))
+                break;
+
+        assert(pt < 15);
+
+        if (from == SQ_MAX)
+            ret = makeDrop(pt | b.turn(), to);
+        else
+            ret = pt == typeOf(b.piece(from)) ? makeMove<LEGAL>(from, to, pt | b.turn(), b)
+                                       : makeMovePromote<LEGAL>(from, to, b.piece(from), b);
+
+        return ret;
     }
 
     // 進行度学習
@@ -505,8 +455,7 @@ namespace Learn
 
             if (token == "")
                 break;
-
-            if (token == "loop")
+            else if (token == "loop")
                 is >> loop_max;
             else if (token == "file")
                 is >> file_name;
@@ -515,9 +464,9 @@ namespace Learn
         }
 
         // 勾配配列の初期化
-        Prog::load();
+        Progress::load();
         initGrad();
-        USI::isReady();
+        USI::isready();
 
         // file_nameは技巧形式の棋譜
         std::vector<std::string> kifus;
@@ -531,11 +480,10 @@ namespace Learn
         const int kifu_size = kifus.size() / 2;
         const int kifu_per_thread = static_cast<int>(std::ceil((double)kifu_size / (double)thread_size));
 
-        ProgressLearner pl;
-        pl.max_loop = loop_max;
+        ProgressSpace::max_loop = loop_max;
 
         for (int i = 0; i < thread_size; i++)
-            pl.games.push_back(GameVector());
+            ProgressSpace::games.push_back(GameVector());
 
         // どうせ学習棋譜は少ないのであらかじめすべてメモリに読み込んでおく。
         for (auto it = kifus.begin(); it < kifus.end(); ++it)
@@ -570,135 +518,12 @@ namespace Learn
             }
 
             if (kifu_num++ <= kifu_size - 100)
-                pl.games[kifu_num / kifu_per_thread].push_back(g);
+                ProgressSpace::games[kifu_num / kifu_per_thread].push_back(g);
             else
-                pl.errors.push_back(g);
+                ProgressSpace::errors.push_back(g);
         }
 
-        pl.setLoopMax(loop_max);
-        pl.think();
-    }
-
-    extern void initLearn(Board& b);
-    Score ab(Board& b, Score alpha, Score beta, Depth depth);
-
-    // 現在の評価関数で残り深さ1で読んだ時の評価値と、それ以上の残り深さで読んだときの評価値の誤差を調べる。
-    // futility marginを決定するのに使えるはず
-    void analyzeFutility(std::istringstream& is)
-    {
-        std::string token,
-
-#ifdef _DEBUG
-            file_name = "records23.txt",
-#else
-            file_name = "records_2800.txt",
-#endif
-            dir = "";
-
-        while (true)
-        {
-            token.clear();
-            is >> token;
-
-            if (token == "")
-                break;
-
-            if (token == "file")
-                is >> file_name;
-            else if (token == "dir")
-                is >> dir;
-        }
-
-        USI::isReady();
-
-        // file_nameは技巧形式の棋譜
-        std::vector<std::string> kifus;
-        readAllLines(path(dir, file_name), kifus);
-        std::ofstream ofs("futility.tsv");
-        ofs << "progress\tdiff\n";
-
-        // 手数
-        int max_ply;
-        StateInfo st[512];
-        USI::isReady();
-        auto& b = Threads.main()->root_board;
-        int num = 0;
-        std::vector<std::pair<double, int>> futility;
-
-        for (auto it = kifus.begin(); it < kifus.end(); ++it)
-        {
-            // (技巧の形式）
-            // 1行目 : <棋譜番号> <対局開始日> <先手名> <後手名> <勝敗(0:引き分け, 1 : 先手勝ち, 2 : 後手勝ち)> <手数> <棋戦> <戦型>
-            // 2行目 : <CSA形式の指し手(1手6文字)を一行に並べたもの>
-            std::istringstream iss(*it++);
-
-            // ゲームの手数を取得（plyが出てくるまで読み飛ばす)
-            for (int i = 0; i < 6; i++)
-                iss >> std::skipws >> token;
-
-            max_ply = atoi(token.c_str());
-
-            iss.clear(std::stringstream::goodbit);
-            iss.str(*it);
-
-            // 平手初期局面セット
-            b.init(USI::START_POS, Threads.main());
-            TT.clear();
-
-            // ゲームの進行
-            for (int i = 1; i < max_ply; i++)
-            {
-                token.clear();
-                iss >> std::skipws >> token;
-                Move m = csaToMove(token, b);
-                b.doMove(m, st[i]);
-
-                if (!b.inCheck())
-                {
-                    // 1手読み。evaluateだと駒取りが残っている状態なのでmarginが大きく出る。
-                    Score static_eval = Eval::evaluate(b); // ab(b, -SCORE_INFINITE, SCORE_INFINITE, ONE_PLY);
-                    Score deep_eval = ab(b, -SCORE_INFINITE, SCORE_INFINITE, 1 * ONE_PLY);
-
-                    // 進行度
-                    double progress_rate = (double)i / (double)max_ply;
-
-
-                    int diff = abs(static_eval - deep_eval);
-#if 0
-                    std::cout << b;
-
-                    std::cout << "p = " << progress_rate 
-                              << " diff = " << diff
-                              << " static_eval = " << static_eval 
-                              << " deep_eval = "<< deep_eval << std::endl;
-#endif
-                    if (diff < Score(3000))
-                        futility.push_back(std::make_pair(progress_rate, diff));
-                }
-            }
-
-            if (num++ > 1000)
-                break;
-        }
-
-        double stats[1001] = { 0.0 };
-        int count[1001] = { 0 };
-
-        for (auto f : futility)
-        {
-            int id = int(f.first * 100.0);
-            assert(id >= 0 && id < 100);
-            stats[id] += f.second;
-            count[id]++;
-        }
-
-        for (int i = 0; i < 100; i++)
-        {
-            if (count[i])
-                stats[i] /= (double)count[i];
-
-            ofs << (double)i / (double)100.0 << "\t" << stats[i] << std::endl;
-        }
+        Threads.startWorkers<ProgressSpace::ProgressLearnThread>(thread_size);
     }
 } // namespace Learn
 

@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,7 +21,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "genmove.h"
+#include "config.h"
+
+#ifdef USE_BITBOARD
+#include "move.h"
 #include "common.h"
 
 // 指し手生成祭り→4.5M/s (i7-6700HQ 2.6GHz)
@@ -34,18 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define USE_YMM
 #endif
 
-// TURNから見たHIGH盤面から敵陣を取り出すマスク
-const uint64_t ENEMY_MASK[TURN_MAX] = { 0x7ffffffULL, 0x7ffffff000000000ULL };
-
-// TURNから見たLOW盤面から自陣を取り出すマスク
-const uint64_t SELF_MASK[TURN_MAX] = { 0x7ffffffffffffe00ULL, 0x3fffffffffffffULL };
-
-const uint64_t RANK1_MASK_HIGH[TURN_MAX] = { 0x1ffULL, 0x7fc0000000000000ULL };
-const uint64_t RANK2_MASK_HIGH[TURN_MAX] = { 0x3fe00ULL, 0x3fe00000000000ULL };
-const uint64_t RANK3_MASK_HIGH[TURN_MAX] = { 0x7fc0000ULL, 0x1ff000000000ULL };
-const uint64_t RANK3_MASK_LOW [TURN_MAX] = { 0x1ffULL, 0x7fc0000000000000ULL };
-const uint64_t TO3_7_MASK_HIGH[TURN_MAX] = { 0x7ffffffffffc0000ULL, 0x1fffffffffffULL };
-
 // プロトタイプ宣言 : generateLegalのため
 template <MoveType MT, Turn T, bool ALL> MoveStack* generate(MoveStack* mlist, const Board& b);
 
@@ -57,7 +48,7 @@ namespace
     {
         const Index T_HIGH = T == BLACK ? HIGH : LOW;
         const Index T_LOW  = T == BLACK ? LOW : HIGH;
-        const Square behind = T == BLACK ? DELTA_S : DELTA_N;
+        const Square behind = T == BLACK ? SQ_D : SQ_U;
         const Piece P = T == BLACK ? B_PAWN : W_PAWN;
         const Bitboard bb_from = b.bbPiece(PAWN, T);
         uint64_t to_4_9 = (T == BLACK ? bb_from.b(T_LOW) >> 9 : bb_from.b(T_LOW) << 9) & target.b(T_LOW) & SELF_MASK[T];
@@ -79,7 +70,7 @@ namespace
                 const Square from = to + behind;
                 mlist++->move = makeMovePromote<MT>(from, to, P, b);
 
-                if (MT == NO_EVASIONS || ALL)
+                if (ALL)
                 {
                     const Rank t_rank1 = (T == BLACK ? RANK_1 : RANK_9);
 
@@ -136,7 +127,7 @@ namespace
                 const Square to = firstOne<T_HIGH>(to_1_7);
                 mlist++->move = makeMovePromote<MT>(from, to, p, b);
 
-                if (MT == NO_EVASIONS || ALL)
+                if (ALL)
                     mlist++->move = makeMove<MT>(from, to, p, b);
             }
 
@@ -147,7 +138,7 @@ namespace
                 const Square to = firstOne<T_LOW>(to_8_9);
                 mlist++->move = makeMovePromote<MT>(from, to, p, b);
 
-                if (MT == NO_EVASIONS || ALL)
+                if (ALL)
                     mlist++->move = makeMove<MT>(from, to, p, b);
             }
         }
@@ -166,7 +157,7 @@ namespace
                 const Square to = firstOne<T_HIGH>(to_1_3);
                 mlist++->move = makeMovePromote<MT>(from, to, p, b);
 
-                if (MT == NO_EVASIONS || ALL)
+                if (ALL)
                     mlist++->move = makeMove<MT>(from, to, p, b);
             }
             
@@ -257,7 +248,7 @@ namespace
                 const Square to = firstOne<T_HIGH, !isCapture>(to_1_3);
                 mlist++->move = makeMovePromote<MT>(from, to, p, b);
 
-                if (MT == NO_EVASIONS || ALL)
+                if (ALL)
                 {
                     if (isBehind(T, RANK_1, to)) // 1段目の不成は除く。
                         mlist++->move = makeMove<MT>(from, to, p, b);
@@ -398,12 +389,33 @@ namespace
     template <Turn T>
     inline MoveStack* generateRecapture(MoveStack* mlist, const Board& b, const Square to)
     {
+        constexpr Rank TRank3 = T == BLACK ? RANK_3 : RANK_7;
         Bitboard bb = b.attackers(T, to);
         Square from;
+        bool can_promote_to = canPromote(T, to);
+        Piece c = b.piece(to);
 
+        // TODO:香車、桂馬、銀の不成を生成していない。
         FORBB(bb, from, {
             const Piece p = b.piece(from);
-            mlist++->move = makeMove(from, to, p, b.piece(to), isNoPromotable(p) ? false : canPromote(T, from) || canPromote(T, to));
+            if (isNoPromotable(p))
+                mlist++->move = makeMove(from, to, p, c, false);
+            else
+            {
+                bool can_promote_from = canPromote(T, from);
+                if (can_promote_from || can_promote_to)
+                {
+                    mlist++->move = makeMove(from, to, p, c, true);
+
+                    if (typeOf(p) == SILVER
+                        || ((typeOf(p) == LANCE || typeOf(p) == KNIGHT) && rankOf(to) == TRank3))
+                        mlist++->move = makeMove(from, to, p, c, false);
+                }
+                else
+                {
+                    mlist++->move = makeMove(from, to, p, c, false);
+                }
+            }
         });
 
         return mlist;
@@ -439,7 +451,7 @@ namespace
         __m256i move256, move256_2;
 #endif
         switch (hand_bit & Hand::plkMask())
-        {			
+        {
         case 0: // 歩香桂を持っていない場合
             switch (hand_num)
             {
@@ -1214,7 +1226,7 @@ namespace
 
     // 王手がかかっていない時の指し手生成。これは相手駒の利きのある地点に移動する自殺手と
     // pinされている駒を動かす自殺手を含む。
-    template <Turn T>
+    template <Turn T, bool ALL>
     inline MoveStack* generateNoEvasion(MoveStack* mlist, const Board& b)
     {
         Bitboard target = b.bbEmpty();
@@ -1223,9 +1235,9 @@ namespace
 
         // targetに敵の駒がいる場所も追加
         target ^= b.bbTurn(~T);
-        mlist = generatePawnMove <NO_EVASIONS, T, false>(mlist, b, target);
-        mlist = generateOtherMove<NO_EVASIONS, T, false>(mlist, b, target);
-        mlist = generateKingMove <NO_EVASIONS, T, false>(mlist, b, target);
+        mlist = generatePawnMove <NO_EVASIONS, T, ALL>(mlist, b, target);
+        mlist = generateOtherMove<NO_EVASIONS, T, ALL>(mlist, b, target);
+        mlist = generateKingMove <NO_EVASIONS, T, ALL>(mlist, b, target);
 
         return mlist;
     }
@@ -1239,7 +1251,7 @@ namespace
         MoveStack* curr = mlist;
 
         mlist = b.inCheck() ?
-            generate<EVASIONS, T, ALL>(mlist, b) : generate<NO_EVASIONS, T, false>(mlist, b);
+            generate<EVASIONS, T, ALL>(mlist, b) : generate<NO_EVASIONS, T, ALL>(mlist, b);
 
         // 玉の移動による自殺手と、pinされている駒の移動による自殺手を削除
         while (curr != mlist)
@@ -1253,29 +1265,9 @@ namespace
         return mlist;
     }
 
-
-    // 玉が5段目より上にいるならHIGH盤面、5段目を含めて下にいるならLOW盤面を使用する。
-    template <Turn T, MoveType MT>
-    MoveStack* generateCheckRBB(MoveStack* mlist, const Board& b)
-    {
-        static_assert(MT == QUIET_CHECKS || MT == NEAR_CHECK, "");
-        const Index T_HIGH = T == BLACK ? HIGH : LOW;
-        const Index T_LOW = T == BLACK ? LOW : HIGH;
-        const Square ksq = b.kingSquare(~T);
-        const Rank k = rankOf(ksq);
-        const bool is_behind = isBehind(BLACK, RANK_5, k);
-
-#ifdef MATE3PLY
-        if (MT == NEAR_CHECK)
-            return is_behind ? generateNearCheck<T, LOW>(mlist, b, ksq) : generateNearCheck<T, HIGH>(mlist, b, ksq);
-        else
-#endif
-            return is_behind ? generateSpeedCheck<T, LOW>(mlist, b, ksq) : generateSpeedCheck<T, HIGH>(mlist, b, ksq);
-    };
-
     // 駒を取らない王手生成。
     template <Turn T, Index TK>
-    MoveStack* generateSpeedCheck(MoveStack* mlist, const Board& b, const Square ksq)
+    MoveStack* generateNocapCheck(MoveStack* mlist, const Board& b, const Square ksq)
     {
         assert(!b.inCheck());
 
@@ -1283,7 +1275,7 @@ namespace
 
         const Turn self = T;
         const Turn enemy = ~T;
-        const Square tsouth = T == BLACK ? DELTA_S : DELTA_N;
+        const Square tsouth = T == BLACK ? SQ_D : SQ_U;
         const Index T_HIGH = T == BLACK ? HIGH : LOW;
         const Index T_LOW = T == BLACK ? LOW : HIGH;
 
@@ -1545,9 +1537,7 @@ namespace
                 if (b.piece(from) == (self == BLACK ? B_PAWN : W_PAWN) && (target64 & mask(to).b(TK)))
                 {
                     if (isBehind(self, RANK_2, krank))
-                    {
                         mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, self == BLACK ? B_PAWN : W_PAWN, b);
-                    }
                 }
             }
         }
@@ -1563,9 +1553,9 @@ namespace
             Bitboard line_bb = bbLine(ksq, from);
 
             // とりあえずこんなもの。
-            Bitboard bb_to =  target 
-                            & ~line_bb // その駒と玉のライン上以外
-                            & attackAll(pc, from, b.bbOccupied());
+            Bitboard bb_to = target
+                & ~line_bb // その駒と玉のライン上以外
+                & attackAll(pc, from, b.bbOccupied());
 
             if (pt < GOLD && pt > PAWN)
             {
@@ -1634,15 +1624,13 @@ namespace
                             mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, pc, b);
                     }
                     else
-                    {
                         mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, pc, b);
-                    }
                 }
                 else
                     mlist++->move = makeMove<NO_CAPTURE_MINUS_PAWN_PROMOTE>(from, to, pc, b);
             }
         }
-        
+
         if (h.exists(PAWN))
         {
             const Square to = ksq + tsouth;
@@ -1660,7 +1648,7 @@ namespace
         if (h.exists(KNIGHT))
             for (uint64_t to64 = target64 & st->check_sq[KNIGHT].b(TK); to64;)
                 mlist++->move = makeDrop(self == BLACK ? B_KNIGHT : W_KNIGHT, firstOne<TK>(to64));
-    
+
         if (h.exists(SILVER))
             for (uint64_t to64 = target64 & st->check_sq[SILVER].b(TK); to64;)
                 mlist++->move = makeDrop(self == BLACK ? B_SILVER : W_SILVER, firstOne<TK>(to64));
@@ -1681,8 +1669,21 @@ namespace
         return mlist;
     }
 
+    // 玉が5段目より上にいるならHIGH盤面、5段目を含めて下にいるならLOW盤面を使用する。
+    template <Turn T, MoveType MT>
+    MoveStack* generateCheckRBB(MoveStack* mlist, const Board& b)
+    {
+        static_assert(MT == QUIET_CHECKS || MT == NEAR_CHECK, "");
+        const Index T_HIGH = T == BLACK ? HIGH : LOW;
+        const Index T_LOW = T == BLACK ? LOW : HIGH;
+        const Square ksq = b.kingSquare(~T);
+        const Rank k = rankOf(ksq);
+        const bool is_behind = isBehind(BLACK, RANK_5, k);
+        return is_behind ? generateNocapCheck<T, LOW>(mlist, b, ksq) : generateNocapCheck<T, HIGH>(mlist, b, ksq);
+    };
+
 #ifdef MATE3PLY
-    // 近接王手生成。
+    // 近接王手生成。現在は使っていないが、いつか使う……かも？
     template <Turn T, Index TK>
     MoveStack* generateNearCheck(MoveStack* mlist, const Board& b, const Square ksq)
     {
@@ -1693,7 +1694,7 @@ namespace
 
         const Turn self = T;
         const Turn enemy = ~T;
-        const Square tsouth = T == BLACK ? DELTA_S : DELTA_N;
+        const Square tsouth = T == BLACK ? SQ_D : SQ_U;
         const Index T_HIGH = T == BLACK ? HIGH : LOW;
         const Index T_LOW = T == BLACK ? LOW : HIGH;
 
@@ -1928,7 +1929,7 @@ namespace
             if (isBehind(enemy, RANK_2, krank))
             {
                 uint64_t from64 = b.bbPiece(PAWN, self).b(TK);
-                const Square tnorth = self == BLACK ? DELTA_N : DELTA_S;
+                const Square tnorth = self == BLACK ? SQ_U : SQ_D;
 
                 if (canPromote(self, krank))
                 {
@@ -2049,10 +2050,9 @@ template <MoveType MT, Turn T, bool ALL> MoveStack* generate(MoveStack* mlist, c
         mlist = generatePawnMove <MT, T, ALL>(mlist, b, target_pawn);
         mlist = generateOtherMove<MT, T, ALL>(mlist, b, target_other);
         mlist = generateKingMove <MT, T, ALL>(mlist, b, target_other);
-        
     }
+
     else if (MT == DROP)
-        // ターゲットは駒がない場所
         mlist = generateDrop<T>(mlist, b, b.bbEmpty());
 
     else if (MT == QUIETS)
@@ -2065,7 +2065,7 @@ template <MoveType MT, Turn T, bool ALL> MoveStack* generate(MoveStack* mlist, c
         mlist = generateEvasion<T, ALL>(mlist, b);
 
     else if (MT == NO_EVASIONS)
-        mlist = generateNoEvasion<T>(mlist, b);
+        mlist = generateNoEvasion<T, ALL>(mlist, b);
 
     else if (MT == LEGAL)
         mlist = generateLegal<T, false>(mlist, b);
@@ -2075,14 +2075,7 @@ template <MoveType MT, Turn T, bool ALL> MoveStack* generate(MoveStack* mlist, c
 
     else if (MT == QUIET_CHECKS)
         mlist = generateCheckRBB<T, QUIET_CHECKS>(mlist, b);
-#ifdef MATE3PLY
-    else if (MT == NEAR_CHECK)
-        mlist = generateCheckRBB<T, NEAR_CHECK>(mlist, b);
-#endif
-#if 0
-    else if (MT == CHECK_ALL)
-        mlist = generateChecks<T,  true>(mlist, b);
-#endif
+
     return mlist;
 }
 
@@ -2110,6 +2103,5 @@ template MoveStack* generate<NO_EVASIONS                  >(MoveStack* mlist, co
 template MoveStack* generate<LEGAL                        >(MoveStack* mlist, const Board& b);
 template MoveStack* generate<LEGAL_ALL                    >(MoveStack* mlist, const Board& b);
 template MoveStack* generate<QUIET_CHECKS                 >(MoveStack* mlist, const Board& b);
-//template MoveStack* generate<NEAR_CHECK                 >(MoveStack* mlist, const Board& b);
-//template MoveStack* generate<CHECK_ALL				  >(MoveStack* mlist, const Board& b);
-template MoveStack* generate<RECAPTURES				 >(MoveStack* mlist, const Board& b, const Square to);
+template MoveStack* generate<RECAPTURES  >(MoveStack* mlist, const Board& b, const Square to);
+#endif

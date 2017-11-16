@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <chrono>
 #include <vector>
 #include <thread>
+
 #include "platform.h"
 
 #ifdef IS_64BIT
@@ -35,32 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #else
 #define ALIGNAS(a)
 #endif
-// 64bit変数に対するforeach
-#define FOR64(mask, sq, id, xxx) \
-do{\
-while(mask){\
-sq = firstOne<id, true>(mask);\
-xxx;\
-}\
-}while(false)
-
-// bitboardに対するforeach
-#define FORBB(bb, sq, xxx) \
-do{\
-uint64_t hi = bb.b(HIGH);\
-while(hi){\
-sq = firstOne<HIGH>(hi);\
-xxx;\
-}\
-uint64_t lo = bb.b(LOW) & EXCEPT_MASK[LOW];\
-while(lo){\
-sq = firstOne<LOW>(lo);\
-xxx;\
-}\
-}while(false)
-
-// bitboardのb[0]とb[1]のかぶっていないビットを取り出すマスク
-const uint64_t EXCEPT_MASK[2] = { 0x3ffffULL, 0x7fffe00000000000ULL };
 
 // --- N回ループを展開するためのマクロ
 // AperyのUROLのtemplateによる実装は模範的なコードなのだが、lambdaで書くと最適化されないケースがあったのでマクロで書く。
@@ -94,16 +69,8 @@ inline TimePoint now()
 // 指定されたミリ秒だけsleepする。
 inline void sleep(int ms)
 {
-    std::this_thread::sleep_for(std::chrono::microseconds(ms));
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
-
-typedef uint64_t Key;
-
-// 通常探索時の最大探索深さ
-const int MAX_PLY = 128;
-
-// 最大の合法手数
-const int MAX_MOVES = 593 + 1;
 
 // L1 / L2キャッシュ内の指定されたアドレスをプリロードする。
 #if defined HAVE_SSE4 || defined HAVE_SSE2
@@ -124,10 +91,9 @@ inline void prefetch(void* addr) {
 inline void prefetch(void*) {}
 #endif
 
-#ifdef HELPER
 // cin/coutへの入出力をファイルにリダイレクトを開始/終了する。
 extern void startLogger(bool b);
-#endif
+
 // ファイルを丸読みする。ファイルが存在しなくともエラーにはならない。空行はスキップする。
 extern int readAllLines(std::string filename, std::vector<std::string>& lines);
 
@@ -136,6 +102,8 @@ extern int readAllLines(std::string filename, std::vector<std::string>& lines);
 std::string path(const std::string& folder, const std::string& filename);
 
 std::string localTime();
+
+std::string timeStamp();
 
 // 擬似乱数生成器
 struct PRNG 

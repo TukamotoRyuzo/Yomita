@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,32 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifdef USE_PROGRESS
 
-#include "platform.h"
-#include "evaluate.h"
+class Board;
 
-#define PROGRESS_BIN "progress.bin"
-#define SAVE_PROGRESS_DIR "save"
-
-namespace Prog
+namespace Progress
 {
-    // 進行度
-    // KP値により、局面の進行度を取得する。
-    // 進行度は32bitで表され、教師棋譜から開始局面を進行度0(0%)、終了局面を進行度1(=100%)として学習を行う。
-    typedef int32_t ValueProg;
+    // 局面の進行度を取得する。
+    // 開始局面を進行度0(0%)、終了局面を進行度1(100%)とする。
 
-    extern ValueProg PROGRESS[SQ_MAX][Eval::fe_end];
-
-    // 進行度ファイルの読み込み
     void load();
-
-    // 進行度を全計算
-    double computeProgress(const Board& b);
-
-    // 進行度を差分計算
-    double calcProgressDiff(const Board& b);
-
-    // ↑二つのラッパー
-    double evaluateProgress(const Board& b);
+    double evaluate(const Board& b);
+    double computeAll(const Board& b);
 
     struct ProgressSum
     {
@@ -61,18 +45,16 @@ namespace Prog
         void set(int64_t b, int64_t w) { bkp = b; wkp = w; }
 
         // 進行度を計算する。
-        // 2^20は適当に決めた。
-        double rate() const { return double(bkp + wkp) / double(1 << 20); }
+        double rate() const;
 
-        // まだ進行度の計算を済ませていないかどうかを返す。
+        // まだ進行度の計算を済ませていなければtrue。
         bool isNone() const { return bkp == INT64_MAX; }
 
         // まだ進行度の計算を済ませていないことを示す値を入れておく。
         void setNoProgress() { bkp = INT64_MAX; }
-        
+
         int64_t bkp, wkp;
     };
-    
-} // namespace Prog
+} // namespace Progress
 
 #endif

@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,43 +21,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "thread.h"
 #include "usi.h"
-#include "genmove.h"
+#include "thread.h"
 
 ThreadPool Threads;
 
-namespace 
-{
-    template<typename T> T* newThread() 
-    {
-#if defined HAVE_SSE2 || defined HAVE_SSE4
-        T* th = new (_mm_malloc(sizeof(T), alignof(T))) T();
-#else
-        T* th = new T;
-#endif
-        return (T*)th;
-    }
-
-    void deleteThread(Thread *th) 
-    {
-        th->terminate();
-#if defined HAVE_SSE2 || defined HAVE_SSE4
-        _mm_free(th);
-#else
-        delete th;
-#endif
-        
-    }
-}
-
 Thread::Thread()
 {
-    // メンバ初期化
-    reset_calls = exit = false;
-    max_ply = calls_count = 0;
-    counter_moves.clear();
+    exit = false;
+    max_ply = 0;
     idx = Threads.size();
+    root_board.setThread(this);
+#ifdef USE_EVAL
+    // デフォルトではグローバルテーブルを参照するようにしておく。
+    evaluater = &Eval::GlobalEvaluater;
+#endif
+    tt = &GlobalTT;
 
     // スレッドがidleLoop内でsleepするまでを正常に実行させる処理
     std::unique_lock<Mutex> lk(mutex);
@@ -70,18 +49,26 @@ Thread::Thread()
     sleep_condition.wait(lk, [&] { return !searching; });
 }
 
-// デストラクタの代わりを担う
-void Thread::terminate()
+Thread::~Thread()
 {
     mutex.lock();
     exit = true;
-
-    // exitをtrueにしたことを通知し、idleLoopを終了を待つ
     sleep_condition.notify_one();
     mutex.unlock();
-
-    // 探索終了を待つ
     native_thread.join();
+}
+
+void Thread::clear()
+{
+    if (tt != &GlobalTT)
+        tt->clear();
+
+    counter_moves.clear();
+    history.clear();
+    counter_move_history.clear();
+    CounterMoveStats& cm = *counter_move_history.refer();
+    auto t = cm.refer();
+    std::fill(t, t + sizeof(cm) / sizeof(*t), -1);
 }
 
 void Thread::wait(std::atomic_bool& b)
@@ -136,17 +123,14 @@ std::vector<Thread*>::iterator Slaves::end() const { return Threads.end(); }
 
 void ThreadPool::init()
 {
-    push_back(newThread<MainThread>());
+    push_back(new MainThread());
     readUsiOptions();
 }
 
 void ThreadPool::exit()
 {
     while (size())
-    {
-        deleteThread(back());
-        pop_back();
-    }
+        delete back(), pop_back();
 }
 
 // ThreadPoolの中のmainスレッド、slaveスレッドが探索を開始するための初期化をする
@@ -155,7 +139,7 @@ void ThreadPool::startThinking(const Board& b, const LimitsType& limits)
     // メインスレッドの参加を待つ
     main()->join();
 
-    USI::Signals.stop_on_ponderhit = USI::Signals.stop = false;
+    stop_on_ponderhit = stop = false;
     USI::Limits = limits;
     Search::RootMoves root_moves;
 
@@ -166,14 +150,24 @@ void ThreadPool::startThinking(const Board& b, const LimitsType& limits)
     // slaveスレッドに探索開始局面を設定する
     for (auto th : Threads)
     {
-        // このとき探索ノード数(Board::nodes_)もリセットされる
-        th->root_board = Board(b, th);
-        th->root_moves = root_moves;
+        th->setPosition(Board(b, th));
         th->max_ply = 0;
+        th->nodes = 0;
         th->root_depth = th->completed_depth = DEPTH_ZERO;
+        th->root_moves = root_moves;
     }
 
     main()->startSearching();
+}
+
+uint64_t ThreadPool::nodeSearched() const
+{
+    uint64_t nodes = 0;
+
+    for (auto* th : *this)
+        nodes += th->nodes.load(std::memory_order_relaxed);
+
+    return nodes;
 }
 
 void ThreadPool::readUsiOptions()
@@ -181,11 +175,11 @@ void ThreadPool::readUsiOptions()
     size_t requested = USI::Options["Threads"];
 
     while (size() < requested)
-        push_back(newThread<Thread>());
+        push_back(new Thread());
 
     while (size() > requested)
-    {
-        deleteThread(back());
-        pop_back();
-    }
+        delete back(), pop_back();
 }
+
+PRNG WorkerThread::prng(20161010);
+Mutex WorkerThread::rand_mutex;

@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,9 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <fstream>
 #include <sstream>
+
+#include "usi.h"
 #include "book.h"
 #include "common.h"
-#include "usi.h"
 
 // bookはグローバルに用意。
 MemoryBook Book;
@@ -94,79 +95,6 @@ namespace USI
         return move;
     }
 }
-#ifdef HELPER
-// 手動で定跡手を登録するモード
-void MemoryBook::make(const Board& b, const std::string filename)
-{
-    std::string y;
-
-    if (read(filename))
-    {
-        std::cout << "ファイルが開けません" << std::endl;
-        return;
-    }
-
-    std::cout << b << "検索中...\n";
-
-    auto it = book.find(b.sfen());
-
-    if (it != book.end())
-    {
-        // 定跡にヒット
-        Move m = it->second;
-
-        // 指し手に欠落している情報があるかもしれないので補う
-        if (!isDrop(m))
-            m = makeMove(fromSq(m), toSq(m), b.piece(fromSq(m)), b.piece(toSq(m)), isPromote(m));
-
-        std::cout << "今登録されてる手は" << pretty(m) << " " << toUSI(m) << "です。どうしますか？\n";
-    }
-    else
-        std::cout << "登録されている手はありません。どうしますか？";
-
-    do {
-        std::cout << "<登録:y やめる:n>:";
-        std::cin >> y;
-    } while (y != "y" && y != "n");
-
-    if (y == "y")
-    {
-        std::cout << "登録開始です\n手をUSI形式で入力:";
-
-        std::string str;
-        std::cin >> str;
-        Move m = USI::toMove(b, str);
-
-        if (m != MOVE_NONE)
-        {
-            std::cout << "登録していいですか?(y/n)";
-            std::cin >> y;
-
-            if (y == "y")
-            {
-                std::cout << pretty(m) << "を登録します" << std::endl;
-                store(filename, b.sfen(), m);
-            }
-            else
-                std::cout << "やめときます" << std::endl;
-        }
-        else
-            std::cout << "そんな手はありません\n";
-    }
-
-    std::cout << "登録終わり" << std::endl;
-
-    // std::cinの後に改行コードが残ってるみたいなので。
-    char temp[100];
-    cin.getline(temp, sizeof(temp));
-}
-#endif
-// bookに指し手を加えてファイルに書き出す。
-void MemoryBook::store(const std::string filename, const std::string sfen, const Move m)
-{
-    insert(sfen, m);
-    write(filename);
-}
 
 // 定跡ファイルの読み込み(book.db)など。MemoryBookに読み出す
 int MemoryBook::read(const std::string filename)
@@ -203,19 +131,15 @@ int MemoryBook::read(const std::string filename)
             continue;
         }
 
-        Move best;
-
+        BookEntry be;
         istringstream is(line);
-        string best_move;
-        is >> best_move;
+        string best_move, ponder;
+        is >> best_move >> ponder >> be.score >> be.depth >> be.count;
 
-        // 起動時なので変換に要するオーバーヘッドは最小化したいので合法かのチェックはしない。
-        if (best_move == "none" || best_move == "resign")
-            best = MOVE_NONE;
-        else
-            best = USI::toMove(best_move);
-
-        insert(sfen, best);
+        auto conv = [](const std::string s) { return (s == "none" || s == "resign") ? MOVE_NONE : USI::toMove(s); };
+        be.best = conv(best_move);
+        be.ponder = conv(best_move);
+        insert(sfen, be);
     }
 
     return 0;
@@ -230,7 +154,11 @@ int MemoryBook::write(const std::string filename)
     fs << "#YANEURAOU-DB2016 1.00" << endl;
 
     for (auto it = book.begin(); it != book.end(); ++it)
-        fs << "sfen " << it->first << endl << it->second << endl; // sfenと指し手を出力
+    {
+        fs << "sfen " << it->first << endl;
+        for (auto s : it->second)
+            fs << s.best << " " << s.ponder << " " << s.score << " " << s.depth << " " << s.count << endl;
+    }
 
     fs.close();
 
@@ -238,30 +166,33 @@ int MemoryBook::write(const std::string filename)
 }
 
 // bookに指し手を加える。
-void MemoryBook::insert(const std::string sfen, const Move m)
+void MemoryBook::insert(const std::string sfen, const BookEntry m)
 {
     auto it = book.find(sfen);
 
     if (it == book.end()) // 存在しないので追加。
-        book[sfen] = m;
+        book[sfen] = std::vector<BookEntry>({ m });
     else
-        it->second = m;
+        it->second.push_back(m);
 }
 
 Move MemoryBook::probe(const Board& b) const
 {
     auto it = book.find(b.sfen());
 
-    if (it != book.end() && it->second != MOVE_NONE)
+    if (it != book.end() && it->second.size())
     {
-        // 定跡にヒット
-        Move m = it->second;
+        // 採択回数が一番多いエントリーを選ぶ。
+        auto entry = it->second;
+        auto be = std::max_element(entry.begin(), entry.end());
+        Move m = be->best;
+        assert(m);
 
         // 指し手に欠落している情報があるかもしれないので補う
         if (!isDrop(m))
             m = makeMove(fromSq(m), toSq(m), b.piece(fromSq(m)), b.piece(toSq(m)), isPromote(m));
         else
-            m = makeDrop(toPiece(movedPieceType(m), b.turn()), toSq(m));
+            m = makeDrop(movedPieceType(m) | b.turn(), toSq(m));
 
         return m;
     }

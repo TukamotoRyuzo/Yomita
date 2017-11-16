@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -39,12 +39,13 @@ extern "C"
 }
 #endif
 
+#include <vector>
 #include <fstream>
 #include <iomanip>
-#include <iostream>
 #include <sstream>
-#include <vector>
+#include <iostream>
 #include <codecvt>
+
 #include "common.h"
 #include "thread.h"
 
@@ -133,7 +134,7 @@ namespace WinProcGroup {
     }
 #endif
 } // namespace WinProcGroup
-#ifdef HELPER
+
 // logging用のhack。streambufをこれでhookしてしまえば追加コードなしで普通に
 // cinからの入力とcoutへの出力をファイルにリダイレクトできる。
 // cf. http://groups.google.com/group/comp.lang.c++/msg/1d941c0f26ea0d81
@@ -187,7 +188,6 @@ private:
 
 };
 void startLogger(bool b) { Logger::start(b); }
-#endif
 
 // ファイルを丸読みする。ファイルが存在しなくともエラーにはならない。空行はスキップする。
 int readAllLines(std::string filename, std::vector<std::string>& lines)
@@ -213,6 +213,17 @@ std::string localTime()
     auto now = std::chrono::system_clock::now();
     auto tp = std::chrono::system_clock::to_time_t(now);
     return std::ctime(&tp);
+}
+
+// YYYYMMDD形式で現在時刻を秒まで。
+std::string timeStamp()
+{
+    char buff[20] = "";
+    time_t now = time(NULL);
+    struct tm *pnow = localtime(&now);
+    sprintf(buff, "%04d%02d%02d%02d%02d%02d", pnow->tm_year + 1900, pnow->tm_mon + 1, pnow->tm_mday,
+        pnow->tm_hour, pnow->tm_min, pnow->tm_sec);
+    return std::string(buff);
 }
 
 std::string path(const std::string& folder, const std::string& filename)

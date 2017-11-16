@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,23 +21,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config.h"
+
 #include <sstream>
 #include <algorithm>
-#include "board.h"
-#include "move.h"
-#include "genmove.h"
-#include "tt.h"
-#include "piecescore.h"
-#include "benchmark.h"
 
-#ifndef USE_EVAL
-// この関数のために.cpp作るのもバカらしいのでここで定義する。
-namespace Eval
-{
-    // 駒割だけ。手番から見た値を返す。
-    Score evaluate(const Board& b) {  return b.turn() == BLACK ? b.state()->material : -b.state()->material; }
-}
-#endif
+#include "tt.h"
+#include "move.h"
+#include "board.h"
+#include "thread.h"
 
 namespace Zobrist
 {
@@ -92,7 +84,7 @@ void Board::init(std::string sfen, Thread* th)
     // 駒の配置。
     for (Square sq = SQ_ZERO; (ss >> token) && !isspace(token);)
     {
-        if (isdigit(token)) // 数字なら、EMPTYなので、数字分だけ読み飛ばす。
+        if (isdigit(token)) // 数字ならEMPTYなので、数字分だけ読み飛ばす。
             sq += Square(token - '0');
 
         else if (token == '/') // '/'があると次の段。この場合は特に何かする必要はなし。
@@ -104,17 +96,20 @@ void Board::init(std::string sfen, Thread* th)
         else if ((p = Piece(piece_to_char.find(token))) != std::string::npos)
         {
             PieceNo piece_no = (p == B_KING) ? PIECE_NO_BKING : // 先手玉
-                               (p == W_KING) ? PIECE_NO_WKING : // 後手玉
-                               piece_no_count[nativeType(p)]++; // それ以外
-
+                (p == W_KING) ? PIECE_NO_WKING : // 後手玉
+                piece_no_count[nativeType(p)]++; // それ以外
+#ifdef USE_BYTEBOARD
+            pieceno_to_sq_[piece_no] = sq;
+            sq_to_pieceno_[sq] = piece_no;
+#endif
             setPiece(promotion ? promotePiece(p) : p, sq, piece_no);
             promotion = false;
             ++sq;
         }
     }
-
+#ifdef USE_BITBOARD
     bb_gold_ = bbType(GOLD, PRO_PAWN, PRO_LANCE, PRO_KNIGHT, PRO_SILVER);
-
+#endif
     // ここで駒の配置はOK。次は手番
     ss >> token;
     assert(token == 'b' || token == 'w'); // ここでtokenはbかwなはず
@@ -141,6 +136,9 @@ void Board::init(std::string sfen, Thread* th)
                 PieceType rpc = nativeType(p);
                 PieceNo piece_no = piece_no_count[rpc]++;
                 assert(isOK(piece_no));
+#ifdef USE_BYTEBOARD
+                pieceno_to_sq_[piece_no] = SQ_MAX;
+#endif
 #ifdef USE_EVAL
                 eval_list_.putPiece(piece_no, turnOf(p), rpc, i);
 #endif
@@ -152,23 +150,54 @@ void Board::init(std::string sfen, Thread* th)
 
     // ハッシュ値と駒割の計算
     setState(st_);
-
+    this_thread_ = th;
+    assert(th != nullptr);
 #ifdef USE_EVAL
-    Eval::computeEval(*this);
-#endif
+    Eval::computeAll(*this);
 #ifdef USE_PROGRESS
-    Prog::computeProgress(*this);
+    Progress::computeAll(*this);
+#endif
+#endif
+#ifdef USE_BYTEBOARD
+#ifdef CALC_MOVE_DIFF
+    __m256i tmp[2];
+
+    for (int i = 0; i < 40; i++)
+    {
+        move_cache_[i] = _mm256_setzero_si256();
+        Square sq = pieceSquare(i);
+
+        if (sq != SQ_MAX)
+        {
+            Piece p = piece(sq);
+            __m256i* rp = generateMoveFrom(bb_, sq, p, tmp);
+            stm_piece_[turnOf(p)] |= 1ULL << i;
+            assert(rp != tmp);
+            move_cache_[i] = tmp[0];
+
+            if (rp - tmp == 2)
+            {
+                assert(i >= PIECE_NO_BISHOP && i < PIECE_NO_KING);
+                move_cache_[i + 6] = tmp[1];
+            }
+        }
+    }
+
+    dirty_flag_ = 0;
+#else
+    for (int i = 0; i < 40; i++)
+    {
+        Square sq = pieceSquare(i);
+
+        if (sq != SQ_MAX)
+            stm_piece_[turnOf(piece(sq))] |= 1ULL << i;
+    }
+#endif
 #endif
     ss >> ply_;
 
-    // この処理、何かおかしい。けどこの状態で定跡ファイルを作ってしまったので直すに直せない。
-    ply_ = std::max((ply_ - 1), 0) + static_cast<int>(turn() == WHITE);
-    this_thread_ = th;
-    assert(th != nullptr);
-#ifdef HELPER
     if (!verify())
         std::cout << "init error?" << std::endl;
-#endif
 }
 
 // メンバをすべて0クリアする。
@@ -177,14 +206,19 @@ void Board::clear() { memset(this, 0, sizeof(Board)); st_ = &start_state_; }
 void Board::setPiece(const Piece piece, const Square sq, PieceNo piece_no)
 {
     board_[sq] = piece;
-
+#ifdef USE_BYTEBOARD
+    bb_.setPieceBit(sq, toPieceBit(piece));
+#endif
+    if (typeOf(piece) == PAWN)
+        st_->nifu_flags[turnOf(piece)] ^= 1 << fileOf(sq);
+#ifdef USE_BITBOARD
     if (piece != EMPTY)
     {
         bb_type_[typeOf(piece)] ^= sq;
         bb_turn_[turnOf(piece)] ^= sq;
         bb_type_[OCCUPIED] ^= sq;
     }
-
+#endif
 #ifdef USE_EVAL
     eval_list_.putPiece(piece_no, sq, piece);
 #endif
@@ -194,13 +228,25 @@ void Board::setPiece(const Piece piece, const Square sq, PieceNo piece_no)
         king_[turnOf(piece)] = sq;
 }
 
-#ifdef HELPER
+std::ostream& operator << (std::ostream &os, const Hand& h)
+{
+    os << "持ち駒:";
+
+    if (!h)
+        os << "なし";
+    else
+        for (auto pt : HandPiece)
+            if (h.exists(pt))
+                os << pretty(pt) << h.count(pt);
+    return os;
+}
+
 std::ostream& operator << (std::ostream &os, const Board& b)
 {
-    std::cout << "手数:" << b.ply_ << std::endl;
+    os << "手数:" << b.ply_ << std::endl;
 
     // 持ち駒表示
-    std::cout << b.hand(WHITE) << std::endl;
+    os << b.hand(WHITE) << std::endl;
 
     for (auto rank : Ranks)
     {
@@ -209,19 +255,79 @@ std::ostream& operator << (std::ostream &os, const Board& b)
             Piece p = b.board_[sqOf(file, rank)];
 
             if (turnOf(p) == BLACK)
-                std::cout << " ";
+                os << " ";
 
-            std::cout << p;
+            os << p;
         }
-        std::cout << std::endl;
+
+        os << std::endl;
     }
 
-    std::cout << b.hand(BLACK) << std::endl;
-    std::cout << (b.turn() == BLACK ? "先手番" : "後手番") << std::endl;
+    os << b.hand(BLACK) << std::endl;
+    os << (b.turn() == BLACK ? "先手番" : "後手番") << std::endl;
+    os << "sfen = " << b.sfen() << "\nkey = " << b.key() << std::endl;
+
     return os;
 }
-#endif
 
+// つまされているかどうかの判定。
+bool Board::isMate() const
+{
+    return MoveList<LEGAL>(*this).size() == 0;
+}
+
+// 千日手、連続王手の千日手、優等局面、劣等局面を分類する。
+RepetitionType Board::repetitionType(int check_max_ply) const
+{
+    const int start = 4;
+    int i = start;
+
+    const int ply = std::min(st_->plies_from_null, check_max_ply);
+
+    // 4手かけないと千日手には絶対にならない。
+    if (i <= ply)
+    {
+        // 2手前を見る。
+        StateInfo* stp = st_->previous->previous;
+
+        do {
+            // さらに2手前を見る
+            stp = stp->previous->previous;
+
+            if (stp->key() == st_->key()) // 同一局面だった
+            {
+                assert(stp->boardKey() == st_->boardKey()
+                    && stp->handKey() == st_->handKey());
+
+                // 連続王手だったら、負け。2回しか繰り返してないけど負け。
+                // どうせ正確な判定は将棋所がやってくれるので、読みの中で生じるrepetitionは2回目で判定する。
+                if (i <= st_->continue_check[turn()])
+                    return REPETITION_LOSE;
+
+                // 連続王手をかけられてたら勝ち。
+                if (i <= st_->continue_check[~turn()])
+                    return REPETITION_WIN;
+
+                // 王手じゃなかったら普通の引き分け
+                return REPETITION_DRAW;
+            }
+            else if (stp->board_key == st_->board_key) // 盤面だけ同一局面だった
+            {
+                assert(hand(turn()) != stp->hand);
+
+                if (st_->hand.isSuperior(stp->hand))
+                    return REPETITION_SUPERIOR;
+
+                if (stp->hand.isSuperior(st_->hand))
+                    return REPETITION_INFERIOR;
+            }
+        } while ((i += 2) <= ply);
+    }
+
+    return NO_REPETITION;
+}
+
+#ifdef USE_BITBOARD
 // 先手後手にかかわらずsqに移動可能な駒のoccupied bitboardを返す。
 Bitboard Board::attackers(const Square sq, const Bitboard& occupied) const
 {
@@ -272,41 +378,9 @@ template <bool ExceptKing> Bitboard Board::attackers(const Turn t, const Square 
         ) & bbTurn(t);
 }
 
-// 敵味方に関係なくpinされている駒のbitboardをセットする。
-template<bool DoNullMove>
-void Board::setCheckInfo(StateInfo* si) const
-{
-    if (!DoNullMove)
-    {
-        si->blockers_for_king[WHITE] = sliderBlockers(BLACK, kingSquare(WHITE), &si->pinners_for_king[WHITE]);
-        si->blockers_for_king[BLACK] = sliderBlockers(WHITE, kingSquare(BLACK), &si->pinners_for_king[BLACK]);
-    }
-
-    const Turn enemy = ~turn();
-    Square ksq = kingSquare(enemy);
-    Bitboard occ = bbOccupied();
-
-    const Bitboard file_attack = attacks<DIRECT_FILE>(ksq, occ);
-    const Bitboard lance_attack = file_attack & frontMask(enemy, ksq);
-    const Bitboard rook_attack = file_attack | attacks<DIRECT_RANK>(ksq, occ);
-
-    si->check_sq[PAWN] = pawnAttack(enemy, ksq);
-    si->check_sq[LANCE] = lance_attack;
-    si->check_sq[KNIGHT] = knightAttack(enemy, ksq);
-    si->check_sq[SILVER] = silverAttack(enemy, ksq);
-    si->check_sq[BISHOP] = bishopAttack(ksq, occ);
-    si->check_sq[ROOK] = rook_attack;
-    si->check_sq[GOLD] = goldAttack(enemy, ksq);
-    si->check_sq[KING] = allZeroMask();
-    si->check_sq[HORSE] = si->check_sq[BISHOP] | kingAttack(ksq);
-    si->check_sq[DRAGON] = si->check_sq[ROOK] | kingAttack(ksq);
-    si->check_sq[PRO_PAWN] = si->check_sq[PRO_LANCE] = si->check_sq[PRO_KNIGHT] = si->check_sq[PRO_SILVER] = si->check_sq[GOLD];
-}
-
 // t側の駒が利いているかどうかをboolで返す。
 bool Board::existAttacker(const Turn t, const Square sq, const Bitboard& occupied) const
 {
-#if 1
     const Turn inv = ~t;
     const Bitboard file_attack = attacks<DIRECT_FILE>(sq, occupied);
     const Bitboard e_lance_attack = file_attack & frontMask(inv, sq);
@@ -322,59 +396,63 @@ bool Board::existAttacker(const Turn t, const Square sq, const Bitboard& occupie
         | (bishopAttack(sq, occupied) & (bbType(BISHOP, HORSE)))
         | (rook_attack & (bbType(ROOK, DRAGON)))
         ) & bbTurn(t);
-#else
-    // 工夫はしてるんだけどこっちのほうが遅い。
-    const Turn inv = ~t;
-    const Bitboard hdk = bbType(HORSE, DRAGON, KING);
-
-    // 近接駒が利いているかどうかはbbの片方だけ調べれば済む。
-    if (isBehind(BLACK, RANK_5, sq))
-    {
-        if ((pawnAttack(inv, sq).b(LOW) & bbType(PAWN).b(LOW)
-            | (knightAttack(inv, sq).b(LOW) & bbType(KNIGHT).b(LOW))
-            | (silverAttack(inv, sq).b(LOW) & bbType(SILVER).b(LOW))
-            | (goldAttack(inv, sq).b(LOW) & bbGold().b(LOW))
-            | (kingAttack(sq).b(LOW) & hdk.b(LOW))) & bbTurn(t).b(LOW))
-            return true;
-    }
-    else
-    {
-        if ((pawnAttack(inv, sq).b(HIGH) & bbType(PAWN).b(HIGH)
-            | (knightAttack(inv, sq).b(HIGH) & bbType(KNIGHT).b(HIGH))
-            | (silverAttack(inv, sq).b(HIGH) & bbType(SILVER).b(HIGH))
-            | (goldAttack(inv, sq).b(HIGH) & bbGold().b(HIGH))
-            | (kingAttack(sq).b(HIGH) & hdk.b(HIGH))) & bbTurn(t).b(HIGH))
-            return true;
-    }
-
-    const Bitboard file_attack = attacks<DIRECT_FILE>(sq, occupied);
-    const Bitboard e_lance_attack = file_attack & frontMask(inv, sq);
-    const Bitboard rook_attack = file_attack | attacks<DIRECT_RANK>(sq, occupied);
-
-    if (((e_lance_attack & bbType(LANCE))
-        | (bishopAttack(sq, occupied) & (bbType(BISHOP, HORSE)))
-        | (rook_attack & (bbType(ROOK, DRAGON)))
-        ) & bbTurn(t))
-        return true;
-
-    return false;
-#endif
 }
+
+bool Board::existAttacker1(const Turn t, const Square sq) const { return existAttacker(t, sq, bbOccupied()); }
+
+bool Board::inCheck1() const { return bbCheckers(); }
 
 void Board::xorBBs(const PieceType pt, const Square sq, const Turn t)
 {
     bb_type_[OCCUPIED] ^= sq;
     bb_type_[pt] ^= sq;
     bb_turn_[t] ^= sq;
+#ifdef USE_BYTEBOARD
+    bb_.setPieceBit(sq, bb_.pieceBit(sq) ^ toPieceBit(pt | t));
+#endif
 }
 
-// 厳しめのチェックをするときにはこれを定義する。
-// 今のところ引っかかったことのない条件でもある。
-//#define STRICT_CHECK 
+template <bool NotAlwaysDrop>
+bool Board::legal1(const Move move) const
+{
+    if (!NotAlwaysDrop && isDrop(move))
+    {
+        const Square dir = turn() == BLACK ? SQ_U : SQ_D;
+        const Square king_square = kingSquare(~turn());
+
+        // 打ち歩詰めの判定
+        if (movedPieceType(move) == PAWN
+            && toSq(move) + dir == king_square
+            && isPawnDropCheckMate(turn(), toSq(move), king_square))
+            return false;
+
+        // 他の駒打ちはpseudoLegalで正しいことを確認済み
+        return true;
+    }
+
+    assert(!isDrop(move));
+
+    const Turn self = turn();
+    const Square from = fromSq(move);
+
+    // 以前非常に悩まされていたassert。今は引っかからなくなった。
+    assert(capturePieceType(move) != KING);
+    assert(piece(from) == movedPiece(move));
+
+    // 玉の移動先に相手の駒の利きがあれば、合法手ではないのでfalse
+    if (typeOf(piece(from)) == KING)
+        return !(existAttacker(~self, toSq(move), bbOccupied() & ~mask(from)));
+
+    // 玉以外の駒の移動 fromにある駒がtoに移動したとき自分の玉に王手がかかるかどうか。
+    return !(isDiscoveredCheck(from, toSq(move), kingSquare(self), st_->blockers_for_king[self]));
+}
+
+template bool Board::legal1<false>(const Move move) const;
+template bool Board::legal1<true>(const Move move) const;
 
 // 任意のmoveに対して、Legalかどうかを判定する。
 // moveが32bitなので、比較的単純なチェックですんでいる。
-bool Board::pseudoLegal(const Move move) const
+bool Board::pseudoLegal1(const Move move) const
 {
     const Turn self = turn();
     const Turn enemy = ~self;
@@ -414,7 +492,9 @@ bool Board::pseudoLegal(const Move move) const
         if (hp_from == PAWN && (bbPiece(PAWN, self) & fileMask(to)))
             return false;
     }
-    else // 駒を動かす手
+
+    // 駒を動かす手
+    else
     {
         // 取った駒がtoにある駒である
         // ※レアケース。ハッシュミスが起こるとこの条件に引っかかることもありえる。
@@ -430,11 +510,9 @@ bool Board::pseudoLegal(const Move move) const
         const Square from = fromSq(move);
         const Piece pc_from = movedPiece(move);
 
-#if defined STRICT_CHECK
         // 成れない駒を成る手は生成しないので、引っかからないはず。
-        if (isPromote(move) && typeOf(pc_from) >= GOLD)
-            return false;
-#endif
+        assert(!isPromote(move) || typeOf(pc_from) < GOLD);
+
         // fromにある駒がpt_fromではない
         if (piece(from) != pc_from)
             return false;
@@ -443,21 +521,6 @@ bool Board::pseudoLegal(const Move move) const
         if (isSlider(pc_from) && attackAll(pc_from, from, bbOccupied()).andIsFalse(mask(to)))
             return false;
 
-#if defined STRICT_CHECK
-        if (isPromote(move))
-        {
-            if (!canPromote(self, from) && !canPromote(self, to))
-                return false;
-        }
-        else
-        {
-            const PieceType pt = typeOf(pc_from);
-
-            if (pt == PAWN || pt == LANCE)
-                if ((self == BLACK && rankOf(to) == RANK_1) || (self == WHITE && rankOf(to) == RANK_9))
-                    return false;
-        }
-#endif
         Bitboard checkers = bbCheckers();
 
         if (checkers)
@@ -483,61 +546,7 @@ bool Board::pseudoLegal(const Move move) const
     return true;
 }
 
-template <bool NotAlwaysDrop>
-bool Board::legal(const Move move) const
-{
-    if (!NotAlwaysDrop && isDrop(move))
-    {
-        const Square dir = turn() == BLACK ? DELTA_N : DELTA_S;
-        const Square king_square = kingSquare(~turn());
-
-        // 打ち歩詰めの判定
-        if (movedPieceType(move) == PAWN
-            && toSq(move) + dir == king_square
-            && isPawnDropCheckMate(turn(), toSq(move), king_square))
-            return false;
-        
-        // 他の駒打ちはpseudoLegalで正しいことを確認済み
-        else 
-            return true;
-    }
-
-    assert(!isDrop(move));
-
-    const Turn self = turn();
-    const Square from = fromSq(move);
-    
-    // 以前非常に悩まされていたassert。今は引っかからなくなった。
-    assert(capturePieceType(move) != KING);
-    assert(piece(from) == movedPiece(move));
-
-    // 玉の移動先に相手の駒の利きがあれば、合法手ではないのでfalse
-    if (typeOf(piece(from)) == KING)
-    {
-        if (existAttacker(~self, toSq(move), bbOccupied() & ~mask(from)))
-            return false;
-        else
-            return true;
-    }
-
-    // 玉以外の駒の移動 fromにある駒がtoに移動したとき自分の玉に王手がかかるかどうか。
-    if (isDiscoveredCheck(from, toSq(move), kingSquare(self), st_->blockers_for_king[self]))
-        return false;
-    else
-        return true;
-}
-
-template bool Board::legal<false>(const Move move) const;
-template bool Board::legal<true>(const Move move) const;
-
-// 過去(又は現在)に生成した指し手が現在の局面でも有効か判定。
-// あまり速度が要求される場面で使ってはいけない。
-bool Board::moveIsLegal(const Move move) const
-{
-    return MoveList<LEGAL_ALL>(*this).contains(move);
-}
-
-bool Board::givesCheck(Move m) const
+bool Board::givesCheck1(Move m) const
 {
     const Square to = toSq(m);
 
@@ -564,67 +573,8 @@ bool Board::givesCheck(Move m) const
     return false;
 }
 
-// 千日手、連続王手の千日手、優等局面、劣等局面を分類する。
-RepetitionType Board::repetitionType(int check_max_ply) const
-{
-    const int start = 4;
-    int i = start;
-
-    const int ply = std::min(st_->plies_from_null, check_max_ply);
-
-    // 4手かけないと千日手には絶対にならない。
-    if (i <= ply)
-    {
-        // 2手前を見る。
-        StateInfo* stp = st_->previous->previous;
-
-        do {
-            // さらに2手前を見る
-            stp = stp->previous->previous;
-
-            if (stp->key() == st_->key()) // 同一局面だった
-            {
-                assert(stp->boardKey() == st_->boardKey()
-                    && stp->handKey() == st_->handKey());
-
-                // 連続王手だったら、負け。2回しか繰り返してないけど負け。
-                // どうせ正確な判定は将棋所がやってくれるので、読みの中で生じるrepetitionは2回目で判定する。
-                if (i <= st_->continue_check[turn()])
-                    return REPETITION_LOSE;
-
-                // 連続王手をかけられてたら勝ち。
-                if (i <= st_->continue_check[~turn()])
-                    return REPETITION_WIN;
-
-                // 王手じゃなかったら普通の引き分け
-                return REPETITION_DRAW;
-            }
-            else if (stp->board_key == st_->board_key) // 盤面だけ同一局面だった
-            {
-                assert(hand(turn()) != stp->hand);
-
-                if (st_->hand.isSuperior(stp->hand))
-                {
-                    //std::cout << "\nnow = " << st_->hand
-                    //          << "\npre = " << stp->hand << std::endl;
-                    return REPETITION_SUPERIOR;
-                }
-
-                if (stp->hand.isSuperior(st_->hand))
-                {
-                    //std::cout << "\nnow = " << st_->hand
-                    //          << "\npre = " << stp->hand << std::endl;
-                    return REPETITION_INFERIOR;
-                }
-            }
-        } while ((i += 2) <= ply);
-    }
-
-    return NO_REPETITION;
-}
-
 // 入玉勝ちかどうかを判定
-bool Board::isDeclareWin() const
+bool Board::isDeclareWin1() const
 {
     // 条件
     // 宣言する者の玉が入玉している。
@@ -646,7 +596,7 @@ bool Board::isDeclareWin() const
 
     if (!(bbPiece(KING, us).b(T_HIGH) & enemy_field.b(T_HIGH)))
         return false;
-    
+
     // 宣言する者の敵陣にいる駒は、玉を除いて10枚以上である。
     if (popCount(bbTurn(us).b(T_HIGH) & enemy_field.b(T_HIGH)) < 11)
         return false;
@@ -654,10 +604,10 @@ bool Board::isDeclareWin() const
     //「宣言する者の敵陣にいる駒」と「宣言する者の持ち駒」を対象に前述の点数計算を行ったとき、宣言する者が先手の場合28点以上、後手の場合27点以上ある。
     const uint64_t big = bbType(ROOK, DRAGON, BISHOP, HORSE).b(T_HIGH) & enemy_field.b(T_HIGH) & bbTurn(us).b(T_HIGH);
     const uint64_t small = (bbType(PAWN, LANCE, KNIGHT, SILVER).b(T_HIGH) | bbGold().b(T_HIGH)) & enemy_field.b(T_HIGH) & bbTurn(us).b(T_HIGH);
-    const Hand hand = this->hand(us);
-    const int score = (popCount(big) + hand.count(ROOK) + hand.count(BISHOP)) * 5 
-                     + popCount(small)
-                     + hand.count(PAWN) + hand.count(LANCE) + hand.count(KNIGHT) + hand.count(SILVER) + hand.count(GOLD);
+    const Hand h = hand(us);
+    const int score = (popCount(big) + h.count(ROOK) + h.count(BISHOP)) * 5
+        + popCount(small)
+        + h.count(PAWN) + h.count(LANCE) + h.count(KNIGHT) + h.count(SILVER) + h.count(GOLD);
 
     if (score < (us == BLACK ? 28 : 27))
         return false;
@@ -667,169 +617,135 @@ bool Board::isDeclareWin() const
 
 namespace
 {
-    // SEEの順番
-    constexpr PieceType NEXT_ATTACKER[PIECETYPE_MAX] =
-    {
-        NO_PIECE_TYPE,  // 空
-        HORSE,          // 角
-        DRAGON,         // 飛車
-        LANCE,          // 歩
-        KNIGHT,         // 香
-        PRO_PAWN,       // 桂
-        PRO_SILVER,     // 銀
-        BISHOP,         // 金
-        NO_PIECE_TYPE,  // 王
-        ROOK,           // 馬
-        KING,           // 竜
-        PRO_LANCE,      // と
-        PRO_KNIGHT,     // 杏
-        SILVER,         // 圭
-        GOLD,           // 全
-    };
 
     // toにある駒と盤面を渡すと、次にどの駒でtoにある駒を取るのかを返す。
     // 駒を見つけたら、occupied bitboardのその駒の位置を0にする。
     // attackersはその駒がいなくなることによってtoに利く駒の位置を1にする。
-    template <PieceType PT = PAWN> FORCE_INLINE PieceType nextAttacker(const Board& b, const Square to, const Bitboard& enemy_attackers,
-        Bitboard& occupied, Bitboard& attackers, const Turn turn)
+    PieceType nextAttacker(const Board& b, const Square to, const Bitboard& stm_attackers,
+        Bitboard& occupied, Bitboard& attackers, const Turn turn, Square& from, bool& promote)
     {
-        const Bitboard bb_type = b.bbType(PT);
+        Bitboard bb;
+        PieceType pt;
 
-        if (enemy_attackers.andIsFalse(bb_type))
+        if (bb = stm_attackers & b.bbType(PAWN)) pt = PAWN;
+        else if (bb = stm_attackers & b.bbType(LANCE)) pt = LANCE;
+        else if (bb = stm_attackers & b.bbType(KNIGHT)) pt = KNIGHT;
+        else if (bb = stm_attackers & b.bbType(PRO_PAWN)) pt = PRO_PAWN;
+        else if (bb = stm_attackers & b.bbType(PRO_LANCE)) pt = PRO_LANCE;
+        else if (bb = stm_attackers & b.bbType(PRO_KNIGHT)) pt = PRO_KNIGHT;
+        else if (bb = stm_attackers & b.bbType(SILVER)) pt = SILVER;
+        else if (bb = stm_attackers & b.bbType(PRO_SILVER)) pt = PRO_SILVER;
+        else if (bb = stm_attackers & b.bbType(GOLD)) pt = GOLD;
+        else if (bb = stm_attackers & b.bbType(BISHOP)) pt = BISHOP;
+        else if (bb = stm_attackers & b.bbType(HORSE)) pt = HORSE;
+        else if (bb = stm_attackers & b.bbType(ROOK)) pt = ROOK;
+        else if (bb = stm_attackers & b.bbType(DRAGON)) pt = DRAGON;
+        else
         {
-            // 相手側の攻め駒の中に、指定した駒種が存在しない場合は、次の駒種を探しに行く。
-            return NEXT_ATTACKER[PT] == KING ? KING : nextAttacker<NEXT_ATTACKER[PT]>(b, to, enemy_attackers, occupied, attackers, turn);
+            promote = false;
+            return KING;
         }
-        else // 相手側の攻め駒の中に、指定した駒種が存在する場合は戻り値はその駒種で決定
+
+        // その駒がいなくなることによって通る利きをattackersにセットする。
+        from = bb.firstOne<false>();
+        occupied ^= from;
+
+        // 実際に移動した方向を基にattackersを更新
+        switch (relation(from, to))
         {
-            Bitboard bb = enemy_attackers & bb_type;
-
-            // その駒がいなくなることによって通る利きをattackersにセットする。
-            const Square from = bb.firstOne<false>();
-            occupied ^= from;
-
-            // 実際に移動した方向を基にattackersを更新
-            switch (relation(from, to))
-            {
-            case DIRECT_DIAG1: case DIRECT_DIAG2: attackers |= (bishopAttack(to, occupied) & b.bbType(BISHOP, HORSE)); break;
-            case DIRECT_RANK: attackers |= attacks<DIRECT_RANK>(to, occupied) & b.bbType(ROOK, DRAGON); break;
-            case DIRECT_FILE:
-            {
-                const Bitboard file_attack = attacks<DIRECT_FILE>(to, occupied);
-                const Bitboard b_lances = file_attack & frontMask(WHITE, to) & b.bbPiece(LANCE, BLACK);
-                const Bitboard w_lances = file_attack & frontMask(BLACK, to) & b.bbPiece(LANCE, WHITE);
-                const Bitboard rooks = file_attack & b.bbType(ROOK, DRAGON);
-                attackers |= b_lances | w_lances | rooks;
-                break;
-            }
-            case DIRECT_MISC: assert(!(bishopAttackToEdge(from) & to) && !(rookAttackToEdge(from) & to)); break;
-            default: UNREACHABLE;
-            }
-
-            return PT;
+        case DIRECT_DIAG1: case DIRECT_DIAG2: attackers |= (bishopAttack(to, occupied) & b.bbType(BISHOP, HORSE)); break;
+        case DIRECT_RANK: attackers |= attacks<DIRECT_RANK>(to, occupied) & b.bbType(ROOK, DRAGON); break;
+        case DIRECT_FILE:
+        {
+            const Bitboard file_attack = attacks<DIRECT_FILE>(to, occupied);
+            const Bitboard b_lances = file_attack & frontMask(WHITE, to) & b.bbPiece(LANCE, BLACK);
+            const Bitboard w_lances = file_attack & frontMask(BLACK, to) & b.bbPiece(LANCE, WHITE);
+            const Bitboard rooks = file_attack & b.bbType(ROOK, DRAGON);
+            attackers |= b_lances | w_lances | rooks;
+            break;
         }
+        case DIRECT_MISC: assert(!(bishopAttackToEdge(from) & to) && !(rookAttackToEdge(from) & to)); break;
+        default: UNREACHABLE;
+        }
+
+        promote = (canPromote(turn, to) || canPromote(turn, from)) && !isNoPromotable(pt);
+        return pt;
     }
 }
 
 // mのSEE >= s を返す。s以上であることがわかった時点でこの関数を抜けるので、通常のSEEよりも高速。
-// 成りは考慮しない。
-bool Board::seeGe(const Move m, const Score s) const
+bool Board::seeGe1(const Move m, const Score s) const
 {
     assert(isOK(m));
-    const Square to = toSq(m);
-    Bitboard occ = bbOccupied(), all_attackers, enemy_attackers;
-    Turn enemy = ~turn();
-    Score balance;
+    Score balance = captureScore(capturePieceType(m));
 
-    if (isDrop(m)) // 駒打ち
-    {
-        // toに利いている相手の駒
-        all_attackers = enemy_attackers = attackers(enemy, to, occ);
+    if (isPromote(m))
+        balance += promoteScore(movedPieceType(m));
 
-        // pinされている駒を使うことを許さない。
-        enemy_attackers &= ~state()->blockers_for_king[enemy];
-
-        // そこに敵の利きがないなら取り合いが起こらない。
-        if (!enemy_attackers)
-            return SCORE_ZERO >= s;
-
-        balance = SCORE_ZERO;
-    }
-    else // 駒打ちではない
-    {
-        // fromが空いたことによって敵の利きが通るかもしれない
-        const Square from = fromSq(m);
-        occ ^= from;
-
-        // toに利いている敵の駒のbitboard
-        all_attackers = enemy_attackers = attackers(enemy, to, occ);
-
-        // toにあった駒がpinnerの可能性があるのでtoに駒があれば取り除いておく。
-        occ ^= to;
-
-        // pinされている駒を使うことを許さない。
-        if (!(state()->pinners_for_king[enemy] & ~occ))
-            enemy_attackers &= ~state()->blockers_for_king[enemy];
-
-        balance = captureScore(capturePieceType(m));
-
-        // 敵の利きがないなら、そこで取り合いは終わり。
-        if (!enemy_attackers)
-        {
-            // 成りなら、取った駒のスコア + 成りのスコア
-            if (isPromote(m))
-                return balance + promoteScore(movedPieceType(m)) >= s;
-
-            // 成りではないなら、取った駒のスコアだけ。
-            return balance >= s;
-        }
-    }
-
+    // 今取った駒がただ取りだとしても閾値を超えないのならこの後何を指しても無駄。
     if (balance < s)
         return false;
 
     // この指し手で移動した駒が、次に相手によって取られる駒である。
-    PieceType next_victims = movedPieceType(m);
+    PieceType next_victim = movedPieceTypeTo(m);
 
-    if (next_victims == KING)
+    // この指し手が玉を動かす手で合法なら、取り返されることはない。
+    if (next_victim == KING)
         return true;
 
-    balance -= captureScore(next_victims);
+    // next_victimを取り返す側の手番が相手ならtrue, 自分ならfalse。
+    // trueであればbalance >= s、falseであればbalance < sでなければならない。
+    bool relative_turn = true, promote;
+    Turn stm = ~turn();
+    Square to = toSq(m), from = isDrop(m) ? SQ_MAX : fromSq(m);
+    Bitboard occ = bbOccupied() ^ from;
+    Bitboard all_attackers = attackers(to, occ);
 
-    if (balance >= s)
-        return true;
+    // 利用可能な敵の駒は、ピンされていない駒か、toと敵玉のライン上に存在する駒である。
+    Bitboard available[TURN_MAX] = {
+        ~state()->blockers_for_king[BLACK] | bbLine(to, kingSquare(BLACK)),
+        ~state()->blockers_for_king[WHITE] | bbLine(to, kingSquare(WHITE))
+    };
 
-    bool relative_turn = true;
-    all_attackers |= attackers(~enemy, to, occ);
+    while (true)
+    {
+        // fromに居る駒が敵玉をpinしているなら、fromと敵玉の間にいる駒は利用可能。
+        if (state()->pinners_for_king[stm] & from)
+            available[stm] |= bbLine(from, kingSquare(stm));
 
-    do {
+        // 手番側のattackers
+        Bitboard stm_attackers = all_attackers & bbTurn(stm) & available[stm];
+
+        // 駒の利きがないなら、そこで取り合いは終わり。このときは取り返せなかったときの
+        // balance >= sの論理を返せば良い。
+        if (!stm_attackers)
+            return relative_turn;
+
         // 次に相手がどの駒で取るのか。
-        next_victims = nextAttacker(*this, to, enemy_attackers, occ, all_attackers, enemy);
-
+        Score c = captureScore(next_victim);
+        next_victim = nextAttacker(*this, to, stm_attackers, occ, all_attackers, stm, from, promote);
         all_attackers &= occ;
+        stm = ~stm;
 
-        if (next_victims == KING)
-            return relative_turn == bool(all_attackers & bbTurn(~enemy));
+        if (promote)
+        {
+            c += promoteScore(nativeType(next_victim));
+            next_victim = promotePieceType(next_victim);
+        }
 
-        balance += relative_turn ? captureScore(next_victims) : -captureScore(next_victims);
+        balance += relative_turn ? -c : c;
 
-        relative_turn = !relative_turn;
-
+        // 今victimを取り返したのに、（手番側から見て）balanceが閾値を超えない。
         if (relative_turn == (balance >= s))
             return relative_turn;
 
-        enemy = ~enemy;
+        // 玉で取る手が発生したら、それが合法であれば取り返せるし、合法でなければ取り返せない。
+        if (next_victim == KING)
+            return relative_turn == bool(all_attackers & bbTurn(stm));
 
-        enemy_attackers = all_attackers & bbTurn(enemy);
-
-        if (!(state()->pinners_for_king[enemy] & ~occ))
-            enemy_attackers &= ~state()->blockers_for_king[enemy];
-
-    } while (enemy_attackers);
-
-    return relative_turn;
+        relative_turn = !relative_turn;
+    };
 }
-
 // ピンされている駒(return)、している駒(pinners)を返す。tはsniperのturn, sqはking_sq
 // BlockersOnlyはBlockersだけを求めたいときにtrueにする。
 template <bool BlockersOnly>
@@ -842,8 +758,8 @@ Bitboard Board::sliderBlockers(Turn t, Square sq, Bitboard* pinners) const
 
     // 間接的にsqに聞いている駒
     Bitboard snipers = ((bbType(ROOK, DRAGON) & rookAttackToEdge(sq))
-                      | (bbType(BISHOP, HORSE) & bishopAttackToEdge(sq))
-                      | (bbType(LANCE) & lanceAttackToEdge(~t, sq))) & bbTurn(t);
+        | (bbType(BISHOP, HORSE) & bishopAttackToEdge(sq))
+        | (bbType(LANCE) & lanceAttackToEdge(~t, sq))) & bbTurn(t);
 
     while (snipers)
     {
@@ -863,24 +779,30 @@ Bitboard Board::sliderBlockers(Turn t, Square sq, Bitboard* pinners) const
     return result;
 }
 
+// BlockersOnlyはBlockersだけを求めたいときにtrueにする。
+template Bitboard Board::sliderBlockers<true>(Turn t, Square sq, Bitboard* pinners) const;
+template Bitboard Board::sliderBlockers<false>(Turn t, Square sq, Bitboard* pinners) const;
+#endif
+
 bool Board::operator == (const Board & b) const
 {
     for (auto t : Turns)
     {
+#ifdef USE_BITBOARD
         if (bbTurn(t) != b.bbTurn(t))
             return false;
-
+#endif
         if (kingSquare(t) != b.kingSquare(t))
             return false;
 
         if (hand(t) != b.hand(t))
             return false;
     }
-
+#ifdef USE_BITBOARD
     for (int i = 0; i < PIECETYPE_MAX; i++)
         if (bbType(PieceType(i)) != b.bbType(PieceType(i)))
             return false;
-
+#endif
     for (auto sq : Squares)
         if (piece(sq) != b.piece(sq))
             return false;
@@ -891,15 +813,12 @@ bool Board::operator == (const Board & b) const
     return true;
 }
 
-Board & Board::operator = (const Board & b)
+Board& Board::operator = (const Board& b)
 {
     std::memcpy(this, &b, sizeof(Board));
     std::memcpy(&start_state_, st_, sizeof(StateInfo));
     st_ = &start_state_;
-    nodes_ = 0;
-
     assert(b.verify());
-
     return *this;
 }
 
@@ -907,7 +826,6 @@ Board & Board::operator = (const Board & b)
 std::string Board::sfen() const
 {
     const std::string piece_to_char(".BRPLNSGK........brplnsgk");
-
     std::ostringstream ss;
     int empty_cnt;
 
@@ -947,7 +865,7 @@ std::string Board::sfen() const
                 if (n != 1)
                     ss << n;
 
-                ss << piece_to_char[toPiece(p, t)];
+                ss << piece_to_char[p | t];
             }
         }
 
@@ -961,20 +879,25 @@ std::string Board::sfen() const
 // 局面のハッシュ値、駒割をstに設定する
 void Board::setState(StateInfo* st) const
 {
+#ifdef USE_BITBOARD
     // この局面で自玉に王手している敵の駒
     st->checkers = attackers<true>(~turn(), kingSquare(turn()));
+#endif
     st->hand = hand(turn());
     st->material = SCORE_ZERO;
     st->board_key = turn() == BLACK ? Zobrist::zero : Zobrist::turn;
     st->hand_key = Zobrist::zero;
     setCheckInfo(st);
 
-    for (auto sq : bbOccupied())
+    for (auto sq : Squares)
     {
-        assert(isOK(sq));
-        assert(piece(sq) > EMPTY && piece(sq) <= W_PRO_SILVER);
-        st->material += pieceScore(piece(sq));
-        st->board_key += Zobrist::psq[sq][piece(sq)];
+        if (piece(sq))
+        {
+            assert(isOK(sq));
+            assert(piece(sq) > EMPTY && piece(sq) <= W_PRO_SILVER);
+            st->material += pieceScore(piece(sq));
+            st->board_key += Zobrist::psq[sq][piece(sq)];
+        }
     }
 
     for (auto t : Turns)
@@ -1043,7 +966,7 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
     Key h = st_->hand_key;
     Score material = st_->material;
 
-    std::memcpy(&new_st, st_, offsetof(StateInfo, checkers));
+    std::memcpy(&new_st, st_, offsetof(StateInfo, material));
     new_st.previous = st_;
     st_ = &new_st;
 
@@ -1058,15 +981,13 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
     // 評価値の計算をまだ済ませていないフラグをセット。
     st_->sum.setNotEvaluated();
     auto& dp = st_->dirty_piece;
-#endif
 #ifdef USE_PROGRESS
     st_->progress.setNoProgress();
 #endif
-
+#endif
     if (isDrop(move)) // 持ち駒を打つ手
     {
         const PieceType pt_to = typeOf(pc);
-
 #ifdef USE_EVAL
         // 評価関数の差分関係
         PieceNo piece_no = pieceNoOf(self, pt_to);
@@ -1075,15 +996,27 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
         dp.pre_piece[0] = eval_list_.extBonaPiece(piece_no);
         eval_list_.putPiece(piece_no, to, pc);
         dp.now_piece[0] = eval_list_.extBonaPiece(piece_no);
+#ifdef USE_BYTEBOARD
+        pieceno_to_sq_[piece_no] = to;
+        sq_to_pieceno_[to] = piece_no;
+        stm_piece_[turnOf(move)] |= 1ULL << piece_no;
+#endif
 #endif
         // 持ち駒を減らす。
-        hand_[self].minus(pt_to);
-
+        hand_[self].sub(pt_to);
+#ifdef USE_BITBOARD
         // 打ったことで変わるBitboardの設定
-        xorBBs(pt_to, to, self);
-
+        bb_type_[OCCUPIED] ^= to;
+        bb_type_[pt_to] ^= to;
+        bb_turn_[self] ^= to;
+#endif
         // 盤面に駒を置く。
         board_[to] = pc;
+#ifdef USE_BYTEBOARD
+        bb_.setPieceBit(to, toPieceBit(pc));
+#endif
+        if (pt_to == PAWN)
+            st_->nifu_flags[self] ^= 1 << fileOf(to);
 
         // keyの更新
         h -= Zobrist::hand[self][pt_to];
@@ -1091,14 +1024,23 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
 
         if (gives_check) // 王手している駒のbitboardを更新する
         {
+#ifdef USE_BITBOARD
             st_->checkers = mask(to);
+#endif
             st_->continue_check[self] += 2;
         }
         else
         {
+#ifdef USE_BITBOARD
             st_->checkers = allZeroMask();
+#endif
             st_->continue_check[self] = 0;
         }
+#ifdef USE_BYTEBOARD
+#ifdef CALC_MOVE_DIFF
+        calcMoveDiff<true, false>(SQ_MAX, to);
+#endif
+#endif
     }
     else // 盤上の指し手
     {
@@ -1107,25 +1049,33 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
         const Piece pc_to = movedPieceTo(move);
         const PieceType pt_from = typeOf(pc);
         const PieceType pt_to = typeOf(pc_to);
-
+#ifdef USE_BITBOARD
         bb_type_[pt_from] ^= from;
         bb_type_[pt_to] ^= to;
         bb_turn_[self] ^= mask(from) ^ mask(to);
+#endif
         board_[from] = EMPTY;
         board_[to] = pc_to;
-
+#ifdef USE_BYTEBOARD
+        bb_.setPieceBit(from, PB_EMPTY);
+        bb_.setPieceBit(to, toPieceBit(pc_to));
+#endif
         k -= Zobrist::psq[from][pc];
         k += Zobrist::psq[to][pc_to];
 
         if (isPromote(move))
+        {
             material += promoteScore(pc);
+
+            if (pt_to == PRO_PAWN)
+                st_->nifu_flags[self] ^= 1 << fileOf(to);
+        }
 
         // 駒を取ったとき
         if (isCapture(move))
         {
             const Piece pc_cap = capturePiece(move);
             const PieceType npt_cap = nativeType(pc_cap);
-
 #ifdef USE_EVAL
             // 評価関数の差分関係
             PieceNo piece_no = pieceNoOf(pc_cap, to);
@@ -1134,12 +1084,20 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
             dp.pre_piece[1] = eval_list_.extBonaPiece(piece_no);
             eval_list_.putPiece(piece_no, self, npt_cap, hand(self).count(npt_cap));
             dp.now_piece[1] = eval_list_.extBonaPiece(piece_no);
+#ifdef USE_BYTEBOARD
+            pieceno_to_sq_[piece_no] = SQ_MAX;
+            stm_piece_[turnOf(pc_cap)] ^= 1ULL << piece_no;
 #endif
+#endif
+#ifdef USE_BITBOARD
             bb_type_[typeOf(pc_cap)] ^= to;
             bb_turn_[enemy] ^= to;
+#endif
+            if (typeOf(pc_cap) == PAWN)
+                st_->nifu_flags[enemy] ^= 1 << fileOf(to);
 
             // 駒を取ったので増やす．
-            hand_[self].plus(npt_cap);
+            hand_[self].add(npt_cap);
 
             // 取られた駒が盤上から消える
             k -= Zobrist::psq[to][pc_cap];
@@ -1151,23 +1109,28 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
         else
             dp.dirty_num = 1;// 動いた駒は１個
 
-        // 移動元にあった駒のpiece_noを得る
+                             // 移動元にあった駒のpiece_noを得る
         PieceNo piece_no2 = pieceNoOf(pc, from);
         dp.piece_no[0] = piece_no2;
         dp.pre_piece[0] = eval_list_.extBonaPiece(piece_no2);
         eval_list_.putPiece(piece_no2, to, pc_to);
         dp.now_piece[0] = eval_list_.extBonaPiece(piece_no2);
+#ifdef USE_BYTEBOARD
+        pieceno_to_sq_[piece_no2] = to;
+        sq_to_pieceno_[to] = piece_no2;
 #endif
-
+#endif
+#ifdef USE_BITBOARD
         // occupiedの更新
         bb_type_[OCCUPIED] = bbTurn(BLACK) ^ bbTurn(WHITE);
-
+#endif
         if (pt_to == KING)
             king_[self] = to;
 
         // 王手している駒のbitboardを更新する
         if (gives_check)
         {
+#ifdef USE_BITBOARD
             const StateInfo* prev = st_->previous;
 
             // 直接王手のときの王手駒
@@ -1193,23 +1156,26 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
                     UNREACHABLE;
                 }
             }
-
+#endif
             st_->continue_check[self] += 2;
         }
         else
         {
+#ifdef USE_BITBOARD
             st_->checkers = allZeroMask();
+#endif
             st_->continue_check[self] = 0;
         }
-    }
-
-    bb_gold_ = bbType(GOLD, PRO_PAWN, PRO_LANCE, PRO_KNIGHT, PRO_SILVER);
-#if 0
-    if (!(st_->checkers == attackers<true>(self, kingSquare(enemy))))
-        std::cout << *this << pretty(move) << st_->checkers << attackers<true>(self, kingSquare(enemy)) << std::endl;
+#ifdef USE_BYTEBOARD
+#ifdef CALC_MOVE_DIFF
+        calcMoveDiff<false, false>(from, to);
 #endif
+#endif
+    }
+#ifdef USE_BITBOARD
+    bb_gold_ = bbType(GOLD, PRO_PAWN, PRO_LANCE, PRO_KNIGHT, PRO_SILVER);
     assert(st_->checkers == attackers<true>(self, kingSquare(enemy)));
-
+#endif
     st_->board_key = k;
     st_->hand_key = h;
     st_->material = material;
@@ -1218,14 +1184,10 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
 
     // increment ply counters.
     ++st_->plies_from_null;
-    ++nodes_;
+    this_thread_->nodes.fetch_add(1, std::memory_order_relaxed);
     ++ply_;
 
     setCheckInfo(st_);
-#if 0
-    if (!verify())
-        std::cout << pretty(move) << std::endl;
-#endif
     assert(verify());
 }
 
@@ -1246,28 +1208,39 @@ void Board::undoMove(const Move move)
 #ifdef USE_EVAL
     // 移動後の駒
     auto moved_after_pc = board_[to];
-    
+
     // 移動元のpiece_no == いまtoの場所にある駒のpiece_no
-    PieceNo piece_no = pieceNoOf(moved_after_pc, to); 
+    PieceNo piece_no = pieceNoOf(moved_after_pc, to);
 #endif
 
     if (isDrop(move)) // 持ち駒を打つ手
     {
         // 打った駒
         const PieceType pt_to = movedPieceType(move);
-
 #ifdef USE_EVAL
         eval_list_.putPiece(piece_no, self, pt_to, hand(self).count(pt_to));
+#ifdef USE_BYTEBOARD
+        pieceno_to_sq_[piece_no] = SQ_MAX;
+        stm_piece_[turnOf(move)] ^= 1ULL << piece_no;
 #endif
+#endif
+#ifdef USE_BITBOARD
         // bitboardを更新
         bb_type_[pt_to] ^= to;
         bb_turn_[self] ^= to;
-
+#endif
         // 打った場所を空にする。
         board_[to] = EMPTY;
-
+#ifdef USE_BYTEBOARD
+        bb_.setPieceBit(to, PB_EMPTY);
+#endif
         // 持ち駒を増やす。
-        hand_[self].plus(pt_to);
+        hand_[self].add(pt_to);
+#ifdef USE_BYTEBOARD
+#ifdef CALC_MOVE_DIFF
+        calcMoveDiff<true, true>(SQ_MAX, to);
+#endif
+#endif
     }
     else // 盤の上の指し手
     {
@@ -1282,31 +1255,57 @@ void Board::undoMove(const Move move)
         if (isCapture(move))
         {
             const Piece pc_cap = capturePiece(move);
-
 #ifdef USE_EVAL
             PieceNo piece_no2 = pieceNoOf(self, nativeType(pc_cap));
             eval_list_.putPiece(piece_no2, to, pc_cap);
+#ifdef USE_BYTEBOARD
+            pieceno_to_sq_[piece_no2] = to;
+            sq_to_pieceno_[to] = piece_no2;
+            stm_piece_[turnOf(pc_cap)] |= 1ULL << piece_no2;
 #endif
+#endif
+#ifdef USE_BITBOARD
             bb_type_[typeOf(pc_cap)] ^= to;
             bb_turn_[enemy] ^= to;
+#endif
             board_[to] = pc_cap;
-            hand_[self].minus(nativeType(pc_cap));
+#ifdef USE_BYTEBOARD
+            bb_.setPieceBit(to, toPieceBit(pc_cap));
+#endif
+            hand_[self].sub(nativeType(pc_cap));
         }
         else
+        {
             board_[to] = EMPTY;
+#ifdef USE_BYTEBOARD
+            bb_.setPieceBit(to, PB_EMPTY);
+#endif
+        }
 
 #ifdef USE_EVAL
         eval_list_.putPiece(piece_no, from, pc_from);
+#ifdef USE_BYTEBOARD
+        pieceno_to_sq_[piece_no] = from;
+        sq_to_pieceno_[from] = piece_no;
 #endif
+#endif
+#ifdef USE_BITBOARD
         bb_type_[pt_to] ^= to;
         bb_type_[pt_from] ^= from;
         bb_turn_[self] ^= mask(from) ^ mask(to);
+#endif
         board_[from] = pc_from;
+#ifdef USE_BYTEBOARD
+        bb_.setPieceBit(from, toPieceBit(pc_from));
+#ifdef CALC_MOVE_DIFF
+        calcMoveDiff<false, true>(from, to);
+#endif
+#endif
     }
-
+#ifdef USE_BITBOARD
     bb_type_[OCCUPIED] = bbTurn(BLACK) ^ bbTurn(WHITE);
     bb_gold_ = bbType(GOLD, PRO_PAWN, PRO_LANCE, PRO_KNIGHT, PRO_SILVER);
-
+#endif
     st_ = st_->previous;
     ply_--;
     assert(verify());
@@ -1317,13 +1316,12 @@ void Board::doNullMove(StateInfo& new_st)
 {
     assert(!inCheck());
     assert(&new_st != st_);
-
     std::memcpy(&new_st, st_, sizeof(StateInfo));
     new_st.previous = st_;
     st_ = &new_st;
     st_->board_key ^= Zobrist::turn;
     st_->plies_from_null = 0;
-    prefetch(TT.firstEntry(st_->key()));
+    prefetch(GlobalTT.firstEntry(st_->key()));
     turn_ = ~turn_;
     st_->hand = hand(turn());
     setCheckInfo<true>(st_);
@@ -1334,16 +1332,20 @@ void Board::doNullMove(StateInfo& new_st)
 void Board::undoNullMove()
 {
     assert(!inCheck());
-
     st_ = st_->previous;
     turn_ = ~turn_;
 }
-
+#ifdef USE_BITBOARD
 // t側がsqにある駒を取れるならばtrueを返す。
 // pinも考慮するので、bb_discoveredにはpinnedPieces(自分の王手駒と敵玉の間にいてpinされている敵の駒)を渡す。
 bool Board::canPieceCapture(const Turn t, const Square sq, const Square king_square, const Bitboard& bb_discovered) const
 {
     Bitboard bb_from = attackers<true>(t, sq);
+
+    if (bb_from & ~bb_discovered)
+        return true;
+
+    bb_from &= bb_discovered;
 
     while (bb_from)
         if (!isDiscoveredCheck(bb_from.firstOne(), sq, king_square, bb_discovered))
@@ -1354,7 +1356,7 @@ bool Board::canPieceCapture(const Turn t, const Square sq, const Square king_squ
 }
 
 // bb_discoveredを遅延評価するバージョン
-bool Board::canPieceCapture(const Turn t, const Square sq, const Square king_square) const
+bool Board::canPieceCapture1(const Turn t, const Square sq, const Square king_square) const
 {
     Bitboard bb_from = attackers<true>(t, sq);
 
@@ -1362,6 +1364,12 @@ bool Board::canPieceCapture(const Turn t, const Square sq, const Square king_squ
     {
         // 自分の王手駒と敵玉の間にいてpinされている敵の駒のbitboard
         const Bitboard bb_discovered = st_->blockers_for_king[t];
+
+
+        if (bb_from & ~bb_discovered)
+            return true;
+
+        bb_from &= bb_discovered;
 
         do {
             if (!isDiscoveredCheck(bb_from.firstOne(), sq, king_square, bb_discovered))
@@ -1399,13 +1407,14 @@ bool Board::canKingEscape(const Square ksq, const Turn self, const Square sq, co
 
     return false;
 }
-
-bool Board::isPawnDropCheckMate(const Turn self, const Square sq, const Square king_square) const
+template bool Board::canKingEscape<LOW>(const Square ksq, const Turn self, const Square sq, const Bitboard& bb) const;
+template bool Board::canKingEscape<HIGH>(const Square ksq, const Turn self, const Square sq, const Bitboard& bb) const;
+bool Board::isPawnDropCheckMate1(const Turn self, const Square sq, const Square king_square) const
 {
     const Turn enemy = ~self;
 
     // 玉以外の駒で、打たれた歩を取れるなら、打ち歩詰めではない。
-    if (canPieceCapture(enemy, sq, king_square))
+    if (canPieceCapture1(enemy, sq, king_square))
         return false;
 
     const Bitboard occupied = bbOccupied() ^ sq;
@@ -1425,55 +1434,7 @@ bool Board::isPawnDropCheckMate(const Turn self, const Square sq, const Square k
     return true;
 }
 
-// つまされているかどうかの判定。
-bool Board::isMate() const
-{
-    Turn self = turn();
-
-    // ステイルメイトの判定
-    if (!st_->checkers && (hand(self) || bbTurn(self) != mask(kingSquare(self))))
-        return false;
-
-    return MoveList<LEGAL>(*this).size() == 0;
-}
-
-bool Board::is1mate()
-{
-    StateInfo st;
-
-    for (auto m : MoveList<LEGAL_ALL>(*this))
-    {
-        doMove(m, st, givesCheck(m));
-        MoveList<LEGAL_ALL> mll(*this);
-        undoMove(m);
-
-        if (mll.size() == 0)
-            return true;
-    }
-
-    return false;
-}
-
-// mate1plyのラッパー
-// 玉が5段目より上にいるならHIGH盤面、5段目を含めて下にいるならLOW盤面を使用する。
-Move Board::mate1ply()
-{
-    const Turn t = turn();
-    const Square ksq = kingSquare(~t);
-
-    // 相手玉はRANK_5を含めずそこよりt側の自陣側にいる。
-    const bool is_behind = isBehind(t, RANK_5, ksq);
-
-    Move ret = t == BLACK ? is_behind ? mate1ply<BLACK,  LOW>(ksq) : mate1ply<BLACK, HIGH>(ksq)
-                          : is_behind ? mate1ply<WHITE, HIGH>(ksq) : mate1ply<WHITE,  LOW>(ksq);
-
-    assert(verify());
-    assert(ret == MOVE_NONE || (pseudoLegal(ret) && legal(ret)));
-    return ret;
-}
-
 // 1手詰め判定とヘルパー関数は、Aperyを参考にしています。
-
 // この局面が自分の手番だとして、1手で相手玉が詰むかどうか。詰むならその指し手を返す。
 // 詰まないならMOVE_NONEを返す。ksqは敵玉の位置。
 // RBBを生かして、なるべく64bit演算で済むように工夫している。
@@ -1485,7 +1446,7 @@ template <Turn T, Index TK> Move Board::mate1ply(const Square ksq)
 
     const Turn self = T;
     const Turn enemy = ~T;
-    const Square tsouth = T == BLACK ? DELTA_S : DELTA_N;
+    const Square tsouth = T == BLACK ? SQ_D : SQ_U;
     const Index T_HIGH = T == BLACK ? HIGH : LOW;
     const Index T_LOW = T == BLACK ? LOW : HIGH;
 
@@ -1513,9 +1474,7 @@ template <Turn T, Index TK> Move Board::mate1ply(const Square ksq)
             if (existAttacker(self, to)
                 && !canKingEscape<TK>(ksq, self, to, rookAttackToEdge(to))
                 && !canPieceCapture(enemy, to, ksq, dc_between_enemy))
-            {
                 return makeDrop(self == BLACK ? B_ROOK : W_ROOK, to);
-            }
         }
     }
     else if (h.exists(LANCE) && isBehind(enemy, RANK_1, ksq))
@@ -1527,9 +1486,7 @@ template <Turn T, Index TK> Move Board::mate1ply(const Square ksq)
             && existAttacker(self, to)
             && !canKingEscape<TK>(ksq, self, to, lanceAttackToEdge(self, to))
             && !canPieceCapture(enemy, to, ksq, dc_between_enemy))
-        {
             return makeDrop(self == BLACK ? B_LANCE : W_LANCE, to);
-        }
     }
 
     if (h.exists(BISHOP))
@@ -1543,9 +1500,7 @@ template <Turn T, Index TK> Move Board::mate1ply(const Square ksq)
             if (existAttacker(self, to)
                 && !canKingEscape<TK>(ksq, self, to, bishopAttackToEdge(to))
                 && !canPieceCapture(enemy, to, ksq, dc_between_enemy))
-            {
                 return makeDrop(self == BLACK ? B_BISHOP : W_BISHOP, to);
-            }
         }
     }
 
@@ -1566,9 +1521,7 @@ template <Turn T, Index TK> Move Board::mate1ply(const Square ksq)
             if (existAttacker(self, to)
                 && !canKingEscape<TK>(ksq, self, to, goldAttack(self, to))
                 && !canPieceCapture(enemy, to, ksq, dc_between_enemy))
-            {
                 return makeDrop(self == BLACK ? B_GOLD : W_GOLD, to);
-            }
         }
     }
 
@@ -1601,9 +1554,7 @@ template <Turn T, Index TK> Move Board::mate1ply(const Square ksq)
             if (existAttacker(self, to)
                 && !canKingEscape<TK>(ksq, self, to, silverAttack(self, to))
                 && !canPieceCapture(enemy, to, ksq, dc_between_enemy))
-            {
                 return makeDrop(self == BLACK ? B_SILVER : W_SILVER, to);
-            }
         }
     }
 
@@ -1619,9 +1570,7 @@ SilverDropEnd:
 
             if (!canKingEscape<TK>(ksq, self, to, allZeroMask())
                 && !canPieceCapture(enemy, to, ksq, dc_between_enemy))
-            {
                 return makeDrop(self == BLACK ? B_KNIGHT : W_KNIGHT, to);
-            }
         }
     }
 
@@ -2116,7 +2065,7 @@ SilverDropEnd:
         if (isBehind(enemy, RANK_2, krank))
         {
             uint64_t from64 = bbPiece(PAWN, self).b(TK);
-            const Square tnorth = self == BLACK ? DELTA_N : DELTA_S;
+            const Square tnorth = self == BLACK ? SQ_U : SQ_D;
 
             if (canPromote(self, krank))
             {
@@ -2172,13 +2121,32 @@ SilverDropEnd:
 
     return MOVE_NONE;
 }
-#ifdef HELPER
+
+// mate1plyのラッパー
+// 玉が5段目より上にいるならHIGH盤面、5段目を含めて下にいるならLOW盤面を使用する。
+Move Board::mate1ply1() const
+{
+    const Turn t = turn();
+    const Square ksq = kingSquare(~t);
+    Board* tb = const_cast<Board*>(this);
+    // 相手玉はRANK_5を含めずそこよりt側の自陣側にいる。
+    const bool is_behind = isBehind(t, RANK_5, ksq);
+
+    Move ret = t == BLACK ? is_behind ? tb->mate1ply<BLACK, LOW>(ksq) : tb->mate1ply<BLACK, HIGH>(ksq)
+        : is_behind ? tb->mate1ply<WHITE, HIGH>(ksq) : tb->mate1ply<WHITE, LOW>(ksq);
+
+    assert(verify());
+    assert(ret == MOVE_NONE || (pseudoLegal(ret) && legal(ret)));
+    return ret;
+}
+
+#endif
 // 各種ビットボード、盤面が正しいかどうかをチェックする
 bool Board::verify() const
 {
     int failed_step = 0;
     StateInfo st;
-#if 1
+
     // step 0
 
     // 駒の枚数チェック (+1はEMPTYの分)
@@ -2205,7 +2173,7 @@ bool Board::verify() const
     failed_step++;
 
     // step 1
-
+#ifdef USE_BITBOARD
     int p_max_bb[PIECETYPE_MAX] = { 0 };
 
     // ビットボードから
@@ -2215,11 +2183,11 @@ bool Board::verify() const
                 p_max_bb[typeOf(piece(sq))]++;
             else
                 goto Failed;
-
+#endif
     failed_step++;
 
     // step 2
-
+#ifdef USE_BITBOARD
     for (auto hp : HandPiece)
         p_max_bb[hp] += hand(BLACK).count(hp) + hand(WHITE).count(hp);
 
@@ -2232,7 +2200,7 @@ bool Board::verify() const
         p_max_bb[GOLD] != 4 ||
         p_max_bb[KING] != 2)
         goto Failed;
-
+#endif
     failed_step++;
 
     // step 3
@@ -2253,7 +2221,7 @@ bool Board::verify() const
         if (pawn[BLACK] > 1 || pawn[WHITE] > 1)
             goto Failed;
     }
-#endif
+
 
 #if 1
     failed_step++;
@@ -2286,42 +2254,42 @@ bool Board::verify() const
     failed_step++;
 
     // step 6
-
+#ifdef USE_BITBOARD
     if (bbTurn(BLACK) & bbTurn(WHITE))
         goto Failed;
-
+#endif
     failed_step++;
 
     // step 7
-
+#ifdef USE_BITBOARD
     if ((bbTurn(BLACK) | bbTurn(WHITE)) != bbOccupied())
         goto Failed;
-
+#endif
     failed_step++;
 
     // step 8
-
+#ifdef USE_BITBOARD
     // bitboardすべてをxorしたらoccupiedになるかどうか
     if ((bbType(PAWN) ^ bbType(LANCE) ^ bbType(KNIGHT) ^ bbType(SILVER) ^ bbType(BISHOP) ^
         bbType(ROOK) ^ bbType(GOLD) ^ bbType(KING) ^ bbType(HORSE) ^ bbType(DRAGON) ^
         bbType(PRO_PAWN) ^ bbType(PRO_LANCE) ^ bbType(PRO_KNIGHT) ^ bbType(PRO_SILVER)) != bbOccupied())
         goto Failed;
-
+#endif
     failed_step++;
 
     // step 9
-
+#ifdef USE_BITBOARD
     for (auto pt1 : PieceTypes)
         for (PieceType pt2 = PieceType(pt1 + 1); pt2 < PIECETYPE_MAX; ++pt2)
             if ((bbType(pt1) & bbType(pt2)))
                 goto Failed;
-
+#endif
     failed_step++;
 #endif
 
-#if 1
-    // step 10
 
+    // step 10
+#ifdef USE_BITBOARD
     // 相手玉を取れないことを確認
     const Turn self = turn();
     const Turn enemy = ~self;
@@ -2329,10 +2297,11 @@ bool Board::verify() const
 
     if (attackers(self, king_square))
         goto Failed;
-
+#endif
     failed_step++;
 
     // step 11
+#ifdef USE_BITBOARD
     for (auto sq : Squares)
     {
         const Piece p = piece(sq);
@@ -2360,24 +2329,25 @@ bool Board::verify() const
     if (bb_gold_ != bbType(GOLD, PRO_PAWN, PRO_LANCE, PRO_KNIGHT, PRO_SILVER))
         goto Failed;
 #endif
-#if defined(IS_64BIT)
+
     failed_step++;
 
     // step 13 hashkeyのチェック
 
     setState(&st);
-#ifdef HELPER
-    if (st != *st_)
+
+    if (st.boardKey() != st_->boardKey()
+        || st.handKey() != st_->handKey()
+        || st.material != st_->material
+        || st.hand != st_->hand)
     {
         std::cout << "boardKey = " << st_->boardKey() << " good boardKey = " << st.boardKey()
             << "\nhandKey = " << st_->handKey() << " good handKey = " << st.handKey()
             << "\nmaterial = " << st_->material << " good material = " << st.material
-            << "\ncheckers = " << st_->checkers << " good checkers = " << st.checkers
             << "\n hand = " << st_->hand << " good hand = " << st.hand << std::endl;
         goto Failed;
     }
-#endif
-#endif
+
 #ifdef USE_EVAL
     failed_step++;
 
@@ -2387,344 +2357,153 @@ bool Board::verify() const
     for (PieceNo no = PIECE_NO_PAWN; no < PIECE_NO_NB; no++)
         if (evalList()->pieceNoOf(list_fb[no]) != no)
             goto Failed;
+
+    failed_step++;
+
+#if 0
+    // step 15 BonaPieceが本当に存在するかどうかのチェック
+    const auto& BHI = Eval::BP_HAND_ID;
+
+    for (PieceNo no = PIECE_NO_PAWN; no < PIECE_NO_NB; no++)
+    {
+        auto bp = list_fb[no];
+
+        if (bp < Eval::fe_hand_end)
+        {
+            auto c = BLACK;
+
+            for (PieceType pc = BISHOP; pc < KING; ++pc)
+            {
+                auto diff = BHI[c][pc].fw - BHI[c][pc].fb;
+
+                if (BHI[c][pc].fb <= bp && bp < BHI[c][pc].fw)
+                {
+                    if (hand(BLACK).count(pc) < (bp - BHI[c][pc].fb))
+                        goto Failed;
+                }
+                else if (BHI[c][pc].fw <= bp && bp < BHI[c][pc].fw + diff)
+                {
+                    if (hand(WHITE).count(pc) < (bp - BHI[c][pc].fw))
+                        goto Failed;
+                }
+            }
+        }
+        else
+        {
+            for (auto pc = B_BISHOP; pc < PIECE_MAX; ++pc)
+                if (Eval::BP_BOARD_ID[pc].fb <= bp && bp < Eval::BP_BOARD_ID[pc].fb + SQ_MAX)
+                {
+                    if (piece(Square(bp - Eval::BP_BOARD_ID[pc].fb)) != pc)
+                        goto Failed;
+                }
+        }
+    }
+#endif
 #endif
 
+#ifdef USE_BYTEBOARD
+    // step16 ByteboardとBoardの整合性チェック
+    for (auto sq : Squares)
+    {
+        auto pb1 = toPieceBit(piece(sq));
+        auto pb2 = bb_.pieceBit(sq);
+
+        if (pb1 != pb2)
+            goto Failed;
+    }
+
+    // step17 二歩フラグのチェック
+    for (auto t : Turns)
+        for (File f : Files)
+        {
+            bool exist_pawn = false;
+
+            for (Rank r : Ranks)
+                if (piece(sqOf(f, r)) == (t | PAWN))
+                    exist_pawn = true;
+
+            if (exist_pawn != existPawnFile(t, f))
+            {
+                std::cout << "nifuflag" << std::endl;
+                goto Failed;
+            }
+        }
+
+    failed_step++;
+
+#if defined USE_EVAL
+    // step18
+    for (PieceNo i = PIECE_NO_ZERO; i < 40; i++)
+    {
+        Square sq = pieceSquare(i);
+
+        if (sq == SQ_MAX)
+        {
+            for (auto t : Turns)
+                if (stm_piece_[t] & (1ULL << i))
+                {
+                    std::cout << "stm_piece_[t] & (1ULL << i)" << std::endl;
+                    goto Failed;
+                }
+        }
+        else
+        {
+            PieceNo j = sq_to_pieceno_[sq];
+            if (i != j)
+            {
+                std::cout << "pieceSquare" << std::endl;
+                goto Failed;
+            }
+            Turn t = turnOf(piece(sq));
+
+            if ((stm_piece_[t] & (1ULL << i)) == 0)
+            {
+                std::cout << "stm_piece_[t] & (1ULL << i)" << std::endl;
+                goto Failed;
+            }
+            if ((stm_piece_[~t] & (1ULL << i)))
+            {
+                std::cout << "stm_piece_[~t] & (1ULL << i)" << std::endl;
+                goto Failed;
+            }
+        }
+    }
+#endif
+#ifdef CALC_MOVE_DIFF
+    __m256i tmp[2];
+
+    for (int i = 0; i < 40; i++)
+    {
+        Square sq = pieceSquare(i);
+
+        if (sq != SQ_MAX && (dirty_flag_ & (1ULL << i)) == 0)
+        {
+            Piece p = piece(sq);
+            __m256i* rp = generateMoveFrom(bb_, sq, p, tmp);
+            assert(rp != tmp);
+            if (move_cache_[i] != tmp[0])
+            {
+                std::cout << *this << "sq = " << pretty(sq) << "pieceno = " << i << " failed";
+                goto Failed;
+            }
+
+            if (rp - tmp == 2)
+            {
+                assert(i >= PIECE_NO_BISHOP && i < PIECE_NO_KING);
+                if (move_cache_[i + 6] != tmp[1])
+                {
+                    std::cout << *this << "sq = " << pretty(sq) << "pieceno = " << i + 6 << " failed";
+                    goto Failed;
+                };
+            }
+        }
+    }
+#endif
+#endif
     return true;
+
 
 Failed:
     std::cout << "error!" << " failed step is " << failed_step << *this << std::endl;
     return false;
 }
-#endif
-#ifdef MATE3PLY
-// 近接王手するとき専用のdoMove
-void Board::doMoveNearCheck(const Move move, StateInfo& new_st)
-{
-    assert(verify());
-    assert(move != MOVE_NONE);
-    assert(isOK(move, turn()));
-
-    std::memcpy(&new_st, st_, offsetof(StateInfo, checkers));
-    new_st.previous = st_;
-    st_ = &new_st;
-
-    const Turn self = turn();
-    const Turn enemy = ~self;
-    const Square to = toSq(move);
-    const Piece pc = movedPiece(move);
-
-    assert(self == turnOf(pc));
-
-    if (isDrop(move)) // 持ち駒を打つ手
-    {
-        const PieceType pt_to = typeOf(pc);
-
-        // 持ち駒を減らす。
-        hand_[self].minus(pt_to);
-
-        // 打ったことで変わるBitboardの設定
-        xorBBs(pt_to, to, self);
-
-        // 盤面に駒を置く。
-        board_[to] = pc;
-
-        // 王手している駒のbitboardを更新する
-        st_->checkers = mask(to);
-    }
-    else // 盤上の指し手
-    {
-        assert(!isCapture(move) || board_[to]);
-        const Square from = fromSq(move);
-        const Piece pc_to = movedPieceTo(move);
-        const PieceType pt_from = typeOf(pc);
-        const PieceType pt_to = typeOf(pc_to);
-
-        bb_type_[pt_from] ^= from;
-        bb_type_[pt_to] ^= to;
-        bb_turn_[self] ^= mask(from) ^ mask(to);
-        board_[from] = EMPTY;
-        board_[to] = pc_to;
-
-        // 駒を取ったとき
-        if (isCapture(move))
-        {
-            const Piece pc_cap = capturePiece(move);
-            const PieceType npt_cap = nativeType(pc_cap);
-
-            bb_type_[typeOf(pc_cap)] ^= to;
-            bb_turn_[enemy] ^= to;
-
-            // 駒を取ったので増やす．
-            hand_[self].plus(npt_cap);
-        }
-
-        // occupiedの更新
-        bb_type_[OCCUPIED] = bbTurn(BLACK) ^ bbTurn(WHITE);
-
-        if (pt_to == KING)
-            king_[self] = to;
-
-        // 王手している駒のbitboardを更新する
-        //assert(isOK(st_->previous->checkinfo.ksq));
-        const CheckInfo& ci = st_->previous->checkinfo;
-
-        // 直接王手のときの王手駒
-        st_->checkers = mask(to);
-
-        // 空き王手
-        const Square ksq = kingSquare(enemy);
-
-        if (isDiscoveredCheck(from, to, ksq, ci.dc_candidates))
-        {
-            switch (relation(from, ksq))
-            {
-            case DIRECT_MISC:
-                assert(false);
-                break;
-            case DIRECT_FILE: // fromの位置から調べるのがミソ 敵玉と空き王手している駒にぶつかる
-                st_->checkers |= attacks<DIRECT_FILE>(from, bbOccupied()) & bbTurn(self); break;
-            case DIRECT_RANK:
-                st_->checkers |= attacks<DIRECT_RANK>(from, bbOccupied()) & bbTurn(self); break;
-            case DIRECT_DIAG1: case DIRECT_DIAG2:
-                st_->checkers |= bishopAttack(ksq, bbOccupied()) & bbPiece(BISHOP, HORSE, self); break;
-            default:
-                UNREACHABLE;
-            }
-        }
-    }
-
-    bb_gold_ = bbType(GOLD, PRO_PAWN, PRO_LANCE, PRO_KNIGHT, PRO_SILVER);
-#if 0
-    if (!(st_->checkers == attackers<true>(self, kingSquare(enemy))))
-        std::cout << *this << pretty(move) << st_->checkers << attackers<true>(self, kingSquare(enemy)) << std::endl;
-#endif
-    assert(st_->checkers == attackers<true>(self, kingSquare(enemy)));
-    turn_ = enemy;
-}
-
-// 近接王手回避専用のdoMove
-// 回避手によって王手してしまう手を渡してはいけない。
-void Board::doMoveKingAndCapture(const Move move, StateInfo& new_st)
-{
-    assert(verify());
-    assert(move != MOVE_NONE);
-    assert(isOK(move, turn()));
-
-    std::memcpy(&new_st, st_, offsetof(StateInfo, checkers));
-    new_st.previous = st_;
-    st_ = &new_st;
-
-    const Turn self = turn();
-    const Turn enemy = ~self;
-    const Square to = toSq(move);
-    const Piece pc = movedPiece(move);
-
-    assert(self == turnOf(pc));
-
-    if (isDrop(move)) // 持ち駒を打つ手
-    {
-        const PieceType pt_to = typeOf(pc);
-
-        // 持ち駒を減らす。
-        hand_[self].minus(pt_to);
-
-        // 打ったことで変わるBitboardの設定
-        xorBBs(pt_to, to, self);
-
-        // 盤面に駒を置く。
-        board_[to] = pc;
-
-        st_->checkers = allZeroMask();
-        st_->continue_check[self] = 0;
-    }
-    else // 盤上の指し手
-    {
-        assert(!isCapture(move) || board_[to]);
-        const Square from = fromSq(move);
-        const Piece pc_to = movedPieceTo(move);
-        const PieceType pt_from = typeOf(pc);
-        const PieceType pt_to = typeOf(pc_to);
-
-        bb_type_[pt_from] ^= from;
-        bb_type_[pt_to] ^= to;
-        bb_turn_[self] ^= mask(from) ^ mask(to);
-        board_[from] = EMPTY;
-        board_[to] = pc_to;
-
-        // 駒を取ったとき
-        if (isCapture(move))
-        {
-            const Piece pc_cap = capturePiece(move);
-            const PieceType npt_cap = nativeType(pc_cap);
-
-            bb_type_[typeOf(pc_cap)] ^= to;
-            bb_turn_[enemy] ^= to;
-
-            // 駒を取ったので増やす．
-            hand_[self].plus(npt_cap);
-        }
-
-        // occupiedの更新
-        bb_type_[OCCUPIED] = bbTurn(BLACK) ^ bbTurn(WHITE);
-
-        if (pt_to == KING)
-            king_[self] = to;
-
-        st_->checkers = allZeroMask();
-    }
-
-    bb_gold_ = bbType(GOLD, PRO_PAWN, PRO_LANCE, PRO_KNIGHT, PRO_SILVER);
-
-    assert(!st_->checkers);
-
-    turn_ = enemy;
-}
-
-Move Board::mate3ply()
-{
-    assert(!inCheck());
-
-    Move mate_move = MOVE_NONE;
-
-    for (auto m1 : MoveList<NEAR_CHECK>(*this))
-    {
-        StateInfo st;
-
-        if (!legal<false, true>(m1))
-            continue;
-
-        doMoveNearCheck(m1, st);
-        
-        // 回避手
-        MoveList<EVASIONS> el(*this);
-
-        // もし回避できないなら1手詰め
-        if (el.size() == 0)
-        {
-            undoMovePerft(m1);
-            mate_move = m1;
-            goto Finish;
-        }
-        else
-        {
-            bool mate = true;
-
-            for (auto m2 : el)
-            {
-                if (!legal(m2))
-                    continue;
-
-                // 回避手が王手になってしまう場合は詰まないものとする。
-                // 1手でも詰まない応手があれば、この局面は詰まない。
-                if (givesCheck(m2))
-                {
-                    mate = false;
-                    break;
-                }
-                else
-                {
-                    StateInfo st2;
-                    doMoveKingAndCapture(m2, st2);
-
-                    if (mate1ply() == MOVE_NONE)
-                    {
-                        undoMovePerft(m2);
-                        mate = false;
-                        break;
-                    }
-
-                    undoMovePerft(m2);
-                }
-            }
-
-            // breakしたらここにくる。
-            if (mate)
-            {
-                mate_move = m1;
-                undoMovePerft(m1);
-                goto Finish;
-            }
-        }
-
-        undoMovePerft(m1);
-    }
-
-Finish:
-    return mate_move;
-}
-
-// 3手詰めを普通に判定する。
-// 長時間かかる。
-Move Board::is3mate()
-{
-    assert(!inCheck());
-
-    Move mate_move = MOVE_NONE;
-
-    for (auto m1 : MoveList<CHECK_ALL>(*this))
-    {
-        StateInfo st;
-
-        if (!legal(m1))
-            continue;
-
-        doMove(m1, st);
-
-        // 回避手
-        MoveList<EVASIONS> el(*this);
-
-        // もし回避できないなら1手詰め
-        if (el.size() == 0)
-        {
-            undoMove(m1);
-            mate_move = m1;
-            goto Finish;
-        }
-        else
-        {
-            bool mate = true;
-
-            for (auto m2 : el)
-            {
-                if (!legal(m2))
-                    continue;
-
-                // 回避手が王手になってしまう場合は詰まないものとする。
-                // 1手でも詰まない応手があれば、この局面は詰まない。
-                if (givesCheck(m2))
-                {
-                    mate = false;
-                    break;
-                }
-                else
-                {
-                    StateInfo st2;
-                    doMove(m2, st2);
-
-                    if (!is1mate())
-                    {
-                        undoMove(m2);
-                        mate = false;
-                        break;
-                    }
-
-                    undoMove(m2);
-                }
-            }
-
-            // breakしたらここにくる。
-            if (mate)
-            {
-                mate_move = m1;
-                undoMove(m1);
-                goto Finish;
-            }
-        }
-
-        undoMove(m1);
-    }
-
-Finish:
-    return mate_move;
-}
-#endif

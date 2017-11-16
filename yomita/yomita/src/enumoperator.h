@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -48,6 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     inline T& operator -- (T& d) { return d = T(int(d) - 1); }\
     inline T  operator ++ (T& d,int) { T prev = d; d = T(int(d) + 1); return prev; } \
     inline T  operator -- (T& d,int) { T prev = d; d = T(int(d) - 1); return prev; } \
-    inline T  operator / (const T d, int i) { return T(int(d) / i); }\
-    inline int operator / (T d1, T d2) { return int(d1) / int(d2); }\
+    inline constexpr T  operator / (const T d, int i) { return T(int(d) / i); }\
+    inline constexpr int operator / (T d1, T d2) { return int(d1) / int(d2); }\
     inline T& operator /= (T& d, int i) { return d = T(int(d) / i); }

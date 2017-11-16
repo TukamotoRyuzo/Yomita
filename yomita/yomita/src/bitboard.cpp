@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,9 +21,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "bitboard.h"
-#include "bitop.h"
+#include "config.h"
+
+#ifdef USE_BITBOARD
+
 #include <fstream>
+
+#include "bitboard.h"
 
 #ifdef HAVE_BMI2
 __m256i YMM_TO[SQ_MAX];
@@ -98,7 +102,80 @@ Bitboard BB_EXCEPT_PAWN_FILE_MASK[TURN_MAX][512];
 Bitboard BB_OBSTACLE[SQ_MAX][SQ_MAX];
 Bitboard BB_LINE[SQ_MAX][SQ_MAX];
 
-RelationType SQUARE_RELATIONSHIP[SQ_MAX][SQ_MAX];
+const Bitboard FILE9_MASK = Bitboard(0x40201008040201ULL << 0, 0x40201008040201ULL << 0);
+const Bitboard FILE8_MASK = Bitboard(0x40201008040201ULL << 1, 0x40201008040201ULL << 1);
+const Bitboard FILE7_MASK = Bitboard(0x40201008040201ULL << 2, 0x40201008040201ULL << 2);
+const Bitboard FILE6_MASK = Bitboard(0x40201008040201ULL << 3, 0x40201008040201ULL << 3);
+const Bitboard FILE5_MASK = Bitboard(0x40201008040201ULL << 4, 0x40201008040201ULL << 4);
+const Bitboard FILE4_MASK = Bitboard(0x40201008040201ULL << 5, 0x40201008040201ULL << 5);
+const Bitboard FILE3_MASK = Bitboard(0x40201008040201ULL << 6, 0x40201008040201ULL << 6);
+const Bitboard FILE2_MASK = Bitboard(0x40201008040201ULL << 7, 0x40201008040201ULL << 7);
+const Bitboard FILE1_MASK = Bitboard(0x40201008040201ULL << 8, 0x40201008040201ULL << 8);
+
+const Bitboard FILE_MASK[FILE_MAX] =
+{
+    FILE9_MASK, FILE8_MASK, FILE7_MASK, FILE6_MASK, FILE5_MASK, FILE4_MASK, FILE3_MASK, FILE2_MASK, FILE1_MASK,
+};
+
+const Bitboard RANK1_MASK = Bitboard(0x1ffULL << (9 * 0), 0);
+const Bitboard RANK2_MASK = Bitboard(0x1ffULL << (9 * 1), 0);
+const Bitboard RANK3_MASK = Bitboard(0x1ffULL << (9 * 2), 0x1ffULL << (9 * 0));
+const Bitboard RANK4_MASK = Bitboard(0x1ffULL << (9 * 3), 0x1ffULL << (9 * 1));
+const Bitboard RANK5_MASK = Bitboard(0x1ffULL << (9 * 4), 0x1ffULL << (9 * 2));
+const Bitboard RANK6_MASK = Bitboard(0x1ffULL << (9 * 5), 0x1ffULL << (9 * 3));
+const Bitboard RANK7_MASK = Bitboard(0x1ffULL << (9 * 6), 0x1ffULL << (9 * 4));
+const Bitboard RANK8_MASK = Bitboard(0, 0x1ffULL << (9 * 5));
+const Bitboard RANK9_MASK = Bitboard(0, 0x1ffULL << (9 * 6));
+
+const Bitboard RANK_MASK[RANK_MAX] =
+{
+    RANK1_MASK, RANK2_MASK, RANK3_MASK, RANK4_MASK, RANK5_MASK, RANK6_MASK, RANK7_MASK, RANK8_MASK, RANK9_MASK,
+};
+
+const Bitboard SQUARE_MASK[SQ_MAX + 1] =
+{
+    Bitboard(1ULL << 0, 0), Bitboard(1ULL << 1, 0), Bitboard(1ULL << 2, 0), Bitboard(1ULL << 3, 0), Bitboard(1ULL << 4, 0), Bitboard(1ULL << 5, 0),
+    Bitboard(1ULL << 6, 0), Bitboard(1ULL << 7, 0), Bitboard(1ULL << 8, 0), Bitboard(1ULL << 9, 0), Bitboard(1ULL << 10, 0), Bitboard(1ULL << 11, 0),
+    Bitboard(1ULL << 12, 0), Bitboard(1ULL << 13, 0), Bitboard(1ULL << 14, 0), Bitboard(1ULL << 15, 0), Bitboard(1ULL << 16, 0), Bitboard(1ULL << 17, 0),
+    Bitboard(1ULL << 18, 1ULL << 0), Bitboard(1ULL << 19, 1ULL << 1), Bitboard(1ULL << 20, 1ULL << 2), Bitboard(1ULL << 21, 1ULL << 3), Bitboard(1ULL << 22, 1ULL << 4),
+    Bitboard(1ULL << 23, 1ULL << 5), Bitboard(1ULL << 24, 1ULL << 6), Bitboard(1ULL << 25, 1ULL << 7), Bitboard(1ULL << 26, 1ULL << 8), Bitboard(1ULL << 27, 1ULL << 9),
+    Bitboard(1ULL << 28, 1ULL << 10), Bitboard(1ULL << 29, 1ULL << 11), Bitboard(1ULL << 30, 1ULL << 12), Bitboard(1ULL << 31, 1ULL << 13), Bitboard(1ULL << 32, 1ULL << 14),
+    Bitboard(1ULL << 33, 1ULL << 15), Bitboard(1ULL << 34, 1ULL << 16), Bitboard(1ULL << 35, 1ULL << 17), Bitboard(1ULL << 36, 1ULL << 18), Bitboard(1ULL << 37, 1ULL << 19),
+    Bitboard(1ULL << 38, 1ULL << 20), Bitboard(1ULL << 39, 1ULL << 21), Bitboard(1ULL << 40, 1ULL << 22), Bitboard(1ULL << 41, 1ULL << 23), Bitboard(1ULL << 42, 1ULL << 24),
+    Bitboard(1ULL << 43, 1ULL << 25), Bitboard(1ULL << 44, 1ULL << 26), Bitboard(1ULL << 45, 1ULL << 27), Bitboard(1ULL << 46, 1ULL << 28), Bitboard(1ULL << 47, 1ULL << 29),
+    Bitboard(1ULL << 48, 1ULL << 30), Bitboard(1ULL << 49, 1ULL << 31), Bitboard(1ULL << 50, 1ULL << 32), Bitboard(1ULL << 51, 1ULL << 33), Bitboard(1ULL << 52, 1ULL << 34),
+    Bitboard(1ULL << 53, 1ULL << 35), Bitboard(1ULL << 54, 1ULL << 36), Bitboard(1ULL << 55, 1ULL << 37), Bitboard(1ULL << 56, 1ULL << 38), Bitboard(1ULL << 57, 1ULL << 39),
+    Bitboard(1ULL << 58, 1ULL << 40), Bitboard(1ULL << 59, 1ULL << 41), Bitboard(1ULL << 60, 1ULL << 42), Bitboard(1ULL << 61, 1ULL << 43), Bitboard(1ULL << 62, 1ULL << 44),
+    Bitboard(0, 1ULL << 45), Bitboard(0, 1ULL << 46), Bitboard(0, 1ULL << 47), Bitboard(0, 1ULL << 48), Bitboard(0, 1ULL << 49), Bitboard(0, 1ULL << 50),
+    Bitboard(0, 1ULL << 51), Bitboard(0, 1ULL << 52), Bitboard(0, 1ULL << 53), Bitboard(0, 1ULL << 54), Bitboard(0, 1ULL << 55), Bitboard(0, 1ULL << 56),
+    Bitboard(0, 1ULL << 57), Bitboard(0, 1ULL << 58), Bitboard(0, 1ULL << 59), Bitboard(0, 1ULL << 60), Bitboard(0, 1ULL << 61), Bitboard(0, 1ULL << 62),
+    allZeroMask()
+};
+
+const Bitboard F1_B = Bitboard(0, 0);
+const Bitboard F2_B = mask(RANK_1);
+const Bitboard F3_B = F2_B | mask(RANK_2);
+const Bitboard F4_B = F3_B | mask(RANK_3);
+const Bitboard F5_B = F4_B | mask(RANK_4);
+const Bitboard F6_B = F5_B | mask(RANK_5);
+const Bitboard F7_B = F6_B | mask(RANK_6);
+const Bitboard F8_B = F7_B | mask(RANK_7);
+const Bitboard F9_B = F8_B | mask(RANK_8);
+const Bitboard F9_W = Bitboard(0, 0);
+const Bitboard F8_W = mask(RANK_9);
+const Bitboard F7_W = F8_W | mask(RANK_8);
+const Bitboard F6_W = F7_W | mask(RANK_7);
+const Bitboard F5_W = F6_W | mask(RANK_6);
+const Bitboard F4_W = F5_W | mask(RANK_5);
+const Bitboard F3_W = F4_W | mask(RANK_4);
+const Bitboard F2_W = F3_W | mask(RANK_3);
+const Bitboard F1_W = F2_W | mask(RANK_2);
+
+const Bitboard FRONT_MASK[TURN_MAX][RANK_MAX] =
+{
+    { F1_B, F2_B, F3_B, F4_B, F5_B, F6_B, F7_B, F8_B, F9_B },
+    { F1_W, F2_W, F3_W, F4_W, F5_W, F6_W, F7_W, F8_W, F9_W },
+};
 
 namespace
 {
@@ -118,7 +195,7 @@ namespace
     {
         Bitboard result = allZeroMask();
 
-        for (Square delta : { DELTA_NE, DELTA_SE, DELTA_SW, DELTA_NW })
+        for (Square delta : { SQ_RU, SQ_RD, SQ_LD, SQ_LU })
         {
             for (Square sq = square + delta;
                 isOK(sq) && abs(fileOf(sq - delta) - fileOf(sq)) == 1; // sq + deltaが盤面内か。二つ目の条件は盤面を一周していないかの判定
@@ -200,7 +277,6 @@ namespace
     }
 }
 
-#ifdef HELPER
 // デバッグ用。ビットボードのレイアウトを見たいときに使う
 std::ostream& operator << (std::ostream& os, const Bitboard& b)
 {
@@ -243,7 +319,7 @@ std::ostream& operator << (std::ostream& os, const Bitboard& b)
     os << "Bitboard(" << "0x" << std::hex << b.b(0) << "ULL, " << "0x" << std::hex << b.b(1) << "ULL),\n" << std::endl;
     return os;
 }
-#endif
+
 // pbbで渡されたBitboardに、rank, fileが示す位置のビットを立てる。
 // rank,fileの範囲チェックも行うので、rankやfileが9以上0未満のときは何も行わずにreturnする。
 void setAttacks(Rank rank, File file, Bitboard* pbb)
@@ -738,3 +814,5 @@ void initTables()
         YMM_TO[sq] = _mm256_set_epi64x(sq, sq, sq, sq);
 #endif
 }
+
+#endif

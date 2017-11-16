@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #include <vector>
+
 #include "platform.h"
 
 // C++11では、std::stack<StateInfo>がalignasを無視するために、代わりにstack相当のものを自作。
@@ -97,6 +98,7 @@ inline int bsr64(const uint64_t mask)
 
 #if defined USE_POPCNT
 #define popCount(v) (int)_mm_popcnt_u64(v)
+#define popCount32(v) (int)_mm_popcnt_u32(v)
 #else
     //64bitのうち、たっているビットの数を返す。(popcntの代わり)
     inline int popCount(uint64_t v) 
@@ -112,6 +114,7 @@ inline int bsr64(const uint64_t mask)
 
 #if defined HAVE_BMI2
 #define pext(a, b) _pext_u64(a, b)
+#define pext32(a, b) _pext_u32(a, b)
 #else
     inline uint64_t pext(uint64_t src, uint64_t mask)
     {

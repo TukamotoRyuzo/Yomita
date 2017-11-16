@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,9 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include <stack>
 #include <vector>
 #include <memory>
-#include <stack>
+#include <utility>
+
 #include "move.h"
 #include "board.h"
 
@@ -70,7 +72,13 @@ namespace Search
     {
         explicit RootMove(Move m) : pv(1, m) {}
 
-        bool operator < (const RootMove& m) const { return m.score < score; } // Descending sort
+        // Descending sort
+        bool operator < (const RootMove& m) const
+        { 
+            return m.score != score ? m.score < score 
+                                    : m.previous_score < previous_score;
+        } 
+
         bool operator == (const Move& m) const { return pv[0] == m; }
         bool extractPonderFromTT(Board& b, Move weak_ponder);
 
@@ -89,10 +97,10 @@ namespace Search
     extern StateStackPtr setup_status;
 } // namespace Search
 
-#if defined LEARN || defined GENSFEN
+#if defined LEARN
 namespace Learn
 {
-    std::pair<Score, std::vector<Move>> qsearch(Board& b, Score alpha, Score beta);
-    std::pair<Score, std::vector<Move>>  search(Board& b, Score alpha, Score beta, Depth depth);
+    std::pair<Score, std::vector<Move>> qsearch(Board& b);
+    std::pair<Score, std::vector<Move>>  search(Board& b, Depth depth, size_t multi_pv = 1, Score multi_pv_range = SCORE_ZERO);
 } // namespace Learn
 #endif

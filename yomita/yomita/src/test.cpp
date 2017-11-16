@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,110 +22,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <fstream>
-#include "test.h"
-#include "board.h"
+
 #include "usi.h"
-#include "genmove.h"
+#include "book.h"
+#include "board.h"
 #include "sfen_rw.h"
-#ifdef HELPER
-bool cantMove(Piece p, Square to)
-{
-    switch (p)
-    {
-    case B_PAWN: case B_LANCE:
-        return mask(to) & mask(RANK_1);
-    case W_PAWN: case W_LANCE:
-        return mask(to) & mask(RANK_9);
-    case B_KNIGHT:
-        return mask(to) & frontMask(BLACK, RANK_3);
-    case W_KNIGHT:
-        return mask(to) & frontMask(WHITE, RANK_7);
-    default:
-        return false;
-    }
+#include "byteboard.h"
 
-    return false;
-}
-
+extern void byteboard_test(const Board& b);
 
 // 引数で与えられるbはランダムな配置なのでさまざまなテストができる。
 void testOnRandomPosition(Board& b)
 {
-    MoveList<LEGAL_ALL> ml(b);
-
-    auto check = [&](Move m)
-    {
-        if (!ml.contains(m))
-            if (b.pseudoLegal(m) && b.legal(m))
-            {
-                auto c = capturePiece(m);
-                std::cout << b << pretty(m) << " capture = " << capturePiece(m) << b.key() << " " << std::hex << (uint32_t)m << std::endl;
-
-                MoveList<LEGAL_ALL> mll(b);
-                if (!mll.contains(m))
-                    if (b.pseudoLegal(m) && b.legal(m))
-                    {
-                        std::cout << b << pretty(m) << " " << b.key() << " " << std::hex << (uint32_t)m << std::endl;
-
-                    }
-            }
-    };
-
-    Move m;
-    Turn t = b.turn();
-    for (auto from : Squares)
-        for (auto to : Squares)
-            for (PieceType pt = BISHOP; pt < PIECETYPE_MAX; pt++)
-            {
-                Piece p = toPiece(pt, t);
-
-                if (pt >= BISHOP && pt < KING && !cantMove(p, to))
-                {
-                    m = makeDrop(p, to);
-                    check(m);
-                }
-
-
-                // 指し手生成で生成されるはずのない手は除外する。
-                if ((attackAll(p, from, allZeroMask()) & to))
-                {
-                    for (Piece c = EMPTY; c < PIECE_MAX; c++)
-                    {
-                        if (typeOf(c) == KING || c == SIGN_WHITE)
-                            continue;
-
-                        if (!cantMove(p, to))
-                        {
-                            m = makeMove(from, to, p, c, false);
-                            check(m);
-                        }
-
-                        if (!isNoPromotable(pt) && canPromote(t, from) && canPromote(t, to))
-                        {
-                            m = makeMove(from, to, p, c, true);
-                            check(m);
-                        }
-                        
-                    }
-                }
-            }
+    //b.init("ln5nl/r3g1s2/psppkp1pp/6p2/1pP1SG1P1/1P1+l1P2P/P2g2r1N/LB5+b1/1N1G1K3 w P3ps 63", Threads.main());
+#if defined USE_BYTEBOARD && defined USE_BITBOARD
+    byteboard_test(b);
+#endif
 }
 
 void randomPlayer(Board& b, uint64_t loop_max)
 {
-    USI::isReady();
+    USI::isready();
     b.init(USI::START_POS, Threads.main());
+    //b.init("1n1+L5/l1GP1P3/kr3p1g+L/1p2+B2pg/7P1/1P2P4/4+n1pG1/+p1P1S+l2S/1rSK1s3 w B4P3p2n 207", Threads.main());
     const int MAX_PLY = 256;
     StateInfo state[MAX_PLY];
     int ply = 0;
     int count1 = 0, count2 = 0;
     Move moves[MAX_PLY];
-
     PRNG rng(20160817);
 
     int k = 0;
     for (int i = 0; i < loop_max; i++)
     {
+
         for (ply = 0; ply < MAX_PLY; ply++)
         {
             MoveList<LEGAL_ALL> ml(b);
@@ -138,7 +68,7 @@ void randomPlayer(Board& b, uint64_t loop_max)
 
             // dropは選ばれすぎるので少し確率を下げる。
             do {
-                m = ml.begin()[rng.rand<int>() % ml.size()].move;
+                m = ml.begin()[rng.rand<int>() % ml.size()];
             } while (cc++ < 3 && isDrop(m));
 #if 0
             if (b.seeGe(m, (Score)0) != b.seeGe2(m, SCORE_ZERO))
@@ -157,7 +87,7 @@ void randomPlayer(Board& b, uint64_t loop_max)
             moves[ply] = m;
 
             // ランダムな局面でテストをする。
-            //testOnRandomPosition(b);
+            testOnRandomPosition(b);
         }
 
         while (ply > 0)
@@ -166,6 +96,7 @@ void randomPlayer(Board& b, uint64_t loop_max)
         if ((i % 1000) == 0)
             std::cout << ".";
     }
+
 #if 0
     std::cout << "ok = " << count2 << "bad = " << count1
         << "true rate = " << (double)count2 / (double)(count1 + count2) * 100.0 << "%" << std::endl;
@@ -194,7 +125,7 @@ struct PerftSolver
 
         if (depth == 0)
         {
-            assert(b.verify());				
+            assert(b.verify());
 
             result.nodes++;
 
@@ -204,7 +135,7 @@ struct PerftSolver
             if (isPromote(m))
                 result.promotions++;
 
-            if (b.bbCheckers())
+            if (b.inCheck())
             {
                 result.checks++;
 
@@ -236,22 +167,22 @@ struct PerftSolver
 };
 
 /* START_POS
-Depth	Nodes		 Captures	Promotions Checks	  Checkmates
-1	    30	         0	        0		   0	      0
-2	    900	         0	        0	       0		  0
-3		25470		 59	        30	       48		  0
-4		719731		 1803	    842	       1121		  0
-5		19861490	 113680	    57214	   71434	  0
-6		547581517	 3387051	1588324	   1730177	  0
-7		15086269607	 156289904	78496954   79636812	  29
-8		416062133009 4713670699	2222896064 2047229309 3420
+Depth   Nodes        Captures   Promotions Checks     Checkmates
+1       30           0          0          0          0
+2       900          0          0          0          0
+3       25470        59         30         48         0
+4       719731       1803       842        1121       0
+5       19861490     113680     57214      71434      0
+6       547581517    3387051    1588324    1730177    0
+7       15086269607  156289904  78496954   79636812   29
+8       416062133009 4713670699	2222896064 2047229309 3420
 */
 
 /* MAX_MOVES_POS
-Depth	Nodes	 Captures	Promotions	Checks	 Checkmates
-1	    593	     0          52          40	     6
-2	    105677	 538        0	        3802     0
-3     	53393368 197899	    4875102	    3493971  566203
+Depth   Nodes    Captures   Promotions  Checks   Checkmates
+1       593      0          52          40       6
+2       105677   538        0           3802     0
+3       53393368 197899     4875102     3493971  566203
 */
 
 void perft(Board& b, int depth)
@@ -261,10 +192,10 @@ void perft(Board& b, int depth)
 
     auto result = solver.perft(b, MOVE_NONE, depth);
 
-    std::cout << "\nnodes = "	   << result.nodes 
+    std::cout << "\nnodes = "      << result.nodes 
               << "\ncaptures = "   << result.captures 
               << "\npromotions = " << result.promotions  
-              << "\nchecks = "	   << result.checks 
+              << "\nchecks = "     << result.checks 
               << "\ncheckmates = " << result.mates
               << std::endl;
 }
@@ -272,67 +203,24 @@ void perft(Board& b, int depth)
 void userTest()
 {
 #if 1 // ランダムプレイヤーテスト
-    USI::isReady();
+
+    USI::isready();
+
     uint64_t loop_max = 100000;
     std::cout << "Random Player test , loop_max = " << loop_max << std::endl;
     Board b;
+
     randomPlayer(b, loop_max);
     std::cout << "finished." << std::endl;
 
-#elif defined LEARN || defined GENSFEN
-
-    USI::isReady();
-    
-    Learn::PackedSfenValue p, p2;
-    Board b(Threads.main());
-
-    p.data[0] = 130;
-    p.data[1] = 142; 
-    p.data[2] = 113; 
-    p.data[3] = 5; 
-    p.data[4] = 70; 
-    p.data[5] = 128; 
-    p.data[6] = 76; 
-    p.data[7] = 248;
-    p.data[8] = 145; 
-    p.data[9] = 240; 
-    p.data[10] = 10; 
-    p.data[11] = 192; 
-    p.data[12] = 42; 
-    p.data[13] = 35; 
-    p.data[14] = 196; 
-    p.data[15] = 17; 
-    p.data[16] = 32; 
-    p.data[17] = 60; 
-    p.data[18] = 7; 
-    p.data[19] = 6;
-    p.data[20] = 30; 
-    p.data[21] = 126; 
-    p.data[22] = 25; 
-    p.data[23] = 22; 
-    p.data[24] = 224;
-    p.data[25] = 125; 
-    p.data[26] = 0; 
-    p.data[27] = 120;
-    p.data[28] = 146;
-    p.data[29] = 100;
-    p.data[30] = 157;
-    p.data[31] = 19; 
-
-    b.setFromPackedSfen(p.data);
-    b.setThread(Threads.main());
-    b.sfenPack(p2.data);
-
-    for (int i = 0; i < 32; i++)
-    {
-        if (p.data[i] != p2.data[i])
-            std::cout << "#";
-    }
-    std::cout << b;
-    auto r = Learn::qsearch(b, -SCORE_INFINITE, SCORE_INFINITE);
-    auto shallow_value = r.first;
-
-    std::cout << r.first;
+#elif defined LEARN
+    Move m; 
+    do {
+        int i;
+        std::cin >> i;
+        m = (Move)i;
+        std::cout << pretty(m) << std::endl;
+    } while (m != MOVE_NONE);
 #else
     Hand n, p;
     std::cout << "hand test" << std::endl;
@@ -389,4 +277,3 @@ void userTest()
     std::cout << count << std::endl;
 #endif
 }
-#endif

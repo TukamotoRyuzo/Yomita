@@ -5,7 +5,7 @@ Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
 Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad (Stockfish author)
 Copyright (C) 2015-2016 Motohiro Isozaki(YaneuraOu author)
-Copyright (C) 2016 Ryuzo Tukamoto
+Copyright (C) 2016-2017 Ryuzo Tukamoto
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -25,8 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <map>
 #include <string>
-#include "platform.h"
+
 #include "thread.h"
+#include "platform.h"
 
 struct OptionsMap;
 
@@ -49,6 +50,9 @@ public:
     // v = デフォルト値かつ現在の値
     Option(const char* v, Fn* = nullptr);
 
+    // combobox用
+    Option(const std::vector<std::string> combo, const std::string& v, Fn* f = nullptr);
+
     // int型用  
     // v = デフォルト値 , min_ = 最小値 , max_ = 最大値 , この項目が変更されたときに呼び出されるハンドラ
     Option(int v, int min_, int max_, Fn* = nullptr);
@@ -65,7 +69,7 @@ public:
     }
 
     // string型への変換子。current_value_の文字列がそのまま返る。  
-    operator std::string() const { assert(type_ == "string"); return current_value_; }
+    operator std::string() const { assert(type_ == "string" || type_ == "combo"); return current_value_; }
 
 private:
 
@@ -76,6 +80,9 @@ private:
     // type_は、UCIプロトコルのoptionコマンドで通知するこのOption項目の型。  
     // 例) int型ならspin(スピンコントロールを表示するためにこれを指定する)  
     std::string default_value_, current_value_, type_;
+
+    // combobox用
+    std::vector<std::string> combo_;
 
     // このOption項目(がint型のとき)の最小値、最大値 (spinコントロールでつかう)
     int min_, max_;
@@ -96,7 +103,7 @@ struct CaseInsensitiveLess
     }
 };
 
-// 我々のオプション設定を保持するコンテナは実際はstd::mapである
+// 我々のオプション設定を保持するコンテナは実際はstd::mapである。
 // mapは<キー値の型,格納されている値の型,mapオーダリングの基準>で指定する。
 struct OptionsMap : public std::map<std::string, Option, CaseInsensitiveLess>
 {
@@ -114,7 +121,7 @@ struct LimitsType
 {
     // コンストラクタではこの構造体をゼロクリア
     LimitsType() { std::memset(this, 0, sizeof(LimitsType)); }
-    bool useTimeManagement() const { return !(mate | move_time | depth | nodes | infinite); }
+    bool useTimeManagement() const { return !(move_time | depth | nodes | infinite); }
 
     std::vector<Move> search_moves;
 
@@ -132,10 +139,6 @@ struct LimitsType
 
     // 固定思考時間(0以外が指定してあるなら) : 単位は[ms]
     int move_time;
- 
-    //  詰み探索モードのときは、ここに思考時間が指定されている。
-    //  この思考時間いっぱいまで考えて良い。
-    int mate;
 
     // 思考時間無制限かどうかのフラグ。非0なら無制限。
     bool infinite;
@@ -144,7 +147,7 @@ struct LimitsType
     bool ponder;
 
     // この探索ノード数だけ探索したら探索を打ち切る。
-    int64_t nodes;
+    uint64_t nodes;
 
     // go開始時刻
     TimePoint start_time;
@@ -155,18 +158,21 @@ class Board;
 namespace USI
 {
     const std::string START_POS = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1";
-    const std::string BENCHMARK = "l6nl/5+P1gk/2np1S3/p1p4Pp/3P2Sp1/1PPb2P1P/P5GS1/R8/LN4bKL w GR5pnsg 1";
-    const std::string MAX_MOVE_POS = "R8/2K1S1SSk/4B4/9/9/9/9/9/1L1L1L3 b RBGSNLP3g3n17p 1";
     extern OptionsMap Options;
-    extern SignalsType Signals;
     extern LimitsType Limits;
 
     // 将棋所で将棋を指せるようにするためのメッセージループ。
     void loop(int argc, char** argv);
 
     // よく使うので。
-    void isReady();
+    void isready();
+    void setoption(std::istringstream& ss_cmd); 
+    void go(const Board& b, std::istringstream& ss_cmd);
 
     std::string score(Score s);
-    std::string pv(const Board& b, Depth depth, Score alpha, Score beta);
+    std::string pv(const Thread* th, Depth depth, Score alpha, Score beta);
 }
+
+void userTest();
+void perft(Board &b, int depth);
+void benchmark(Board& b);
