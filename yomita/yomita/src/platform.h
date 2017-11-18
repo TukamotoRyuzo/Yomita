@@ -53,7 +53,6 @@ typedef unsigned __int64 uint64_t;
 #endif
 #endif
 
-// bsfq命令(_Bitscanforword)を使うか
 #if defined(_WIN64) && !defined(IS_64BIT)
 #include <intrin.h> // MSVC popcnt and bsfq instrinsics
 #define IS_64BIT

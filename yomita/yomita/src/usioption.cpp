@@ -90,7 +90,7 @@ void OptionsMap::init()
     (*this)["DrawScore"]             = Option(-50, -32000, 32000);
     (*this)["MultiPV"]               = Option(1, 1, 500);
     (*this)["UseBook"]               = Option(true);
-    (*this)["BookName"]              = Option("mafu_yokofu.txt");
+    (*this)["BookName"]              = Option("book.txt");
     (*this)["ResignScore"]           = Option(-32000, -32000, 32000);
 #ifdef USE_PROGRESS
     (*this)["ProgressDir"]           = Option("progress/0.104809");

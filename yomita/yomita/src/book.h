@@ -32,6 +32,7 @@ struct BookEntry {
     Move best, ponder;
     int score, depth;
     uint64_t count;
+    BookEntry() : score(0), depth(0), count(0) {};
 };
 
 // insertionSort() や std::sort() で必要

@@ -96,8 +96,9 @@ void Thread::startSearching(bool resume)
 
 void Thread::idleLoop()
 {
+#ifdef IS_64BIT
     WinProcGroup::bindThisThread(idx);
-
+#endif
     while (!exit)
     {
         std::unique_lock<Mutex> lk(mutex);

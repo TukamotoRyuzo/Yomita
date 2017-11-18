@@ -5,6 +5,7 @@
 
 #pragma warning(disable: 4789)
 
+#ifdef USE_BYTEBOARD
 // Byteboard
 // 将棋におけるByteboardは、駒を一つ1byteとしてそれを96byte分用意するデータ構造である。81bit目~95bit目は使わない。
 // 普通の駒配列を用いた場合との違いは、この96byteの配列を32byte変数3つで構成されていると考える点と、
@@ -125,3 +126,4 @@ public:
 };
 
 __m256i* generateMoveFrom(const Byteboard& bb, Square from, Piece p, __m256i* mlist);
+#endif

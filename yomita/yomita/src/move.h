@@ -180,6 +180,7 @@ struct MoveStack
 inline bool operator < (const MoveStack& f, const MoveStack& s) { return f.score < s.score; }
 inline bool operator > (const MoveStack& f, const MoveStack& s) { return f.score > s.score; }
 
+#ifdef USE_BYTEBOARD
 // Move16はByteboardで盤上の駒を動かす手を生成するときにのみ用いる。
 typedef uint16_t Move16;
 
@@ -225,7 +226,7 @@ inline Move* generate(Move* mlist, const Board& b)
     else if (MT == LEGAL_ALL)
         return generateLegal<true>(b, mlist);
 }
-
+#endif
 // MoveType の全ての指し手を生成
 template <MoveType MT> MoveStack* generate(MoveStack* mlist, const Board& b);
 template <MoveType MT> MoveStack* generate(MoveStack* mlist, const Board& b, const Square to);

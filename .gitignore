@@ -227,3 +227,4 @@ generated*
 *.etl
 /yomita_engine/evalsave/
 !yomita*.exe
+/yomita_engine/mafu_yokofu.txt

@@ -52,6 +52,21 @@ Square sqOf(char f, char r)
     return SQ_MAX;
 }
 
+// sfen文字列から先頭の"sfen"を取り除く。
+std::string removeSfen(std::string sfen)
+{
+    return sfen.substr(5, sfen.length() - 5);
+}
+
+// sfen文字列から末尾の手数を取り除く。
+std::string removePly(std::string sfen)
+{
+    int i;
+    for (i = sfen.size() - 1; isdigit(sfen[i]); i--);
+    sfen = sfen.substr(0, i);
+    return sfen;
+}
+
 namespace USI
 {
     // usi文字列の指し手をMoveインスタンスに変換
@@ -127,7 +142,8 @@ int MemoryBook::read(const std::string filename)
         // "sfen "で始まる行は局面のデータであり、sfen文字列が格納されている。
         if (line.length() >= 5 && line.substr(0, 5) == "sfen ")
         {
-            sfen = line.substr(5, line.length() - 5); // 新しいsfen文字列を"sfen "を除去して格納
+            sfen = removeSfen(line);
+            sfen = removePly(sfen);
             continue;
         }
 
@@ -138,7 +154,7 @@ int MemoryBook::read(const std::string filename)
 
         auto conv = [](const std::string s) { return (s == "none" || s == "resign") ? MOVE_NONE : USI::toMove(s); };
         be.best = conv(best_move);
-        be.ponder = conv(best_move);
+        be.ponder = conv(ponder);
         insert(sfen, be);
     }
 
@@ -178,7 +194,7 @@ void MemoryBook::insert(const std::string sfen, const BookEntry m)
 
 Move MemoryBook::probe(const Board& b) const
 {
-    auto it = book.find(b.sfen());
+    auto it = book.find(removePly(b.sfen()));
 
     if (it != book.end() && it->second.size())
     {
