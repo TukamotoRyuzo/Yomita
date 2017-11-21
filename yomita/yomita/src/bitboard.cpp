@@ -185,7 +185,7 @@ namespace
         Bitboard result = allZeroMask();
 
         for (auto s : Squares)
-            if (abs(rankOf(sq) - rankOf(s)) == abs(fileOf(sq) - fileOf(s)))
+            if (abs((int)rankOf(sq) - (int)rankOf(s)) == abs((int)fileOf(sq) - (int)fileOf(s)))
                 result ^= s;
 
         return result & ~(mask(FILE_1) | mask(FILE_9) | mask(RANK_1) | mask(RANK_9) | mask(sq));
@@ -198,7 +198,7 @@ namespace
         for (Square delta : { SQ_RU, SQ_RD, SQ_LD, SQ_LU })
         {
             for (Square sq = square + delta;
-                isOK(sq) && abs(fileOf(sq - delta) - fileOf(sq)) == 1; // sq + deltaが盤面内か。二つ目の条件は盤面を一周していないかの判定
+                isOK(sq) && abs((int)fileOf(sq - delta) - (int)fileOf(sq)) == 1; // sq + deltaが盤面内か。二つ目の条件は盤面を一周していないかの判定
                 sq += delta)
             {
                 result ^= sq;

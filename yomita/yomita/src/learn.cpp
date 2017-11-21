@@ -30,7 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sstream>
 #include <iomanip>
 #define NOMINMAX
+
+#ifdef _MSC_VER
 #include <Windows.h>
+#endif
 
 #include "tt.h"
 #include "usi.h"
@@ -320,8 +323,8 @@ namespace Learn
         bool gen_sfen = true;
         uint64_t teacher_win = 0, training_win = 0, draw = 0;
         Eval::Evaluater* teacher_base;
-        std::atomic<double> rmse = 0.0;
-        std::atomic<uint64_t> rmse_count = 0;
+        std::atomic<double> rmse = {0.0};
+        std::atomic<uint64_t> rmse_count = {0};
 
         // mini batchの大きさ
         uint64_t mini_batch_size;
@@ -679,7 +682,7 @@ namespace Learn
 
                             Eval::addGrad(b, root_turn, dj_dw);
 
-                            if (pvi >= ps.pv.size())
+                            if (pvi >= (int)ps.pv.size())
                                 break;
 
                             for (auto it = r.second.rbegin(); it != r.second.rend(); it++)
@@ -1060,7 +1063,7 @@ namespace Learn
                     b.setFromPackedSfen(p.data);
 
                     //SYNC_COUT << b << p.deep << " win = " << p.win << SYNC_ENDL;
-                    if (p.win && p.deep < -2000 || !p.win && p.deep > 2000)
+                    if ((p.win && p.deep < -2000) || (!p.win && p.deep > 2000))
                     {
                        // SYNC_COUT << b << p.deep << " win = " << p.win << SYNC_ENDL;
                         reverse_eval++;

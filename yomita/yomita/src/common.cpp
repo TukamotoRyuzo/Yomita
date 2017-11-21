@@ -28,7 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #undef _WIN32_WINNT
 #define _WIN32_WINNT 0x0601
 #endif
+#ifdef _MSC_VER
 #include <windows.h>
+#endif
 
 extern "C"
 {
@@ -45,6 +47,10 @@ extern "C"
 #include <sstream>
 #include <iostream>
 #include <codecvt>
+#ifndef _MSC_VER
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 
 #include "common.h"
 #include "thread.h"
@@ -52,7 +58,7 @@ extern "C"
 using namespace std;
 
 namespace WinProcGroup {
-#ifndef _WIN32
+#ifndef _MSC_VER
     void bindThisThread(size_t) {};
 #else
     int getGroup(size_t idx)
@@ -234,11 +240,22 @@ std::string path(const std::string& folder, const std::string& filename)
     return folder + filename;
 }
 
-void mkdir(std::string dir)
+void _mkdir(std::string dir)
 {
+#ifdef _MSC_VER
     std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
 
     if (_wmkdir(cv.from_bytes(dir).c_str()) == -1)
+#else
+#ifdef _WIN32
+    if (mkdir(dir.c_str()) == -1)
+#else
+    if (mkdir(dir.c_str(),
+                S_IRUSR | S_IWUSR | S_IXUSR |
+                S_IRGRP | S_IWGRP | S_IXGRP |
+                S_IROTH | S_IXOTH | S_IXOTH ) == -1)
+#endif
+#endif
     {
         if (errno == EEXIST)
             std::cout << "ディレクトリは dirname が既存のファイル、ディレクトリ、またはデバイスの名前であるため生成されませんでした。" << std::endl;

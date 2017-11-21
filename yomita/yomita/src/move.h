@@ -240,7 +240,7 @@ public:
     void operator ++ () { ++curr_; }
     const MoveStack* begin() const { return mlist_; }
     const MoveStack* end() const { return last_; }
-    MoveStack move() const { return *curr; }
+    MoveStack move() const { return *curr_; }
 
     // 生成した手の数を返す
     size_t size() const { return static_cast<size_t>(last_ - mlist_); }

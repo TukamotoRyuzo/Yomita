@@ -204,7 +204,7 @@ namespace Eval
     void Evaluater::save(std::string eval_dir, bool save_in_eval_dir)
     {
         auto dir = path(save_in_eval_dir ? evalDir() : evalSaveDir(), eval_dir);
-        mkdir(dir);
+        _mkdir(dir);
         std::ofstream ofsPP(path(dir, PP_BIN), std::ios::binary);
 
         if (!ofsPP.write(reinterpret_cast<char*>(pp_), sizeof(pp_)))

@@ -23,6 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include <climits>
+
 #include "range.h"
 #include "common.h"
 #include "platform.h"

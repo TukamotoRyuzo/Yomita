@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <sstream>
 #include <algorithm>
+#include <stddef.h>
 
 #include "tt.h"
 #include "move.h"
@@ -47,7 +48,7 @@ namespace Zobrist
                 psq[sq][p] = rng.rand<Key>() & ~turn;
 
         for (auto t : Turns)
-            for (Piece p = EMPTY; p < HAND_MAX; ++p)
+            for (Piece p = EMPTY; p < (Piece)HAND_MAX; ++p)
                 hand[t][p] = rng.rand<Key>() & ~turn;
     }
 }
@@ -93,7 +94,7 @@ void Board::init(std::string sfen, Thread* th)
         else if (token == '+') // 成り
             promotion = true;
 
-        else if ((p = Piece(piece_to_char.find(token))) != std::string::npos)
+        else if ((p = Piece(piece_to_char.find(token))) != (Piece)std::string::npos)
         {
             PieceNo piece_no = (p == B_KING) ? PIECE_NO_BKING : // 先手玉
                 (p == W_KING) ? PIECE_NO_WKING : // 後手玉
@@ -125,7 +126,7 @@ void Board::init(std::string sfen, Thread* th)
         else if (isdigit(token))
             p_num = p_num * 10 + token - '0';
 
-        else if ((p = Piece(piece_to_char.find(token))) != std::string::npos)
+        else if ((p = Piece(piece_to_char.find(token))) != (Piece)std::string::npos)
         {
             p_num = std::max(1, p_num);
             hand_[turnOf(p)].set(nativeType(p), p_num);
@@ -627,19 +628,19 @@ namespace
         Bitboard bb;
         PieceType pt;
 
-        if (bb = stm_attackers & b.bbType(PAWN)) pt = PAWN;
-        else if (bb = stm_attackers & b.bbType(LANCE)) pt = LANCE;
-        else if (bb = stm_attackers & b.bbType(KNIGHT)) pt = KNIGHT;
-        else if (bb = stm_attackers & b.bbType(PRO_PAWN)) pt = PRO_PAWN;
-        else if (bb = stm_attackers & b.bbType(PRO_LANCE)) pt = PRO_LANCE;
-        else if (bb = stm_attackers & b.bbType(PRO_KNIGHT)) pt = PRO_KNIGHT;
-        else if (bb = stm_attackers & b.bbType(SILVER)) pt = SILVER;
-        else if (bb = stm_attackers & b.bbType(PRO_SILVER)) pt = PRO_SILVER;
-        else if (bb = stm_attackers & b.bbType(GOLD)) pt = GOLD;
-        else if (bb = stm_attackers & b.bbType(BISHOP)) pt = BISHOP;
-        else if (bb = stm_attackers & b.bbType(HORSE)) pt = HORSE;
-        else if (bb = stm_attackers & b.bbType(ROOK)) pt = ROOK;
-        else if (bb = stm_attackers & b.bbType(DRAGON)) pt = DRAGON;
+        if ((bb = stm_attackers) & b.bbType(PAWN)) pt = PAWN;
+        else if ((bb = stm_attackers) & b.bbType(LANCE)) pt = LANCE;
+        else if ((bb = stm_attackers) & b.bbType(KNIGHT)) pt = KNIGHT;
+        else if ((bb = stm_attackers) & b.bbType(PRO_PAWN)) pt = PRO_PAWN;
+        else if ((bb = stm_attackers) & b.bbType(PRO_LANCE)) pt = PRO_LANCE;
+        else if ((bb = stm_attackers) & b.bbType(PRO_KNIGHT)) pt = PRO_KNIGHT;
+        else if ((bb = stm_attackers) & b.bbType(SILVER)) pt = SILVER;
+        else if ((bb = stm_attackers) & b.bbType(PRO_SILVER)) pt = PRO_SILVER;
+        else if ((bb = stm_attackers) & b.bbType(GOLD)) pt = GOLD;
+        else if ((bb = stm_attackers) & b.bbType(BISHOP)) pt = BISHOP;
+        else if ((bb = stm_attackers) & b.bbType(HORSE)) pt = HORSE;
+        else if ((bb = stm_attackers) & b.bbType(ROOK)) pt = ROOK;
+        else if ((bb = stm_attackers) & b.bbType(DRAGON)) pt = DRAGON;
         else
         {
             promote = false;
@@ -966,7 +967,7 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
     Key h = st_->hand_key;
     Score material = st_->material;
 
-    std::memcpy(&new_st, st_, offsetof(StateInfo, material));
+    std::memcpy(&new_st, st_, offsetof(struct StateInfo, material));
     new_st.previous = st_;
     st_ = &new_st;
 
@@ -2141,6 +2142,10 @@ Move Board::mate1ply1() const
 }
 
 #endif
+
+// @see https://stackoverflow.com/questions/14274225/statement-goto-can-not-cross-pointer-definition
+#define GOTO_FAILED {std::cout << "error!" << " failed step is " << failed_step << *this << std::endl; return false;}
+
 // 各種ビットボード、盤面が正しいかどうかをチェックする
 bool Board::verify() const
 {
@@ -2168,7 +2173,7 @@ bool Board::verify() const
         p_max[ROOK] + p_max[DRAGON] != 2 ||
         p_max[GOLD] != 4 ||
         p_max[KING] != 2)
-        goto Failed;
+        GOTO_FAILED;
 
     failed_step++;
 
@@ -2182,7 +2187,7 @@ bool Board::verify() const
             if (pt == typeOf(piece(sq)))
                 p_max_bb[typeOf(piece(sq))]++;
             else
-                goto Failed;
+                GOTO_FAILED;
 #endif
     failed_step++;
 
@@ -2199,7 +2204,7 @@ bool Board::verify() const
         p_max_bb[ROOK] + p_max_bb[DRAGON] != 2 ||
         p_max_bb[GOLD] != 4 ||
         p_max_bb[KING] != 2)
-        goto Failed;
+        GOTO_FAILED;
 #endif
     failed_step++;
 
@@ -2219,7 +2224,7 @@ bool Board::verify() const
         }
 
         if (pawn[BLACK] > 1 || pawn[WHITE] > 1)
-            goto Failed;
+            GOTO_FAILED;
     }
 
 
@@ -2232,11 +2237,11 @@ bool Board::verify() const
     // 先手の桂香歩
     for (Square sq = SQ_91; sq <= SQ_11; ++sq)
         if (board_[sq] == B_PAWN || board_[sq] == B_LANCE)
-            goto Failed;
+            GOTO_FAILED;
 
     for (Square sq = SQ_91; sq <= SQ_12; ++sq)
         if (board_[sq] == B_KNIGHT)
-            goto Failed;
+            GOTO_FAILED;
 
     failed_step++;
 
@@ -2245,25 +2250,25 @@ bool Board::verify() const
     // 後手の桂香歩
     for (Square sq = SQ_99; sq <= SQ_19; ++sq)
         if (board_[sq] == W_PAWN || board_[sq] == W_LANCE)
-            goto Failed;
+            GOTO_FAILED;
 
     for (Square sq = SQ_98; sq <= SQ_19; ++sq)
         if (board_[sq] == W_KNIGHT)
-            goto Failed;
+            GOTO_FAILED;
 
     failed_step++;
 
     // step 6
 #ifdef USE_BITBOARD
     if (bbTurn(BLACK) & bbTurn(WHITE))
-        goto Failed;
+        GOTO_FAILED;
 #endif
     failed_step++;
 
     // step 7
 #ifdef USE_BITBOARD
     if ((bbTurn(BLACK) | bbTurn(WHITE)) != bbOccupied())
-        goto Failed;
+        GOTO_FAILED;
 #endif
     failed_step++;
 
@@ -2273,7 +2278,7 @@ bool Board::verify() const
     if ((bbType(PAWN) ^ bbType(LANCE) ^ bbType(KNIGHT) ^ bbType(SILVER) ^ bbType(BISHOP) ^
         bbType(ROOK) ^ bbType(GOLD) ^ bbType(KING) ^ bbType(HORSE) ^ bbType(DRAGON) ^
         bbType(PRO_PAWN) ^ bbType(PRO_LANCE) ^ bbType(PRO_KNIGHT) ^ bbType(PRO_SILVER)) != bbOccupied())
-        goto Failed;
+        GOTO_FAILED;
 #endif
     failed_step++;
 
@@ -2282,7 +2287,7 @@ bool Board::verify() const
     for (auto pt1 : PieceTypes)
         for (PieceType pt2 = PieceType(pt1 + 1); pt2 < PIECETYPE_MAX; ++pt2)
             if ((bbType(pt1) & bbType(pt2)))
-                goto Failed;
+                GOTO_FAILED;
 #endif
     failed_step++;
 #endif
@@ -2296,7 +2301,7 @@ bool Board::verify() const
     const Square king_square = kingSquare(enemy);
 
     if (attackers(self, king_square))
-        goto Failed;
+        GOTO_FAILED;
 #endif
     failed_step++;
 
@@ -2309,25 +2314,25 @@ bool Board::verify() const
         if (p == EMPTY)
         {
             if (!(bbEmpty() & sq))
-                goto Failed;
+                GOTO_FAILED;
 
             if (bbTurn(BLACK) & sq || bbTurn(WHITE) & sq || bbOccupied() & sq
                 || bbType(PAWN) & sq || bbType(LANCE) & sq || bbType(KNIGHT) & sq
                 || bbType(SILVER) & sq || bbType(GOLD) & sq || bbType(BISHOP) & sq || bbType(ROOK) & sq
                 || bbType(HORSE) & sq || bbType(DRAGON) & sq || bbType(PRO_PAWN) & sq || bbType(PRO_LANCE) & sq
                 || bbType(PRO_KNIGHT) & sq || bbType(PRO_SILVER) & sq)
-                goto Failed;
+                GOTO_FAILED;
         }
         else
         {
             if (!(bbPiece(p) & sq))
-                goto Failed;
+                GOTO_FAILED;
         }
     }
 
     // step 12
     if (bb_gold_ != bbType(GOLD, PRO_PAWN, PRO_LANCE, PRO_KNIGHT, PRO_SILVER))
-        goto Failed;
+        GOTO_FAILED;
 #endif
 
     failed_step++;
@@ -2345,7 +2350,7 @@ bool Board::verify() const
             << "\nhandKey = " << st_->handKey() << " good handKey = " << st.handKey()
             << "\nmaterial = " << st_->material << " good material = " << st.material
             << "\n hand = " << st_->hand << " good hand = " << st.hand << std::endl;
-        goto Failed;
+        GOTO_FAILED;
     }
 
 #ifdef USE_EVAL
@@ -2356,7 +2361,7 @@ bool Board::verify() const
 
     for (PieceNo no = PIECE_NO_PAWN; no < PIECE_NO_NB; no++)
         if (evalList()->pieceNoOf(list_fb[no]) != no)
-            goto Failed;
+            GOTO_FAILED;
 
     failed_step++;
 
@@ -2379,12 +2384,12 @@ bool Board::verify() const
                 if (BHI[c][pc].fb <= bp && bp < BHI[c][pc].fw)
                 {
                     if (hand(BLACK).count(pc) < (bp - BHI[c][pc].fb))
-                        goto Failed;
+                        GOTO_FAILED;
                 }
                 else if (BHI[c][pc].fw <= bp && bp < BHI[c][pc].fw + diff)
                 {
                     if (hand(WHITE).count(pc) < (bp - BHI[c][pc].fw))
-                        goto Failed;
+                        GOTO_FAILED;
                 }
             }
         }
@@ -2394,7 +2399,7 @@ bool Board::verify() const
                 if (Eval::BP_BOARD_ID[pc].fb <= bp && bp < Eval::BP_BOARD_ID[pc].fb + SQ_MAX)
                 {
                     if (piece(Square(bp - Eval::BP_BOARD_ID[pc].fb)) != pc)
-                        goto Failed;
+                        GOTO_FAILED;
                 }
         }
     }
@@ -2409,7 +2414,7 @@ bool Board::verify() const
         auto pb2 = bb_.pieceBit(sq);
 
         if (pb1 != pb2)
-            goto Failed;
+            GOTO_FAILED;
     }
 
     // step17 二歩フラグのチェック
@@ -2425,7 +2430,7 @@ bool Board::verify() const
             if (exist_pawn != existPawnFile(t, f))
             {
                 std::cout << "nifuflag" << std::endl;
-                goto Failed;
+                GOTO_FAILED;
             }
         }
 
@@ -2443,7 +2448,7 @@ bool Board::verify() const
                 if (stm_piece_[t] & (1ULL << i))
                 {
                     std::cout << "stm_piece_[t] & (1ULL << i)" << std::endl;
-                    goto Failed;
+                    GOTO_FAILED;
                 }
         }
         else
@@ -2452,19 +2457,19 @@ bool Board::verify() const
             if (i != j)
             {
                 std::cout << "pieceSquare" << std::endl;
-                goto Failed;
+                GOTO_FAILED;
             }
             Turn t = turnOf(piece(sq));
 
             if ((stm_piece_[t] & (1ULL << i)) == 0)
             {
                 std::cout << "stm_piece_[t] & (1ULL << i)" << std::endl;
-                goto Failed;
+                GOTO_FAILED;
             }
             if ((stm_piece_[~t] & (1ULL << i)))
             {
                 std::cout << "stm_piece_[~t] & (1ULL << i)" << std::endl;
-                goto Failed;
+                GOTO_FAILED;
             }
         }
     }
@@ -2484,7 +2489,7 @@ bool Board::verify() const
             if (move_cache_[i] != tmp[0])
             {
                 std::cout << *this << "sq = " << pretty(sq) << "pieceno = " << i << " failed";
-                goto Failed;
+                GOTO_FAILED;
             }
 
             if (rp - tmp == 2)
@@ -2493,7 +2498,7 @@ bool Board::verify() const
                 if (move_cache_[i + 6] != tmp[1])
                 {
                     std::cout << *this << "sq = " << pretty(sq) << "pieceno = " << i + 6 << " failed";
-                    goto Failed;
+                    GOTO_FAILED;
                 };
             }
         }
@@ -2502,8 +2507,4 @@ bool Board::verify() const
 #endif
     return true;
 
-
-Failed:
-    std::cout << "error!" << " failed step is " << failed_step << *this << std::endl;
-    return false;
 }

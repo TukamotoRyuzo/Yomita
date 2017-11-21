@@ -24,7 +24,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sstream>
 #include <fstream>
 #include <algorithm>
+
+#ifdef _MSC_VER
 #include <filesystem>
+
+#else
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem ;
+
+#endif
+
 
 #include "tt.h"
 #include "usi.h"
@@ -37,12 +46,25 @@ std::vector<std::string> evalFiles()
 {
     std::vector<std::string> filenames;
 
+#ifdef _MSC_VER
     for (std::tr2::sys::directory_iterator it(evalDir());
         it != std::tr2::sys::directory_iterator(); ++it)
+#else
+    for (fs::directory_iterator it(evalDir());
+        it != fs::directory_iterator(); ++it)
+#endif
     {
+#ifdef _MSC_VER
         std::tr2::sys::path target = *it;
+#else
+        fs::path target = *it;
+#endif
 
+#ifdef _MSC_VER
         if (std::tr2::sys::is_directory(target))
+#else
+        if (fs::is_directory(target))
+#endif
             filenames.push_back(path(evalDir(), target.filename().string()));
     }
     
