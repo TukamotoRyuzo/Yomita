@@ -628,19 +628,19 @@ namespace
         Bitboard bb;
         PieceType pt;
 
-        if ((bb = stm_attackers) & b.bbType(PAWN)) pt = PAWN;
-        else if ((bb = stm_attackers) & b.bbType(LANCE)) pt = LANCE;
-        else if ((bb = stm_attackers) & b.bbType(KNIGHT)) pt = KNIGHT;
-        else if ((bb = stm_attackers) & b.bbType(PRO_PAWN)) pt = PRO_PAWN;
-        else if ((bb = stm_attackers) & b.bbType(PRO_LANCE)) pt = PRO_LANCE;
-        else if ((bb = stm_attackers) & b.bbType(PRO_KNIGHT)) pt = PRO_KNIGHT;
-        else if ((bb = stm_attackers) & b.bbType(SILVER)) pt = SILVER;
-        else if ((bb = stm_attackers) & b.bbType(PRO_SILVER)) pt = PRO_SILVER;
-        else if ((bb = stm_attackers) & b.bbType(GOLD)) pt = GOLD;
-        else if ((bb = stm_attackers) & b.bbType(BISHOP)) pt = BISHOP;
-        else if ((bb = stm_attackers) & b.bbType(HORSE)) pt = HORSE;
-        else if ((bb = stm_attackers) & b.bbType(ROOK)) pt = ROOK;
-        else if ((bb = stm_attackers) & b.bbType(DRAGON)) pt = DRAGON;
+        if ((bb = (stm_attackers & b.bbType(PAWN))) != 0) pt = PAWN;
+        else if ((bb = (stm_attackers & b.bbType(LANCE))) != 0) pt = LANCE;
+        else if ((bb = (stm_attackers & b.bbType(KNIGHT))) != 0) pt = KNIGHT;
+        else if ((bb = (stm_attackers & b.bbType(PRO_PAWN))) != 0) pt = PRO_PAWN;
+        else if ((bb = (stm_attackers & b.bbType(PRO_LANCE))) != 0) pt = PRO_LANCE;
+        else if ((bb = (stm_attackers & b.bbType(PRO_KNIGHT))) != 0) pt = PRO_KNIGHT;
+        else if ((bb = (stm_attackers & b.bbType(SILVER))) != 0) pt = SILVER;
+        else if ((bb = (stm_attackers & b.bbType(PRO_SILVER))) != 0) pt = PRO_SILVER;
+        else if ((bb = (stm_attackers & b.bbType(GOLD))) != 0) pt = GOLD;
+        else if ((bb = (stm_attackers & b.bbType(BISHOP))) != 0) pt = BISHOP;
+        else if ((bb = (stm_attackers & b.bbType(HORSE))) != 0) pt = HORSE;
+        else if ((bb = (stm_attackers & b.bbType(ROOK))) != 0) pt = ROOK;
+        else if ((bb = (stm_attackers & b.bbType(DRAGON))) != 0) pt = DRAGON;
         else
         {
             promote = false;
