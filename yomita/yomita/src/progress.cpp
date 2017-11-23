@@ -71,7 +71,7 @@ namespace Progress
     void save(std::string dir_name)
     {
         std::string prog_dir = path("progress/save", dir_name);
-        mkdir(prog_dir);
+        _mkdir(prog_dir);
         std::ofstream ofs(path(prog_dir, PROGRESS_BIN), std::ios::binary);
 
         if (!ofs.write(reinterpret_cast<char*>(PROGRESS), sizeof(PROGRESS)))
@@ -246,7 +246,7 @@ namespace Learn
     void updateWeights()
     {
         for (auto sq : Squares)
-            for (int i = 0; i < Eval::fe_end; ++i)
+            for (int i = 0; i < (int)Eval::fe_end; ++i)
             {
                 auto& w = prog_w[sq][i];
 
@@ -295,7 +295,7 @@ namespace Learn
 #else
                 const int interval = 10000000;
 #endif
-                for (int loop = 0; loop < max_loop && !Threads.stop;)
+                for (uint64_t loop = 0; loop < max_loop && !Threads.stop;)
                 {
                     for (auto game : games[idx])
                     {

@@ -133,8 +133,7 @@ namespace Eval
                 uint64_t key; 
             };
 
-#if defined HAVE_SSE2 || defined HAVE_SSE4
-#if defined HAVE_BMI2
+#if defined HAVE_SSE2 || defined HAVE_SSE4 || defined HAVE_BMI2
             __m256i mm;
 #endif
             __m128i m[2];
@@ -143,7 +142,7 @@ namespace Eval
     };
 } // namespace Eval
 
-#elif defined EVAL_PPT
+#if defined EVAL_PPT
 
 #include <array>
 #include "platform.h"

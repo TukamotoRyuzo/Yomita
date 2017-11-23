@@ -176,3 +176,8 @@ namespace USI
 void userTest();
 void perft(Board &b, int depth);
 void benchmark(Board& b);
+
+std::vector<std::string> evalFiles();
+std::string evalConfig(std::vector<std::string> eval_files);
+std::ostream& operator << (std::ostream& os, const OptionsMap& om);
+

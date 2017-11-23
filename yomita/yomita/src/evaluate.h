@@ -23,6 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#if defined(__GNUC__)
+#include <cstring>
+#include <mm_malloc.h>
+using namespace std ;
+#endif
+
 // 評価関数全般に関するヘッダファイル
 
 #include "types.h"
@@ -192,7 +198,7 @@ namespace Eval
         { 
             assert(isOK(bp));
             PieceNo ret = piece_no_list_[bp];
-            assert(ret != -1);
+            assert(ret != (PieceNo)-1);
             return ret;
         }
 

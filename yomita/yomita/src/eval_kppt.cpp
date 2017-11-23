@@ -70,6 +70,9 @@ Eval::BonaPiece f2r(const Eval::BonaPiece p)
 };
 #endif
 
+// @see https://stackoverflow.com/questions/14274225/statement-goto-can-not-cross-pointer-definition
+#define GOTO_CALC_DIFF_END { sum.p[2][0] += b.state()->material * FV_SCALE; return (Score)(sum.sum(b.turn()) / FV_SCALE); }
+
 namespace Eval
 {
     // 評価関数ファイルを読み込む
@@ -298,7 +301,7 @@ namespace Eval
         if (!st->sum.isNotEvaluated())
         {
             sum = st->sum;
-            goto CALC_DIFF_END;
+            GOTO_CALC_DIFF_END;
         }
 
         auto now = st;
@@ -522,10 +525,7 @@ namespace Eval
 
         now->sum = sum;
 
-        // 差分計算終わり
-    CALC_DIFF_END:
-        sum.p[2][0] += b.state()->material * FV_SCALE;
-        return (Score)(sum.sum(b.turn()) / FV_SCALE);
+        GOTO_CALC_DIFF_END;
     }
 
     // 評価関数
@@ -660,23 +660,34 @@ namespace Eval
         {
             auto k0 = list_fb[i];
             auto k1 = list_fw[i];
-            KKPW[sq_bk][sq_wk][k0].addGrad(WeightValue{ f, g });
+            {
+                WeightValue delta{ f, g };
+                KKPW[sq_bk][sq_wk][k0].addGrad(delta);
+            }
 
             for (int j = 0; j < i; ++j)
             {
                 auto l0 = list_fb[j];
                 auto l1 = list_fw[j];
-                ((Weight*)kpp_w_)[getKppIndex(sq_bk, k0, l0)].addGrad(WeightValue{ +f, g });
-                ((Weight*)kpp_w_)[getKppIndex(sq_ik, k1, l1)].addGrad(WeightValue{ -f, g });
+                {
+                    WeightValue delta{ +f, g };
+                    ((Weight*)kpp_w_)[getKppIndex(sq_bk, k0, l0)].addGrad(delta);
+                }
+                {
+                    WeightValue delta{ -f, g };
+                    ((Weight*)kpp_w_)[getKppIndex(sq_ik, k1, l1)].addGrad(delta);
+                }
             }
         }
-
-        KKW[sq_bk][sq_wk].addGrad(WeightValue{ f, g });
+        {
+            WeightValue delta{ f, g };
+            KKW[sq_bk][sq_wk].addGrad(delta);
+        }
     }
 
     void updateWeights(uint64_t epoch)
     {
-        const bool skip_update = epoch <= Eval::Weight::skip_count;
+        const bool skip_update = epoch <= (uint64_t)Eval::Weight::skip_count;
 
         // KKPの一番大きな値を表示させることで学習が進んでいるかのチェックに用いる。
 #ifdef DISPLAY_STATS_IN_UPDATE_WEIGHTS
@@ -701,7 +712,7 @@ namespace Eval
                     }
                 }
 
-            for (Square k = Square(9 * id); k < 9 * (id + 1); k++)
+            for (Square k = Square(9 * id); k < (Square)(9 * (id + 1)); k++)
                 for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
                     for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
                     {
@@ -744,7 +755,7 @@ namespace Eval
     void Evaluater::save(std::string eval_dir, bool save_in_eval_dir)
     {
         auto dir = path(save_in_eval_dir ? evalDir() : evalSaveDir(), eval_dir);
-        mkdir(dir);
+        _mkdir(dir);
         std::ofstream ofsKK(path(dir, KK_BIN), std::ios::binary);
         std::ofstream ofsKKP(path(dir, KKP_BIN), std::ios::binary);
         std::ofstream ofsKPP(path(dir, KPP_BIN), std::ios::binary);
@@ -798,7 +809,7 @@ namespace Eval
     void Evaluater::saveNoFileConvert(std::string eval_dir)
     {
         eval_dir = path(USI::Options["EvalSaveDir"], eval_dir);
-        mkdir(eval_dir);
+        _mkdir(eval_dir);
         std::ofstream ofsKK (path(eval_dir,  KK_BIN), std::ios::binary);
         std::ofstream ofsKKP(path(eval_dir, KKP_BIN), std::ios::binary);
         std::ofstream ofsKPP(path(eval_dir, KPP_BIN), std::ios::binary);

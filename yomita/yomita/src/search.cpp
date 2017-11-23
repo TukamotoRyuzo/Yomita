@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <sstream>
+#include <math.h>
 
 #include "tt.h"
 #include "usi.h"
@@ -302,8 +303,8 @@ void MainThread::search()
 
         SYNC_COUT << "bestmove " << toUSI(best_move);
         
-        if (Options["USI_Ponder"]
-            && best_thread->root_moves[0].pv.size() > 1
+        if ((Options["USI_Ponder"]
+            && best_thread->root_moves[0].pv.size() > 1)
             || (best_thread->root_moves[0].pv[0] != MOVE_NONE
                 && best_thread->root_moves[0].extractPonderFromTT(root_board, WeakPonder)))
             std::cout << " ponder " << toUSI(best_thread->root_moves[0].pv[1]);
@@ -430,7 +431,7 @@ void Thread::search()
             if (!main_thread)
                 continue;
 
-            if (Threads.stop || (pv_idx + 1 == multi_pv || Time.elapsed() > 3000)
+            if ((Threads.stop || (pv_idx + 1 == multi_pv || Time.elapsed() > 3000))
                 && (root_depth < 3 * ONE_PLY || last_info_time + pv_interval < Time.elapsed()))
             {
                 last_info_time = Time.elapsed();

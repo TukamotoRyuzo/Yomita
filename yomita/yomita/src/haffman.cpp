@@ -112,7 +112,7 @@ struct SfenPacker
         auto c = huffman_table[pr];
         writeNbit(c[0], c[1]);
 
-        if (pc == NO_PIECE_TYPE)
+        if (pc == (Piece)NO_PIECE_TYPE)
             return;
 
         if (pr != GOLD)

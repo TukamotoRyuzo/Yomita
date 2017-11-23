@@ -278,9 +278,10 @@ namespace Learn {
 // 将棋所で将棋を指せるようにするためのメッセージループ。
 void USI::loop(int argc, char** argv)
 {
+#ifndef NDEBUG
     // デフォルトでログを取る。
     startLogger(true);
-
+#endif
     Board board(Threads.main());
 
     // USIから送られてくるコマンドを受け取るバッファ
@@ -303,7 +304,7 @@ void USI::loop(int argc, char** argv)
 
         if (   token == "quit"
             || token == "stop"
-            || token == "ponderhit" && Threads.stop_on_ponderhit
+            || (token == "ponderhit" && Threads.stop_on_ponderhit)
             || token == "gameover")
         {
             Threads.stop = true;

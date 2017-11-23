@@ -52,8 +52,8 @@ void randomPlayer(Board& b, uint64_t loop_max)
     Move moves[MAX_PLY];
     PRNG rng(20160817);
 
-    int k = 0;
-    for (int i = 0; i < loop_max; i++)
+    uint64_t  k = 0;
+    for (uint64_t  i = 0; i < loop_max; i++)
     {
 
         for (ply = 0; ply < MAX_PLY; ply++)

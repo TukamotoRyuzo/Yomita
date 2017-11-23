@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma warning(disable: 4838) // 'int' から 'const char' への変換
 #pragma warning(disable: 4805) // '|': 演算中の 'int64_t' 型と 'const bool' 型の混用は安全ではありません
 
+#if defined(_MSC_VER)
 // MicroSoft Visual C++はinttypes.hをサポートしていない。サポートしているならここに書かれる内容はinttypes.hに任せればいい。
 typedef   signed __int8    int8_t;
 typedef unsigned __int8   uint8_t;
@@ -40,6 +41,9 @@ typedef   signed __int32  int32_t;
 typedef unsigned __int32 uint32_t;
 typedef   signed __int64  int64_t;
 typedef unsigned __int64 uint64_t;
+#elif defined(__GNUC__)
+#define __assume(cond) do { if (!(cond)) __builtin_unreachable(); } while (0)
+#endif
 
 // Debug時に定義するとassertが無効になり、Release時に定義するとassertが有効になる。
 //#define SPEED_DEBUG

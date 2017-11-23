@@ -128,7 +128,7 @@ private:
     }
 };
 
-void mkdir(std::string dir);
+void _mkdir(std::string dir);
 
 namespace WinProcGroup
 {

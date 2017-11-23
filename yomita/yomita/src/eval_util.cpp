@@ -39,7 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <codecvt>
 #include <fstream>
 #include <iostream>
+#ifdef _MSC_VER
 #include <windows.h>
+#endif
 
 #include "usi.h"
 
@@ -165,6 +167,12 @@ namespace Eval
         const size_t size = sizeof(Evaluater);
         const std::string dir_name = USI::Options["EvalDir"];
 
+#ifndef _MSC_VER
+            GlobalEvaluater = new Evaluater;
+            GlobalEvaluater->load(dir_name);
+            SYNC_COUT << "info string use non-shared eval memory " << dir_name << SYNC_ENDL;
+            return;
+#else
         if (!(bool)USI::Options["EvalShare"])
         {
             GlobalEvaluater = new Evaluater;
@@ -202,6 +210,7 @@ namespace Eval
 
             ReleaseMutex(h_mutex);
         }
+#endif
     }
 }
 

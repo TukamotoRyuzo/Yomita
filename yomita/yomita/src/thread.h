@@ -174,7 +174,7 @@ inline void ThreadPool::startWorkers(size_t thread_num)
     stop = false;
     exit();
 
-    for (int i = 0; i < thread_num; i++)
+    for (int i = 0; i < (int)thread_num; i++)
     {
         push_back(new T());
         back()->startSearching();
