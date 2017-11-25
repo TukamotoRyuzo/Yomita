@@ -460,13 +460,13 @@ namespace
 #ifdef USE_YMM
             case 2: 
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]); 
-                FORBB(target, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); break;
+                FORBB(target, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); break;
             case 3: 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]); 
-                FORBB(target, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); break;
+                FORBB(target, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); break;
             case 4: 
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]); 
-                FORBB(target, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); break;
+                FORBB(target, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); break;
 #else
             case 2: FORBB(target, to, UROL2(mlist++->move = Move(pc[i] | to))); break;
             case 3: FORBB(target, to, UROL3(mlist++->move = Move(pc[i] | to))); break;
@@ -490,24 +490,24 @@ namespace
 #ifdef USE_YMM
             case 1:
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FORBB(target_p, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; });
+                FORBB(target_p, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; });
                 FORBB(target_o, to, mlist++->move = Move(pc[0] | to)); break;
             case 2: 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FORBB(target_p, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; });
+                FORBB(target_p, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; });
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FORBB(target_o, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); break;
+                FORBB(target_o, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); break;
             case 3: 
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FORBB(target_p, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; });
+                FORBB(target_p, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; });
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FORBB(target_o, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); break;
+                FORBB(target_o, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); break;
             case 4:
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FORBB(target_p, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4;
+                FORBB(target_p, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4;
                 mlist++->move = Move(pc[0] | to); });
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FORBB(target_o, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); break;
+                FORBB(target_o, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); break;
 #else
             case 1: FORBB(target_p, to, UROL2(mlist++->move = Move(pc[i] | to))); FORBB(target_o, to, UROL1(mlist++->move = Move(pc[i] | to))); break;
             case 2: FORBB(target_p, to, UROL3(mlist++->move = Move(pc[i] | to))); FORBB(target_o, to, UROL2(mlist++->move = Move(pc[i] | to))); break;
@@ -531,24 +531,24 @@ namespace
 #ifdef USE_YMM
             case 1: 
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FORBB(target_l, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; });
+                FORBB(target_l, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; });
                 FOR64(target_o64, to, T_HIGH, mlist++->move = Move(pc[0] | to)); break;
             case 2: 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FORBB(target_l, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; });
+                FORBB(target_l, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; });
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); break;
             case 3:  
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FORBB(target_l, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); 
+                FORBB(target_l, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); break;
             case 4: 
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FORBB(target_l, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FORBB(target_l, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); });
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); break;
 #else
             case 1: FORBB(target_l, to, UROL2(mlist++->move = Move(pc[i] | to))); FOR64(target_o64, to, T_HIGH, UROL1(mlist++->move = Move(pc[i] | to))); break;
             case 2: FORBB(target_l, to, UROL3(mlist++->move = Move(pc[i] | to))); FOR64(target_o64, to, T_HIGH, UROL2(mlist++->move = Move(pc[i] | to))); break;
@@ -578,38 +578,38 @@ namespace
 #ifdef USE_YMM
             case 0: 
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FORBB(target_p, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; });
+                FORBB(target_p, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; });
                 FORBB(target_l, to, mlist++->move = Move(pc[0] | to)); break;
             case 1: 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FORBB(target_p, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); 
+                FORBB(target_p, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); 
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FORBB(target_l, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); 
+                FORBB(target_l, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); 
                 FOR64(target_o64, to, T_HIGH, mlist++->move = Move(pc[0] | to)); break;
             case 2: 
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FORBB(target_p, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); 
+                FORBB(target_p, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FORBB(target_l, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); 
+                FORBB(target_l, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); 
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); break;
             case 3:
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FORBB(target_p, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FORBB(target_p, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); }); 
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FORBB(target_l, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); 
+                FORBB(target_l, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); break;
             case 4: 
                 move256 = _mm256_set_epi64x(pc[5], pc[4], pc[3], pc[2]), move256_2 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FORBB(target_p, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
-                                      *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256_2); mlist += 2; }); 
+                FORBB(target_p, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
+                                      _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256_2)); mlist += 2; }); 
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FORBB(target_l, to, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4;
+                FORBB(target_l, to, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4;
                 mlist++->move = Move(pc[0] | to); }); 
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]); 
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); break;
 #else
             case 0: FORBB(target_p, to, UROL2(mlist++->move = Move(pc[i] | to)));  FORBB(target_l, to, UROL1(mlist++->move = Move(pc[i] | to))); break;
             case 1: FORBB(target_p, to, UROL3(mlist++->move = Move(pc[i] | to)));  FORBB(target_l, to, UROL2(mlist++->move = Move(pc[i] | to))); FOR64(target_o64, to, T_HIGH, UROL1(mlist++->move = Move(pc[i] | to)));  break;
@@ -634,24 +634,24 @@ namespace
 #ifdef USE_YMM
             case 1: 
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_k64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; });
+                FOR64(target_k64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; });
                 FOR64(target_o64, to, T_HIGH, mlist++->move = Move(pc[0] | to)); break;
             case 2: 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_k64, to, T_LOW,  { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); 
+                FOR64(target_k64, to, T_LOW,  { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); 
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); break;
             case 3: 
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_k64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); 
+                FOR64(target_k64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); break;
             case 4: 
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FOR64(target_k64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FOR64(target_k64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); }); 
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); break;
 #else
             case 1: FOR64(target_k64, to, T_LOW, UROL2(mlist++->move = Move(pc[i] | to))); FOR64(target_o64, to, T_HIGH, UROL1(mlist++->move = Move(pc[i] | to))); break;
             case 2: FOR64(target_k64, to, T_LOW, UROL3(mlist++->move = Move(pc[i] | to))); FOR64(target_o64, to, T_HIGH, UROL2(mlist++->move = Move(pc[i] | to))); break;
@@ -687,48 +687,48 @@ namespace
 #ifdef USE_YMM
             case 0: 
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_pk64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; });
+                FOR64(target_pk64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; });
                 FOR64(target_k64, to, T_LOW,  mlist++->move = Move(dk | to));
                 FOR64(target_p64, to, T_HIGH, mlist++->move = Move(dp | to)); break;
             case 1: 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_pk64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); 
+                FOR64(target_pk64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); 
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_k64, to, T_LOW,  { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); 
+                FOR64(target_k64, to, T_LOW,  { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); 
                 move256 = _mm256_set_epi64x(0, 0, pc[2], pc[0]);
-                FOR64(target_p64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; });
+                FOR64(target_p64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; });
                 FOR64(target_o64, to, T_HIGH, mlist++->move = Move(pc[0] | to)); break;
             case 2: 
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_pk64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); 
+                FOR64(target_pk64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_k64,  to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); 
+                FOR64(target_k64,  to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); 
                 move256 = _mm256_set_epi64x(0, pc[3], pc[1], pc[0]);
-                FOR64(target_p64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; });
+                FOR64(target_p64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; });
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); break;
             case 3:
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FOR64(target_pk64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FOR64(target_pk64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); }); 
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_k64,  to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); 
+                FOR64(target_k64,  to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); 
                 move256 = _mm256_set_epi64x(pc[4], pc[2], pc[1], pc[0]);
-                FOR64(target_p64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); 
+                FOR64(target_p64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); 
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); break;
             case 4: 
                 move256 = _mm256_set_epi64x(pc[5], pc[4], pc[3], pc[2]), move256_2 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_pk64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
-                                                *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256_2); mlist += 2; }); 
+                FOR64(target_pk64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
+                                                _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256_2)); mlist += 2; }); 
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FOR64(target_k64,  to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FOR64(target_k64,  to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); }); 
                 move256 = _mm256_set_epi64x(pc[5], pc[3], pc[2], pc[1]);
-                FOR64(target_p64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FOR64(target_p64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); }); 
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); break;
 #else
             case 0:
                 FOR64(target_pk64, to, T_LOW, UROL2(mlist++->move = Move(pc[i] | to)));
@@ -784,38 +784,38 @@ namespace
 #ifdef USE_YMM
             case 0:
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_k64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; });
+                FOR64(target_k64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; });
                 FOR64(target_l64, to, T_HIGH, mlist++->move = Move(dl | to)); break;
             case 1:
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_k64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; });
+                FOR64(target_k64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; });
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_l64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; });
+                FOR64(target_l64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; });
                 FOR64(target_o64, to, T_HIGH, mlist++->move = Move(pc[0] | to)); break;
             case 2:
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_k64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; });
+                FOR64(target_k64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; });
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_l64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; });
+                FOR64(target_l64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; });
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); break;
             case 3:
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FOR64(target_k64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4;
+                FOR64(target_k64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4;
                 mlist++->move = Move(pc[0] | to); });
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_l64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; });
+                FOR64(target_l64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; });
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); break;
             case 4:
                 move256 = _mm256_set_epi64x(pc[5], pc[4], pc[3], pc[2]), move256_2 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_k64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4;
-                                               *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256_2); mlist += 2; });
+                FOR64(target_k64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4;
+                                               _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256_2)); mlist += 2; });
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FOR64(target_l64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FOR64(target_l64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); });
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); break;
 #else
             case 0: 
                 FOR64(target_k64, to, T_LOW,  UROL2(mlist++->move = Move(pc[i] | to))); 
@@ -876,63 +876,63 @@ namespace
 #ifdef USE_YMM
             case 0:
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_pkl64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; });
+                FOR64(target_pkl64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; });
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_pl64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; });
+                FOR64(target_pl64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; });
                 move256 = _mm256_set_epi64x(0, 0, pc[2], pc[0]);
-                FOR64(target_kl64, to, T_LOW,  { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; });
+                FOR64(target_kl64, to, T_LOW,  { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; });
                 FOR64(target_l64, to, T_HIGH, mlist++->move = Move(pc[0] | to)); break;
             case 1:
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_pkl64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; });
+                FOR64(target_pkl64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; });
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_pl64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; });
+                FOR64(target_pl64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; });
                 move256 = _mm256_set_epi64x(0, pc[3], pc[1], pc[0]);
-                FOR64(target_kl64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; });
+                FOR64(target_kl64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; });
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_l64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); 
+                FOR64(target_l64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); 
                 FOR64(target_o64, to, T_HIGH, mlist++->move = Move(pc[0] | to)); break;
             case 2:
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FOR64(target_pkl64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FOR64(target_pkl64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); });
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_pl64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; });
+                FOR64(target_pl64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; });
                 move256 = _mm256_set_epi64x(pc[4], pc[2], pc[1], pc[0]);
-                FOR64(target_kl64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; });
+                FOR64(target_kl64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; });
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_l64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; });
+                FOR64(target_l64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; });
                 move256 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 2; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 2; }); break;
             case 3:
                 move256 = _mm256_set_epi64x(pc[5], pc[4], pc[3], pc[2]), move256_2 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_pkl64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
-                                                 *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256_2); mlist += 2; });
+                FOR64(target_pkl64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
+                                                 _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256_2)); mlist += 2; });
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FOR64(target_pl64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FOR64(target_pl64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); });
                 move256 = _mm256_set_epi64x(pc[5], pc[3], pc[2], pc[1]);
-                FOR64(target_kl64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FOR64(target_kl64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); });
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_l64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; });
+                FOR64(target_l64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; });
                 move256 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 3; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 3; }); break;
             case 4:
                 move256 = _mm256_set_epi64x(pc[6], pc[5], pc[4], pc[3]), move256_2 = _mm256_set_epi64x(0, pc[2], pc[1], pc[0]);
-                FOR64(target_pkl64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4;
-                                                 *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256_2); mlist += 3; });
+                FOR64(target_pkl64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4;
+                                                 _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256_2)); mlist += 3; });
                 move256 = _mm256_set_epi64x(pc[5], pc[4], pc[3], pc[2]); move256_2 = _mm256_set_epi64x(0, 0, pc[1], pc[0]);
-                FOR64(target_pl64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
-                                                 *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256_2); mlist += 2; });
+                FOR64(target_pl64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
+                                                 _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256_2)); mlist += 2; });
                 move256 = _mm256_set_epi64x(pc[6], pc[4], pc[3], pc[2]);
-                FOR64(target_kl64, to, T_LOW, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4;
-                                                *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256_2); mlist += 2; });
+                FOR64(target_kl64, to, T_LOW, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4;
+                                                _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256_2)); mlist += 2; });
                 move256 = _mm256_set_epi64x(pc[4], pc[3], pc[2], pc[1]);
-                FOR64(target_l64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; 
+                FOR64(target_l64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; 
                 mlist++->move = Move(pc[0] | to); });
                 move256 = _mm256_set_epi64x(pc[3], pc[2], pc[1], pc[0]);
-                FOR64(target_o64, to, T_HIGH, { *(__m256i*)mlist = _mm256_or_si256(YMM_TO[to], move256); mlist += 4; }); break;
+                FOR64(target_o64, to, T_HIGH, { _mm256_storeu_si256((__m256i*)mlist, _mm256_or_si256(YMM_TO[to], move256)); mlist += 4; }); break;
 #else
             case 0:
                 FOR64(target_pkl64, to, T_LOW, UROL3(mlist++->move = Move(pc[i] | to)));
