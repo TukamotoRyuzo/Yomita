@@ -34,7 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // 持ち駒打ちでAVX2命令を使うか
 #ifdef HAVE_BMI2
+// MSVC で無い場合は、YMM を使用しない
+#if defined(_MSC_VER)
 #define USE_YMM
+#endif
 #endif
 
 // プロトタイプ宣言 : generateLegalのため
