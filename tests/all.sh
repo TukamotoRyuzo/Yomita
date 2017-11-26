@@ -1,7 +1,6 @@
 #!/bin/bash
 
-#if [ "x$1" != "xsse42" ]; then
-if [ "x$1" != "xsse42" || "x$1" != "xavx2" ]; then
+if [ "x$1" != "xsse42" ]; then
   echo "testing cancel(!= $1)"
   exit 0
 fi
