@@ -29,12 +29,13 @@ before_install:
   - env
   - cat /proc/cpuinfo
   - export SRC_DIR="`pwd`/yomita/yomita/src"
+  - export TEST_DIR="`pwd`/tests"
 script:
   - pwd
   - echo $TARGET
   - mkdir "$TRAVIS_BUILD_DIR/build-ninja-$TARGET"
   - cd "$TRAVIS_BUILD_DIR/build-ninja-$TARGET"
   - cmake -Dtarget=$TARGET -G Ninja "$SRC_DIR" && ninja -v
-  - mv Yomita-by-clang ../../../tests/
-  - cd ../../../tests/
+  - mv Yomita-by-clang "$TEST_DIR"
+  - cd $TEST_DIR
   - ./all.sh $TARGET
