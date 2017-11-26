@@ -35,8 +35,6 @@ script:
   - mkdir "$TRAVIS_BUILD_DIR/build-ninja-$TARGET"
   - cd "$TRAVIS_BUILD_DIR/build-ninja-$TARGET"
   - cmake -Dtarget=$TARGET -G Ninja "$SRC_DIR" && ninja -v
-  - 'if [ "$TARGET" = "avx2" ]; then wget https://github.com/TukamotoRyuzo/Yomita/releases/download/SDT5/yomitaSDT5.zip && unzip yomitaSDT5.zip && mv Yomita-by-clang yomita_engine && cd yomita_engine && echo usi | ./Yomita-by-clang && echo b | ./Yomita-by-clang; fi'
-  - 'if [ "$TARGET" = "sse42" ]; then wget https://github.com/TukamotoRyuzo/Yomita/releases/download/SDT5/yomitaSDT5.zip && unzip yomitaSDT5.zip && mv Yomita-by-clang yomita_engine && cd yomita_engine && echo usi | ./Yomita-by-clang && echo b | ./Yomita-by-clang; fi'
-  - 'if [ "$TARGET" = "learn" ]; then wget https://github.com/TukamotoRyuzo/Yomita/releases/download/SDT5/yomitaSDT5.zip && unzip yomitaSDT5.zip && mv Yomita-by-clang yomita_engine && cd yomita_engine && echo usi | ./Yomita-by-clang && echo b | ./Yomita-by-clang; fi'
-  - 'if [ "$TARGET" = "learn-sse42" ]; then wget https://github.com/TukamotoRyuzo/Yomita/releases/download/SDT5/yomitaSDT5.zip && unzip yomitaSDT5.zip && mv Yomita-by-clang yomita_engine && cd yomita_engine && echo usi | ./Yomita-by-clang && echo b | ./Yomita-by-clang; fi'
-# - 'if [ -f "Yomita-by-clang" && "$TARGET" = "avx2" ]; then
+  - mv Yomita-by-clang ../../../tests/
+  - cd ../../../tests/
+  - ./all.sh $TARGET
