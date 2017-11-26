@@ -1,0 +1,41 @@
+language: cpp
+os: linux
+dist: trusty
+sudo: required
+compiler: clang
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-trusty-3.9
+    packages:
+      - clang-3.9
+      - g++-6
+      - libc++-dev
+      - ninja-build
+      - cmake
+      - cmake-data
+env:
+  global:
+    - CC='clang-3.9'
+    - CXX='clang++-3.9'
+  matrix:
+    - TARGET=avx2
+    - TARGET=sse42
+    - TARGET=learn
+    - TARGET=learn-sse42
+
+before_install:
+  - env
+  - cat /proc/cpuinfo
+  - export SRC_DIR="`pwd`/yomita/yomita/src"
+  - export TEST_DIR="`pwd`/tests"
+script:
+  - pwd
+  - echo $TARGET
+  - mkdir "$TRAVIS_BUILD_DIR/build-ninja-$TARGET"
+  - cd "$TRAVIS_BUILD_DIR/build-ninja-$TARGET"
+  - cmake -Dtarget=$TARGET -G Ninja "$SRC_DIR" && ninja -v
+  - mv Yomita-by-clang "$TEST_DIR"
+  - cd $TEST_DIR
+  - ./all.sh $TARGET

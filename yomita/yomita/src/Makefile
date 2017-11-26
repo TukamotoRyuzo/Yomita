@@ -56,7 +56,7 @@ $(OBJDIR)/%.o: %.cpp
 all: clean $(TARGET)
 
 avx2:
-	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DHAVE_BMI2 -mbmi2 -mavx2 -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
+	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DHAVE_BMI2 -DHAVE_SSE4 -mbmi2 -mavx2 -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
 
 sse42:
 	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DHAVE_SSE42 -msse4.2 -march=corei7' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
@@ -65,7 +65,7 @@ sse42:
 # 	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DHAVE_SSE2 -msse2 -march=core2' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)_sse
 
 learn:
-	$(MAKE) CFLAGS='$(CFLAGS) -DHAVE_BMI2 -DLEARN -mbmi2 -mavx2 -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
+	$(MAKE) CFLAGS='$(CFLAGS) -DHAVE_BMI2  -DHAVE_SSE4 -DLEARN -mbmi2 -mavx2 -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
 
 learn-sse42:
 	$(MAKE) CFLAGS='$(CFLAGS) -DHAVE_SSE42 -DLEARN -mbmi2 -mavx2 -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)

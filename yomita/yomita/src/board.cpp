@@ -358,6 +358,7 @@ Bitboard Board::attackers(const Square sq, const Bitboard& occupied) const
 }
 
 template Bitboard Board::attackers<true>(const Turn t, const Square sq, const Bitboard& occupied) const;
+template Bitboard Board::attackers<false>(const Turn t, const Square sq, const Bitboard& occupied) const;
 
 // sqに移動可能な手番側の駒のBitboardを返す。
 template <bool ExceptKing> Bitboard Board::attackers(const Turn t, const Square sq, const Bitboard& occupied) const
