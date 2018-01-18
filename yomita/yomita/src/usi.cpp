@@ -37,6 +37,8 @@ const std::string version = "4.61";
 // USIプロトコル対応のGUIとのやりとりを受け持つクラス
 namespace USI
 {
+    std::string engineName() { return engine_name + version; }
+
     OptionsMap Options;
     LimitsType Limits;
 

@@ -88,55 +88,7 @@ namespace Eval
             return;
         }
 
-#if defined CONSIDER_PROMOTION_IN_EVAL && 0
-        {
-            const size_t fe_end0 = 1548;
-            const size_t size_kk = SQ_MAX * SQ_MAX;
-            const size_t size_kkp = (size_t)SQ_MAX * (size_t)SQ_MAX * (size_t)fe_end0;
-            const size_t size_kpp = (size_t)SQ_MAX * (size_t)fe_end0 * (size_t)fe_end0;
-            auto kk_e = (ValueKk(*)[SQ_MAX][SQ_MAX])new ValueKk[size_kk];
-            auto kkp_e = (ValueKkp(*)[SQ_MAX][SQ_MAX][fe_end0])new ValueKkp[size_kkp];
-            auto kpp_e = (ValueKpp(*)[SQ_MAX][fe_end0][fe_end0])new ValueKpp[size_kpp];
-            ifsKK.read(reinterpret_cast<char*>(kk_e), size_kk * sizeof(ValueKk));
-            ifsKKP.read(reinterpret_cast<char*>(kkp_e), size_kkp * sizeof(ValueKkp));
-            ifsKPP.read(reinterpret_cast<char*>(kpp_e), size_kpp * sizeof(ValueKpp));
-            auto conv_gold = [](BonaPiece bp) {
-                BonaPiece ret = bp;
-                if (bp >= f_pro_pawn)
-                {
-                    if (bp < fe_gold_end)
-                    {
-                        int offset = (bp - f_pro_pawn) % 162;
-                        ret = f_gold + offset;
-                    }
-                    else
-                        ret = bp - 648;
-                }
-                return ret;
-            };
-
-            for (auto k1 : Squares)
-                for (auto k2 : Squares)
-                    kk_[k1][k2] = (*kk_e)[k1][k2];
-
-            for (auto k1 : Squares)
-                for (auto k2 : Squares)
-                    for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
-                        kkp_[k1][k2][p] = (*kkp_e)[k1][k2][conv_gold(p)];
-
-            for (auto k : Squares)
-                for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
-                    for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
-                        kpp_[k][p1][p2] = (*kpp_e)[k][conv_gold(p1)][conv_gold(p2)];
-
-            delete[] kk_e;
-            delete[] kkp_e;
-            delete[] kpp_e;
-        }
-
-        return;
-#endif
-#ifdef USE_FILE_SQUARE_EVAL
+#if defined USE_FILE_SQUARE_EVAL
         // x86環境ではKPPT二つ分のメモリを確保しようとするとbad_allocを起こすことがある。
         // 一時バッファ無しで縦型→横型変換するコードが理想だが今のところ思いつかないので
         // なるべくメモリを節約しながら縦横変換を行うことにする。また、省メモリ読み込みに
@@ -786,7 +738,7 @@ namespace Eval
         auto& kkp2 = kkp_;
         auto& kpp2 = kpp_;
 #endif
-        if (!ofsKK.write(reinterpret_cast<char*>(kk2), sizeof(ValueKk)  * size_kk)
+        if (   ! ofsKK.write(reinterpret_cast<char*>(kk2),  sizeof(ValueKk)  * size_kk)
             || !ofsKKP.write(reinterpret_cast<char*>(kkp2), sizeof(ValueKkp) * size_kkp)
             || !ofsKPP.write(reinterpret_cast<char*>(kpp2), sizeof(ValueKpp) * size_kpp))
             std::cout << "Error : save_eval() failed" << std::endl;

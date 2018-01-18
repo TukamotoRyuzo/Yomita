@@ -85,19 +85,7 @@ namespace Eval
         e_silver = f_silver + 81,
         f_gold = e_silver + 81,
         e_gold = f_gold + 81,
-#ifdef CONSIDER_PROMOTION_IN_EVAL
-        f_pro_pawn = e_gold + 81,
-        e_pro_pawn = f_pro_pawn + 81,
-        f_pro_lance = e_pro_pawn + 81,
-        e_pro_lance = f_pro_lance + 81,
-        f_pro_knight = e_pro_lance + 81,
-        e_pro_knight = f_pro_knight + 81,
-        f_pro_silver = e_pro_knight + 81,
-        e_pro_silver = f_pro_silver + 81,
-        fe_gold_end = e_pro_silver + 81,
-#else
         fe_gold_end = e_gold + 81,
-#endif
         f_bishop = fe_gold_end,
         e_bishop = f_bishop + 81,
         f_horse = e_bishop + 81,

@@ -1282,54 +1282,6 @@ bool Board::pseudoLegal2(const Move move) const
     return true;
 }
 
-#ifdef CALC_MOVE_DIFF
-template <bool IsDrop, bool Undo>
-void Board::calcMoveDiff(Square from, Square to)
-{
-    constexpr PackType PTS[2] = { NEIGHBOR, RAY };
-    const Square sqs[2] = { to, from };
-    uint64_t dirty = 0;
-
-    __m256i n0 = bb_.pack<NEIGHBOR>(to);
-    __m256i r0 = bb_.pack<RAY>(to);
-    __m256i n1 = bb_.pack<NEIGHBOR>(from);
-    __m256i r1 = bb_.pack<RAY>(from);
-
-    for (auto t : Turns)
-    {
-        uint32_t attacks[4] = {
-            to32bit(attackBit<KNIGHTS>(t, to, n0)),
-            to32bit(attackBit<NO_KNIGHTS>(t, to, r0)),
-            IsDrop ? 0 : to32bit(attackBit<KNIGHTS>(t, from, n1)),
-            IsDrop ? 0 : to32bit(attackBit<NO_KNIGHTS>(t, from, r1)),
-        };
-
-        for (int c = 0; c < (IsDrop ? 1 : 2); c++)
-        {
-            uint32_t mask = attacks[c * 2];
-
-            while (mask)
-            {
-                Square sq = pop<NEIGHBOR>(mask, sqs[c]);
-                PieceNo piece_no = sq_to_pieceno_[sq];
-                dirty_flag_ |= 1ULL << piece_no;
-            }
-
-            mask = attacks[c * 2 + 1];
-
-            while (mask)
-            {
-                Square sq = pop<RAY>(mask, sqs[c]);
-                PieceNo piece_no = sq_to_pieceno_[sq];
-                dirty_flag_ |= 1ULL << piece_no;
-            }
-        }
-    }
-
-    PieceNo move_no = sq_to_pieceno_[Undo && !IsDrop ? from : to];
-    dirty_flag_ |= 1ULL << move_no;
-}
-#endif
 template <bool NotAlwaysDrop>
 bool Board::legal2(const Move move) const
 {
@@ -1420,105 +1372,23 @@ bool Board::isDeclareWin2() const
     return true;
 }
 
-// 飛び駒の指し手生成。
-template <Turn T, PieceType PT, MoveType MT>
-__m256i* generateSliderMove(const Byteboard& bb, Square from, __m256i* mlist)
-{
-    constexpr bool IsPromotion = isPromoted(PT);
-    constexpr int id = PT == ROOK || PT == DRAGON || PT == LANCE ? 0 : 1;
-    constexpr PackType Pack = IsPromotion ? RAY : PT == BISHOP ? DIAG : CROSS;
-
-    __m256i line = bb.pack<Pack>(from);
-    __m256i strike = strikeMask<Pack>(line, from);
-    __m256i mask = MT == CAPTURE_PLUS_PAWN_PROMOTE ? (turnMask(line, ~T) & strike) 
-                 : MT == NO_CAPTURE_MINUS_PAWN_PROMOTE ? (emptyMask(line) & strike)
-                 : _mm256_andnot_si256(turnMask(line, T), strike);
-    __m256i pat = _mm256_cvtepi8_epi16(_mm256_extractf128_si256(mask, id));
-
-    if (PT == LANCE)
-        pat = _mm256_broadcastsi128_si256(_mm256_extractf128_si256(pat, 0));
-
-    __m256i moves = MOVE16_PIECE_BASE[T][nativeType(PT)][from] & pat;
-
-    if (PT == HORSE || PT == DRAGON)
-        moves &= MASK_MOVE_NOT_PROMOTE;
-
-    *mlist++ = moves;
-
-    if (IsPromotion)
-    {
-        pat = _mm256_cvtepi8_epi16(_mm256_extractf128_si256(mask, id ? 0 : 1));
-        moves = MOVE16_PIECE_BASE[T][PT][from] & pat;
-        *mlist++ = moves;
-    }
-
-    return mlist;
-}
-
 template <Turn T, MoveType MT>
-__m256i* generateMoveFrom(const Byteboard& bb, Square from, Piece p, __m256i* mlist)
+MoveStack* generateMoveFrom(const Byteboard& bb, Square from, Piece p, MoveStack* mlist)
 {
     if (isSlider(p))
     {
-        switch (typeOf(p))
-        {
-        case LANCE:  mlist = (generateSliderMove<T, LANCE,  MT>(bb, from, mlist)); break;
-        case BISHOP: mlist = (generateSliderMove<T, BISHOP, MT>(bb, from, mlist)); break;
-        case ROOK:   mlist = (generateSliderMove<T, ROOK,   MT>(bb, from, mlist)); break;
-        case HORSE:  mlist = (generateSliderMove<T, HORSE,  MT>(bb, from, mlist)); break;
-        case DRAGON: mlist = (generateSliderMove<T, DRAGON, MT>(bb, from, mlist)); break;
-        default: UNREACHABLE;
-        }
+
     }
     else
     {
-        PieceType pt = typeOf(p);
-        __m256i line = bb.pack<NEIGHBOR>(from);
-        __m256i mask = MT == CAPTURE_PLUS_PAWN_PROMOTE ? turnMask(line, ~T) 
-                     : MT == NO_CAPTURE_MINUS_PAWN_PROMOTE ? emptyMask(line)
-                     : notTurnMask<T>(line);
-        __m256i pat = _mm256_cvtepi8_epi16(_mm256_extractf128_si256(mask, 0));
-        pat = _mm256_broadcastsi128_si256(pt == KNIGHT ? _mm256_extractf128_si256(pat, 1) : _mm256_extractf128_si256(pat, 0));
-        __m256i moves = MOVE16_PIECE_BASE[T][pt][from] & pat;
 
-        if (!isZero(moves))
-            *mlist++ = moves;
     }
 
     return mlist;
 }
 
-#ifdef CALC_MOVE_DIFF
-template <Turn T, MoveType MT>
-FORCE_INLINE __m256i* Board::getMove(PieceNo no, Square sq, Piece p, __m256i* mlist)
-{
-    __m256i* start = mlist;
-
-    if (dirty_flag_ & (1ULL << no))
-    {
-        dirty_flag_ ^= 1ULL << no;
-        mlist = generateMoveFrom<T>(bb_, sq, p, mlist);
-        move_cache_[no] = start[0];
-
-        if (mlist - start == 2)
-        {
-            assert(no >= PIECE_NO_BISHOP && no < PIECE_NO_KING);
-            move_cache_[no + 6] = start[1];
-        }
-    }
-    else
-    {
-        *mlist++ = move_cache_[no];
-
-        if (isSlider(p) && isPromoted(p))
-            *mlist++ = move_cache_[no + 6];
-    }
-
-    return mlist;
-}
-#endif
 template <MoveType MT>
-__m256i* generateMoveFrom(const Byteboard& bb, Square from, Piece p, __m256i* mlist)
+MoveStack* generateMoveFrom(const Byteboard& bb, Square from, Piece p, MoveStack* mlist)
 {
     return turnOf(p) == BLACK ? generateMoveFrom<BLACK, MT>(bb, from, p, mlist) : generateMoveFrom<WHITE, MT>(bb, from, p, mlist);
 }
@@ -1527,7 +1397,7 @@ namespace
 {
     // 盤上の駒を動かす手を生成
     template <Turn T, MoveType MT>
-    __m256i* generateOnBoard(const Board& b, __m256i* mlist)
+    MoveStack* generateOnBoard(const Board& b, MoveStack* mlist)
     {
         const Byteboard& bb = b.getByteboard();
         uint64_t bit = b.getExistsPiece(T);
@@ -1538,11 +1408,7 @@ namespace
             assert(from != SQ_MAX);
             Piece p = b.piece(from);
             assert(turnOf(p) == T);
-#ifdef CALC_MOVE_DIFF
-            mlist = b.getMove<T>(i, from, p, mlist);
-#else
             mlist = generateMoveFrom<T, MT>(bb, from, p, mlist);
-#endif
         } while (bit &= bit - 1);
 
         return mlist;
@@ -2208,14 +2074,14 @@ Move* generateDrop(const Board& b, Move* mlist)
 }
 
 template <MoveType MT>
-__m256i* generateOnBoard(const Board& b, __m256i* mlist)
+MoveStack* generateOnBoard(const Board& b, MoveStack* mlist)
 {
     return b.turn() == BLACK ? generateOnBoard<BLACK, MT>(b, mlist) : generateOnBoard<WHITE, MT>(b, mlist);
 }
 
-template __m256i* generateOnBoard<CAPTURE_PLUS_PAWN_PROMOTE>(const Board& b, __m256i* mlist);
-template __m256i* generateOnBoard<NO_CAPTURE_MINUS_PAWN_PROMOTE>(const Board& b, __m256i* mlist);
-template __m256i* generateOnBoard<NO_EVASIONS>(const Board& b, __m256i* mlist);
+template MoveStack* generateOnBoard<CAPTURE_PLUS_PAWN_PROMOTE>(const Board& b, MoveStack* mlist);
+template MoveStack* generateOnBoard<NO_CAPTURE_MINUS_PAWN_PROMOTE>(const Board& b, MoveStack* mlist);
+template MoveStack* generateOnBoard<NO_EVASIONS>(const Board& b, MoveStack* mlist);
 
 Move* generateEvasion(const Board& b, Move* mlist)
 {

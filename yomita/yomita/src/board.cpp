@@ -160,32 +160,6 @@ void Board::init(std::string sfen, Thread* th)
 #endif
 #endif
 #ifdef USE_BYTEBOARD
-#ifdef CALC_MOVE_DIFF
-    __m256i tmp[2];
-
-    for (int i = 0; i < 40; i++)
-    {
-        move_cache_[i] = _mm256_setzero_si256();
-        Square sq = pieceSquare(i);
-
-        if (sq != SQ_MAX)
-        {
-            Piece p = piece(sq);
-            __m256i* rp = generateMoveFrom(bb_, sq, p, tmp);
-            stm_piece_[turnOf(p)] |= 1ULL << i;
-            assert(rp != tmp);
-            move_cache_[i] = tmp[0];
-
-            if (rp - tmp == 2)
-            {
-                assert(i >= PIECE_NO_BISHOP && i < PIECE_NO_KING);
-                move_cache_[i + 6] = tmp[1];
-            }
-        }
-    }
-
-    dirty_flag_ = 0;
-#else
     for (int i = 0; i < 40; i++)
     {
         Square sq = pieceSquare(i);
@@ -193,7 +167,6 @@ void Board::init(std::string sfen, Thread* th)
         if (sq != SQ_MAX)
             stm_piece_[turnOf(piece(sq))] |= 1ULL << i;
     }
-#endif
 #endif
     ss >> ply_;
 
@@ -1038,11 +1011,6 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
 #endif
             st_->continue_check[self] = 0;
         }
-#ifdef USE_BYTEBOARD
-#ifdef CALC_MOVE_DIFF
-        calcMoveDiff<true, false>(SQ_MAX, to);
-#endif
-#endif
     }
     else // 盤上の指し手
     {
@@ -1168,11 +1136,6 @@ void Board::doMove(const Move move, StateInfo& new_st, bool gives_check)
 #endif
             st_->continue_check[self] = 0;
         }
-#ifdef USE_BYTEBOARD
-#ifdef CALC_MOVE_DIFF
-        calcMoveDiff<false, false>(from, to);
-#endif
-#endif
     }
 #ifdef USE_BITBOARD
     bb_gold_ = bbType(GOLD, PRO_PAWN, PRO_LANCE, PRO_KNIGHT, PRO_SILVER);
@@ -1238,11 +1201,6 @@ void Board::undoMove(const Move move)
 #endif
         // 持ち駒を増やす。
         hand_[self].add(pt_to);
-#ifdef USE_BYTEBOARD
-#ifdef CALC_MOVE_DIFF
-        calcMoveDiff<true, true>(SQ_MAX, to);
-#endif
-#endif
     }
     else // 盤の上の指し手
     {
@@ -1299,9 +1257,6 @@ void Board::undoMove(const Move move)
         board_[from] = pc_from;
 #ifdef USE_BYTEBOARD
         bb_.setPieceBit(from, toPieceBit(pc_from));
-#ifdef CALC_MOVE_DIFF
-        calcMoveDiff<false, true>(from, to);
-#endif
 #endif
     }
 #ifdef USE_BITBOARD
@@ -2471,36 +2426,6 @@ bool Board::verify() const
             {
                 std::cout << "stm_piece_[~t] & (1ULL << i)" << std::endl;
                 GOTO_FAILED;
-            }
-        }
-    }
-#endif
-#ifdef CALC_MOVE_DIFF
-    __m256i tmp[2];
-
-    for (int i = 0; i < 40; i++)
-    {
-        Square sq = pieceSquare(i);
-
-        if (sq != SQ_MAX && (dirty_flag_ & (1ULL << i)) == 0)
-        {
-            Piece p = piece(sq);
-            __m256i* rp = generateMoveFrom(bb_, sq, p, tmp);
-            assert(rp != tmp);
-            if (move_cache_[i] != tmp[0])
-            {
-                std::cout << *this << "sq = " << pretty(sq) << "pieceno = " << i << " failed";
-                GOTO_FAILED;
-            }
-
-            if (rp - tmp == 2)
-            {
-                assert(i >= PIECE_NO_BISHOP && i < PIECE_NO_KING);
-                if (move_cache_[i + 6] != tmp[1])
-                {
-                    std::cout << *this << "sq = " << pretty(sq) << "pieceno = " << i + 6 << " failed";
-                    GOTO_FAILED;
-                };
             }
         }
     }

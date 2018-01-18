@@ -212,8 +212,7 @@ Move* generateEvasion(const Board& b, Move* mlist);
 Move* generateRecapture(const Board& b, Move* mlist, const Square sq);
 Move* generateDrop(const Board& b, Move* mlist);
 template <MoveType MT>
-__m256i* generateOnBoard(const Board& b, __m256i* mlist);
-
+MoveStack* generateOnBoard(const Board& b, MoveStack* mlist);
 MoveStack* generateQuietCheck(const Board& b, MoveStack* mlist);
 
 template <MoveType MT>

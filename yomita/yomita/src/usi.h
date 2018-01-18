@@ -163,8 +163,7 @@ namespace USI
 
     // 将棋所で将棋を指せるようにするためのメッセージループ。
     void loop(int argc, char** argv);
-
-    // よく使うので。
+    std::string engineName();
     void isready();
     void setoption(std::istringstream& ss_cmd); 
     void go(const Board& b, std::istringstream& ss_cmd);

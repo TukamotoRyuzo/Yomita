@@ -228,3 +228,4 @@ generated*
 /yomita_engine/evalsave/
 !yomita*.exe
 /yomita_engine/mafu_yokofu.txt
+/yomita_engine/yomita_debug.exe

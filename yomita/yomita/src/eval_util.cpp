@@ -63,17 +63,10 @@ namespace Eval
         { f_king, e_king },
         { f_horse, e_horse }, // 馬
         { f_dragon, e_dragon }, // 龍
-#ifdef CONSIDER_PROMOTION_IN_EVAL
-        { f_pro_pawn, e_pro_pawn }, // 成歩
-        { f_pro_lance, e_pro_lance }, // 成香
-        { f_pro_knight, e_pro_knight }, // 成桂
-        { f_pro_silver, e_pro_silver }, // 成銀
-#else
         { f_gold, e_gold }, // 成歩
         { f_gold, e_gold }, // 成香
         { f_gold, e_gold }, // 成桂
         { f_gold, e_gold }, // 成銀
-#endif
         { BONA_PIECE_ZERO, BONA_PIECE_ZERO }, // 金の成りはない
 
         // 後手から見た場合。fとeが入れ替わる。
@@ -88,17 +81,10 @@ namespace Eval
         { e_king, f_king },
         { e_horse, f_horse }, // 馬
         { e_dragon, f_dragon }, // 龍
-#ifdef CONSIDER_PROMOTION_IN_EVAL
-        { e_pro_pawn, f_pro_pawn }, // 成歩
-        { e_pro_lance, f_pro_lance }, // 成香
-        { e_pro_knight, f_pro_knight }, // 成桂
-        { e_pro_silver, f_pro_silver }, // 成銀
-#else
         { e_gold, f_gold }, // 成歩
         { e_gold, f_gold }, // 成香
         { e_gold, f_gold }, // 成桂
         { e_gold, f_gold }, // 成銀
-#endif
         //{ BONA_PIECE_ZERO, BONA_PIECE_ZERO }, // 金の成りはない
     };
 
@@ -181,7 +167,7 @@ namespace Eval
             return;
         }
 
-        std::string wd = dir_name;
+        std::string wd = dir_name + USI::engineName();
         replace(wd.begin(), wd.end(), '\\', '_');
         replace(wd.begin(), wd.end(), '/', '_');
         std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;

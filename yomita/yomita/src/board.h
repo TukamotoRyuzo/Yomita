@@ -390,17 +390,6 @@ private:
     Square pieceno_to_sq_[PIECE_NO_NB];
     PieceNo sq_to_pieceno_[SQ_MAX];
     uint64_t stm_piece_[TURN_MAX];
-
-#ifdef CALC_MOVE_DIFF
-    // 指し手配列。盤面上の駒だけ。
-    // 竜、馬は256bitに指し手が収まりきらないので、成ることで追加される動きをPieceNo+6番目に入れておく。
-    __m256i move_cache_[PIECE_NO_NB + 4];
-    uint64_t dirty_flag_;
-public:
-    template <bool IsDrop, bool Undo> void calcMoveDiff(Square from, Square to);
-    template <Turn T> __m256i* getMove(PieceNo no, Square sq, Piece p, __m256i* mlist);
-private:
-#endif
 #endif
 #ifdef USE_BITBOARD
     // 手番側の、駒がいる場所が1になっているビットボード

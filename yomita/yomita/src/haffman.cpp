@@ -303,32 +303,6 @@ void Board::setFromPackedSfen(uint8_t data[32])
 #endif
 
 #ifdef USE_BYTEBOARD
-#ifdef CALC_MOVE_DIFF
-    __m256i tmp[2];
-
-    for (int i = 0; i < 40; i++)
-    {
-        move_cache_[i] = _mm256_setzero_si256();
-        Square sq = pieceSquare(i);
-
-        if (sq != SQ_MAX)
-        {
-            Piece p = piece(sq);
-            __m256i* rp = generateMoveFrom(bb_, sq, p, tmp);
-            stm_piece_[turnOf(p)] |= 1ULL << i;
-            assert(rp != tmp);
-            move_cache_[i] = tmp[0];
-
-            if (rp - tmp == 2)
-            {
-                assert(i >= PIECE_NO_BISHOP && i < PIECE_NO_KING);
-                move_cache_[i + 6] = tmp[1];
-            }
-        }
-    }
-
-    dirty_flag_ = 0;
-#else
     for (int i = 0; i < 40; i++)
     {
         Square sq = pieceSquare(i);
@@ -336,7 +310,6 @@ void Board::setFromPackedSfen(uint8_t data[32])
         if (sq != SQ_MAX)
             stm_piece_[turnOf(piece(sq))] |= 1ULL << i;
     }
-#endif
 #endif
     assert(verify());
 }

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "platform.h"
 
 // 教師棋譜の生成時、棋譜からの学習時に定義（評価関数、進行度）
-//#define LEARN
+#define LEARN
 
 // 評価関数。
 // 使用する場合、以下から一つを定義する。
@@ -41,12 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // PP + 手番 + 進行度ボーナス
 //#define EVAL_PPTP
 
-// 評価関数で成り駒を区別する。
-#define CONSIDER_PROMOTION_IN_EVAL
-
 // 縦型Square用のevalファイルを使いたいときに定義する。
 #if defined EVAL_KPPT
-//#define USE_FILE_SQUARE_EVAL
+#define USE_FILE_SQUARE_EVAL
 #endif
 
 // 以下から一つ選択。
@@ -57,11 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // bitboardを使用するときに定義
 #define USE_BITBOARD
-
-// 指し手を差分生成する（遅いので非推奨）
-#ifdef USE_BYTEBOARD
-//#define CALC_MOVE_DIFF
-#endif
 
 // 縦型Squareで作られたハフマン化sfenを読み込みたいときに定義する。
 // 読み込み方が対応するだけで、生成には対応しない。

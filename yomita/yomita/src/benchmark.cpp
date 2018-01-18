@@ -53,7 +53,7 @@ void benchmark(Board& b)
     const vector<string> positions =
     {
         // 5f4e
-        //"startpos moves 5g5f",
+        "startpos moves 5g5f",
         //"sfen l4+N2l/3s1+N3/2S3kpp/2p1pp3/1P1P2P1P/2PGPBg2/1nS2P3/3G1K3/P+r1N1b2L w Gr5pls 143"
         //"startpos moves 7g7f 8c8d 2g2f 8d8e 8h7g 3c3d 7i8h 4a3b 6i7h 2b7g+ 8h7g 3a4b 3i3h 7a7b 9g9f 6c6d 5i6h 7c7d 4i5h 7b6c 4g4f 6c5d 3h4g 5a4a 4g5f 4a3a 3g3f 4c4d 6h7i 6a5b 2i3g 6d6e 1g1f 1c1d 9f9e 8a7c 7i8h B*6d 2h4h 4b4c 4h4i 5b4b 2f2e 3a2b 5h6h 2a3c 5f4g 8e8f 7g8f 6d5e B*7g 5e7g+ 6h7g 7c8e 8f8e 8b8e N*2f 6e6f 6g6f 3c2e 3g2e 8e2e 4i2i 2b3a N*3g 2e8e 4f4e B*5e 2i2g 4d4e B*6a S*4h 4g5f 5e3g+ 2g3g 4h3g 2f3d 4c3d 6a3d+ 8e8a",
         //"startpos moves 7g7f 8c8d 2g2f 8d8e 8h7g 3c3d 7i8h 4a3b 6i7h 2b7g+ 8h7g 3a2b 3i3h 7a6b 4g4f 5a4b 4i5h 7c7d 3h4g 2b3c 5i6h 6b7c 4g5f 7c6d 6g6f 7d7e 6f6e 7e7f 7g7f 6d7c 5h6g 6c6d 6e6d 7c6d P*6e 6d7c",
@@ -64,10 +64,10 @@ void benchmark(Board& b)
         //"startpos moves 7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d3d 2b3c 5i6h 3a2b 3g3f 8f8b 2i3g 3c8h+ 7i8h 2b3c P*8c 8b8c P*8d 8c8b 3d3e 8b8d B*6f 8d8b P*8c",
 
         // △59飛車が詰めろ(19手詰み)
-        //"startpos moves 7g7f 8c8d 5g5f 8d8e 8h7g 7a6b 5f5e 5a4b 2h5h 7c7d 5i4h 6b7c 4h3h 7c6d 7i7h 6a5b 6g6f 7d7e 7f7e 8b8d 3h2h 4b3b 3i3h 6d7e 7g6h P*7f 6h4f 6c6d 5e5d 3a4b 5d5c+ 4b5c P*7b 8e8f 8g8f P*8h 7b7a+ 8h8i+ 7a8a 8d8a P*5d 5c4b P*7c 8a8c 7c7b+ 8i8h 7b7c 8c7c N*6e 8h7h 6e7c+ 7h6i R*7b G*5i 5d5c+ 5i5h 5c5b 5h4i 5b4b 4a4b 3h4i R*8h G*3h G*6a 7b4b+ 3b4b 4f3e P*5b G*5d N*4a 7c6c 2b3a S*5c 5b5c 6c5c 4a5c 3e5c+ 4b4a 5c4c",
+        "startpos moves 7g7f 8c8d 5g5f 8d8e 8h7g 7a6b 5f5e 5a4b 2h5h 7c7d 5i4h 6b7c 4h3h 7c6d 7i7h 6a5b 6g6f 7d7e 7f7e 8b8d 3h2h 4b3b 3i3h 6d7e 7g6h P*7f 6h4f 6c6d 5e5d 3a4b 5d5c+ 4b5c P*7b 8e8f 8g8f P*8h 7b7a+ 8h8i+ 7a8a 8d8a P*5d 5c4b P*7c 8a8c 7c7b+ 8i8h 7b7c 8c7c N*6e 8h7h 6e7c+ 7h6i R*7b G*5i 5d5c+ 5i5h 5c5b 5h4i 5b4b 4a4b 3h4i R*8h G*3h G*6a 7b4b+ 3b4b 4f3e P*5b G*5d N*4a 7c6c 2b3a S*5c 5b5c 6c5c 4a5c 3e5c+ 4b4a 5c4c",
 
         // ▲23銀で21手詰み
-        "sfen lr6+L/2P3gk1/4g4/4pppp1/p8/1Pnp+s1P2/P5SP1/LS7/K7R b BGS2NL6Pbgnp 100",
+        //"sfen lr6+L/2P3gk1/4g4/4pppp1/p8/1Pnp+s1P2/P5SP1/LS7/K7R b BGS2NL6Pbgnp 100",
 
         // 馬を取れば勝ち確定なのに引き分けのスコアを返す局面
         //"sfen 1n2+B3K/l2k2s2/p2pg2+b1/1+rp2g3/5g3/9/1+p+n1+p2+p1/6+n1+p/1+r+p6 w 10p3ln3sg 187",
