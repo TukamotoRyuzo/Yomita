@@ -51,7 +51,7 @@ namespace Learn
     // 評価値を勝率[0,1]に変換する関数
     double winest(Score score) { return sigmoid(static_cast<int>(score) / 600.0); }
 
-    const double LAMBDA = 1.0;
+    const double LAMBDA = 0.5;
     const Score EVAL_LIMIT = (Score)2000;
 
     // 式変形したelmo式
@@ -287,6 +287,9 @@ namespace Learn
         // 評価関数パラメーターの読み込み
         USI::isready();
 
+        // 評価関数パラメーターの勾配配列の初期化
+        Eval::initGrad();
+
         // 局面ファイルをバックグラウンドで読み込むスレッドを起動
         LearnSpace::sr.initReader(thread_num, files);
         LearnSpace::sr.startReader();
@@ -295,9 +298,6 @@ namespace Learn
         // mse計算用にデータ1万件ほど取得しておく。
         if (!LearnSpace::initMse())
             return;
-
-        // 評価関数パラメーターの勾配配列の初期化
-        Eval::initGrad();
 
         std::cout << "init done." << std::endl;
 

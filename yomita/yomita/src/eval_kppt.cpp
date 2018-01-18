@@ -489,7 +489,73 @@ namespace Eval
     }
 
 #if defined LEARN
+#define DIMENSION_DOWN_KPP
+#if defined DIMENSION_DOWN_KPP
+    BonaPiece INV_PIECE[fe_end], MIR_PIECE[fe_end];
+    // 学習のためのテーブルの初期化
+    void evalLearnInit()
+    {
+        int t[] =
+        {
+            f_hand_pawn - 1 , e_hand_pawn - 1 ,
+            f_hand_lance - 1 , e_hand_lance - 1 ,
+            f_hand_knight - 1 , e_hand_knight - 1 ,
+            f_hand_silver - 1 , e_hand_silver - 1 ,
+            f_hand_gold - 1 , e_hand_gold - 1 ,
+            f_hand_bishop - 1 , e_hand_bishop - 1 ,
+            f_hand_rook - 1 , e_hand_rook - 1 ,
+            f_pawn            , e_pawn            ,
+            f_lance           , e_lance           ,
+            f_knight          , e_knight          ,
+            f_silver          , e_silver          ,
+            f_gold            , e_gold            ,
+            f_bishop          , e_bishop          ,
+            f_horse           , e_horse           ,
+            f_rook            , e_rook            ,
+            f_dragon          , e_dragon          ,
+        };
 
+        // 未初期化の値を突っ込んでおく。
+        for (BonaPiece p = BONA_PIECE_ZERO; p < fe_end; ++p)
+        {
+            INV_PIECE[p] = (BonaPiece)-1;
+            MIR_PIECE[p] = (p < fe_hand_end) ? p : (BonaPiece)-1;
+        }
+
+        for (BonaPiece p = BONA_PIECE_ZERO; p < fe_end; ++p)
+        {
+            for (int i = 0; i < 32; i += 2)
+            {
+                if (t[i] <= p && p < t[i + 1])
+                {
+                    Square sq = (Square)(p - t[i]);
+                    BonaPiece q = (p < fe_hand_end) ? BonaPiece(sq + t[i + 1]) : (BonaPiece)(inverse(sq) + t[i + 1]);
+                    INV_PIECE[p] = q;
+                    INV_PIECE[q] = p;
+
+                    // 手駒に関してはmirrorなど存在しない。
+                    if (p < fe_hand_end)
+                        continue;
+
+                    BonaPiece r1 = (BonaPiece)(mirror(sq) + t[i]);
+                    MIR_PIECE[p] = r1;
+                    MIR_PIECE[r1] = p;
+                    BonaPiece p2 = (BonaPiece)(sq + t[i + 1]);
+                    BonaPiece r2 = (BonaPiece)(mirror(sq) + t[i + 1]);
+                    MIR_PIECE[p2] = r2;
+                    MIR_PIECE[r2] = p2;
+                    break;
+                }
+            }
+        }
+
+        for (BonaPiece p = BONA_PIECE_ZERO; p < fe_end; ++p)
+            if (INV_PIECE[p] == (BonaPiece)-1 || MIR_PIECE[p] == (BonaPiece)-1)
+            {
+                assert(false);
+            }
+    }
+#endif
     // 絶対値を抑制するマクロ
 #define SET_A_LIMIT_TO(X,MIN,MAX)  \
     X[0] = std::min(X[0],(MAX));   \
@@ -505,16 +571,44 @@ namespace Eval
     // KPP配列の同じ重みが入るべき場所に同じ値を書き込む。
     void writeKpp(Square k1, BonaPiece p1, BonaPiece p2, ValueKpp value)
     {
+#ifdef DIMENSION_DOWN_KPP
+        BonaPiece mp1 = MIR_PIECE[p1];
+        BonaPiece mp2 = MIR_PIECE[p2];
+        Square mk1 = mirror(k1);
+
+        assert(KPP[k1][p1][p2] == KPP[k1][p2][p1]);
+        assert(KPP[k1][p1][p2] == KPP[mk1][mp1][mp2] || fileOf(k1) == FILE_5);
+        assert(KPP[k1][p1][p2] == KPP[mk1][mp2][mp1] || fileOf(k1) == FILE_5);
+
+        KPP[k1][p1][p2] = value;
+        KPP[k1][p2][p1] = value;
+        KPP[mk1][mp1][mp2] = value;
+        KPP[mk1][mp2][mp1] = value;
+#else
         KPP[k1][p1][p2] = KPP[k1][p2][p1] = value;
+#endif
     }
 
     // 書き込む場所を少なくする目的で、一番若いアドレスを返す。
     uint64_t getKppIndex(Square k1, BonaPiece p1, BonaPiece p2)
     {
         const auto q0 = &KPP[0][0][0];
+#ifdef DIMENSION_DOWN_KPP
+        BonaPiece mp1 = MIR_PIECE[p1];
+        BonaPiece mp2 = MIR_PIECE[p2];
+        Square mk1 = mirror(k1);
+
+        auto q1 = &KPP[k1][p1][p2] - q0;
+        auto q2 = &KPP[k1][p2][p1] - q0;
+        auto q3 = &KPP[mk1][mp1][mp2] - q0;
+        auto q4 = &KPP[mk1][mp2][mp1] - q0;
+
+        return std::min({ q1, q2, q3, q4 });
+#else
         auto q1 = &KPP[k1][p1][p2] - q0;
         auto q2 = &KPP[k1][p2][p1] - q0;
         return std::min(q1, q2);
+#endif
     }
 
     void writeKkp(Square k1, Square k2, BonaPiece p1, ValueKkp value)
@@ -594,6 +688,9 @@ namespace Eval
                         KPPW[k][p1][p2].w[0] = LearnFloatType(KPP[k][p1][p2][0]);
                         KPPW[k][p1][p2].w[1] = LearnFloatType(KPP[k][p1][p2][1]);
                     }
+#if defined DIMENSION_DOWN_KPP
+            evalLearnInit();
+#endif
         }
     }
 
